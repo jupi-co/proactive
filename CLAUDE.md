@@ -17,6 +17,7 @@ Conventions for any Claude session operating this workspace. Full rationale in [
 - **Decisions + lifecycle (`STARTED → FINALIZED → EXECUTED`) → Jupi.**
 
 ## Golden rules
+- **Prefer an installed MCP connector over API-key config** for any service; never ask connector-vs-key when a connector is already present. A skill must not prompt for a concern another skill owns (e.g. the Supermemory container tag belongs to `update-context`, hard-coded — not asked in setup).
 - `act-or-decide` **reads** Facts, never writes them (delegates to `update-context`).
 - **Noise control = confidence × risk gate, not volume caps.** Draft = low risk → act. External send / sensitive recipient (peer < manager < CEO < external) = high risk → decide.
 - **Value-based task selection lives INSIDE act-or-decide** (the coordination-node pass). Only the cheap Scorer is upstream.
