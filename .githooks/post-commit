@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Validate after the fact. The commit has already landed, so this cannot block
+# it — it only surfaces a problem (e.g. an XML tag in a skill description) so
+# the developer knows the produced artifact will fail Cowork's validator.
+if ! "$REPO_ROOT/scripts/validate-plugin.sh"; then
+  echo "post-commit: WARNING — validation failed on the commit that just landed; the zip below will not pass Cowork's validator until it is fixed." >&2
+fi
+
+# Regenerate the uploadable zip(s) from the new HEAD.
+exec "$REPO_ROOT/scripts/package-plugin.sh"

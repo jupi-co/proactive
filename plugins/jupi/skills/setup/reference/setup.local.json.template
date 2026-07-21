@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to the workspace .claude/setup.local.json (gitignored) and fill in. Instance-specific; never commit.",
+  "jupiWorkspace": "<jupi-workspace-slug>",
+  "neonProjectId": "<neon-project-id>",
+  "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
+  "supermemoryOrg": "<supermemory-org-name>",
+  "supermemoryApiKey": "<supermemory-api-key>",
+  "containerTag": "<workspace-slug>",
+  "seedTools": ["gmail", "calendar", "linear"],
+  "crawlWindowDays": 30
+}

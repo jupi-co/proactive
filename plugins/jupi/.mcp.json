@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "Jupi": {
+      "type": "http",
+      "url": "https://apis.jupi.co/mcp"
+    }
+  }
+}
