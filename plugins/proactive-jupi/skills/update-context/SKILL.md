@@ -1,15 +1,20 @@
 ---
 name: update-context
 description: >-
-  Auto-Jupi's context crawler and the ONLY writer of Facts about the user and their world
-  (people, orgs, projects, processes, tools, goals), stored in Supermemory via the connector.
-  Use whenever the brain/context needs building, refreshing, extending, or correcting —
-  "refresh the context", "update the context", "crawl my world", "update-context", or a
-  targeted lookup on one entity requested by act-and-decide. Also launched by the daily
-  routine. Two modes: full (windowed sweep of the connected tools into Supermemory) and
-  targeted (focused lookup on one entity, returns a short summary). Read-only on the tools.
-  Reach for this any time the work is about enriching what Auto-Jupi knows — don't wait for
-  the exact word "skill".
+  Auto-Jupi's context crawler — the single writer of Facts about the user's world (people,
+  orgs, projects, processes, tools, goals), built by reading the user's connected tools
+  (Gmail, Calendar, Linear, and so on) and stored in Supermemory. Use it whenever the goal is
+  to build up, refresh, extend, or correct what Auto-Jupi knows: "update the context",
+  "refresh my context", "crawl my world", "update-context", "the brain feels stale", or an
+  entity lookup such as "who is this person?", "what do we know about this company or
+  project?", "get me up to speed on an account before a meeting". Also runs from the daily
+  routine, and act-and-decide calls it when it needs context on an entity. Two modes: full
+  (windowed sweep of the tools into Supermemory) and targeted (focused lookup on one entity,
+  returns a short summary). Read-only on the tools — it never acts, drafts, or decides. Not
+  for: the initial workspace cold-start (that is setup-proactive-jupi, which then calls
+  this), doing a task or drafting a reply (act-and-decide), or looking up past decisions
+  (search-decisions). Reach for it any time the work is about enriching what Auto-Jupi knows
+  — don't wait for the word "skill".
 disable-model-invocation: false
 ---
 
