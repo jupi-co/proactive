@@ -1,0 +1,77 @@
+---
+name: update-context
+description: >-
+  Auto-Jupi's context crawler and the ONLY writer of Facts about the user and their world
+  (people, orgs, projects, processes, tools, goals), stored in Supermemory via the connector.
+  Use whenever the brain/context needs building, refreshing, extending, or correcting —
+  "refresh the context", "update the context", "crawl my world", "update-context", or a
+  targeted lookup on one entity requested by act-and-decide. Also launched by the daily
+  routine. Two modes: full (windowed sweep of the connected tools into Supermemory) and
+  targeted (focused lookup on one entity, returns a short summary). Read-only on the tools.
+  Reach for this any time the work is about enriching what Auto-Jupi knows — don't wait for
+  the exact word "skill".
+disable-model-invocation: false
+---
+
+# update-context — Auto-Jupi's context crawler
+
+You build and maintain **the brain**: what Auto-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
+
+**Read `references/supermemory.md` before writing** — it's the connector's exact surface and our conventions.
+
+## Store: Supermemory via the connector (connector-simple)
+- **Write** with the `memory` tool (`save`); **read** with `recall`. Both take a `containerTag`.
+- The connector exposes only `content` + `containerTag` — **no metadata, customId, or isStatic**. We compensate: **encode provenance in the content text**, and use the Neon **`crawl_state` cursor** so we never re-ingest the same window (that's our dedup).
+- **Container tag** = one user-level tag from `whoAmI` → **`user_<userId>`**. Call `whoAmI` at run start to get it. (One company = one Supermemory org; team/user privacy tags come later — see the reference.)
+
+## What a Fact looks like
+Every saved memory is a compact, standalone statement with its **type and provenance inline**, so semantic recall carries the structure the connector won't store as metadata:
+
+```
+[<Type>] <entity> — <fact>. (src: <tool> <ref> <date>; <confirmed|inferred>)
+```
+- `[Person] Jane Doe — CPO of Batch; the user's main contact on the Batch pilot. (src: gmail thread 18f… 2026-06-09; confirmed)`
+- `[Org] Batch — Paris CDP; pilot prospect, read-only scope, wants month-end decision proof. (src: linear doc 2026-06-29; confirmed)`
+- `[Person] <user> — CEO & co-founder of Jupi. (src: gmail signature; confirmed)` — durable traits phrased durably.
+
+Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a deduction as certainty** ("probably in Paris" → inferred). **One fact per memory** (entity-centric — Supermemory reconciles + graphs them). Keep it terse and self-contained; `recall` returns these verbatim.
+
+## Types (the ontology)
+**Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-and-decide` turns recurrences into Patterns, not you.
+
+## Incremental crawling — the `crawl_state` cursor
+Each source has a row in Neon `crawl_state` (`source, last_cursor, last_run_at`). This is our dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice.
+- Access `crawl_state` via the **project-scoped `neonConnString`** (from `.claude/setup.local.json`) with a driver (`psql` / `@neondatabase/serverless`) — the same project-scoped path setup uses, **not** the account-wide Neon MCP.
+
+## Modes
+
+### `full` (default) — windowed sweep to build/refresh the brain
+Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budget.
+1. `whoAmI` → container tag. Read `crawl_state` cursors.
+2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once).
+3. For each tool in `seedTools` (from config; default **Gmail + Calendar + Linear**): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
+4. **Advance each cursor** in `crawl_state`.
+5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if stale or duplicated, `forget` + re-`save` the corrected version. This counters connector drift, since we lack `customId` updates.
+6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
+
+### `targeted "<request>"` — focused lookup for act-and-decide
+1. `whoAmI` → tag. `recall` what we already know about the entity — don't re-fetch what's known.
+2. Pull specific **new** content from the relevant tool(s) (filtered search on the entity).
+3. Synthesize + `save` new/updated Facts.
+4. **Return a short synthesized summary (4–6 lines)** to the caller — that's the value; don't just say "done".
+
+## Per-tool exploration (read-only, filtered)
+Explore **what the task asks**, with filters — not exhaustive dumps. Tool names may be namespaced by how each MCP is connected; use whichever the environment exposes (load schemas via ToolSearch as needed).
+- **Gmail** — `search_threads` with `newer_than:` (window) since cursor; `from:/to:/subject:` when targeted. Deep-read only threads worth it. Rich for people, style, topics.
+- **Calendar** — events in the window: recurring meetings → Process + who-works-with-whom; external participants → Person/Org; big future events → Project/Goal.
+- **Linear** — teams, projects (→ Project), cycles/rituals (→ Process), members (→ Person), issues updated since cursor.
+- **Drive / GitHub / Slack** (if in `seedTools`) — docs where the user is author/key contributor; repos touched; threads.
+- If a tool is **unreachable**, note it in the summary and do the most with what's reachable — never fail silently.
+
+## Contract (non-negotiable)
+- **ONLY writer of Facts** (Supermemory). `act-and-decide` reads, never writes.
+- **Read-only** on the tools; no execution; no Jupi `create`/`finalize` (`search-decisions` read-only is OK for context).
+- **Provenance, never invention.**
+
+## When to upgrade beyond the connector
+If `recall` gets noisy (duplicate/contradictory facts) or `act-and-decide` needs structured **filtering/enumeration**, that's the trigger to add the Supermemory **HTTP API** (customId dedup, metadata, isStatic — see the reference). Until then, stay connector-simple.
