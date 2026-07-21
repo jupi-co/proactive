@@ -34,7 +34,7 @@ Ensure these MCP servers are connected (add the server entry if absent, then ver
   - **Neon** — **project-scoped connection string via a driver, NOT the account-wide MCP** (see step 4).
 
 ### 3 · Discover assets → `assets.md`
-Inventory existing **agents/skills** and any **documented rules/playbooks**; register agents for reuse (reuse, not lifecycle). **At Jupi today there are no business rules → record "none", skip rule-discovery.** At a partner, crawl their docs.
+Read the files of the **current project or workspace** to inventory what's already here — scan the **working tree** (the project/repo root if in a project, or the Cowork workspace if in one), **not** the wider computer. Look for: existing **agents/skills** (e.g. `.claude/skills/`, `.claude/agents/`, project plugins), **tool config** (`.mcp.json`, settings), and any **documented rules/playbooks** (READMEs, docs, playbook files). Register discovered agents for reuse (reuse, not lifecycle); record findings in `assets.md`. **At Jupi today there are no business rules → record "none", skip rule-discovery.** At a partner, crawl their docs.
 
 ### 4 · Apply the Neon schema
 Run the bundled `reference/schema.sql` against the project using a driver (`psql` or `@neondatabase/serverless` / `pg`) over the **project-scoped `neonConnString`** — **not** the account-wide Neon MCP, whose OAuth spans every project on the account and would expose any production project. The connection string is scoped to one project: a hard isolation boundary. Idempotent — safe to re-run. Creates `tasks` + `actions` (no separate registry — the decision + its lifecycle live in Jupi).
@@ -58,5 +58,6 @@ Print: which MCPs connected (and any pending OAuth), schema applied, Facts seede
 ## Guardrails
 - **Prefer an installed MCP connector over API-key config** for any service (e.g., Supermemory) — never ask connector-vs-key when a connector is already present.
 - **Never** enter credentials or complete OAuth on the user's behalf — instruct them precisely.
+- **Asset discovery stays within the current project/workspace tree** — read the working directory's files only; never scan the wider filesystem or unrelated personal files.
 - **Default conservative** (draft-only) until trust builds; no external side-effects during setup.
 - `.claude/setup.local.json` is **gitignored** — never commit it or echo secrets.
