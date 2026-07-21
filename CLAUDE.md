@@ -24,5 +24,8 @@ Conventions for any Claude session operating this workspace. Full rationale in [
 - **Closing loop:** the execution trace on the signal *is* the notification; plus at most one optional EXECUTED ping (email/Slack/none).
 - **Guardrails:** default conservative (draft-only) until trust builds. No external side-effect until a decision is settled and runs through the closing loop.
 
+## Setup-skill parity
+`setup-proactive-jupi` re-implements Nick's proven `jupi:setup` (`../jupi-skills-beta/plugins/jupi/skills/setup/SKILL.md`). When editing it, diff against that reference so nothing regresses silently. Capabilities to preserve: **Jupi is the blocking gate** (probe → loop until it answers, never continue without it) · **discover the user's stack** (ask their role/tools — never a hardcoded menu) · **inventory before asking** (a tool is connected iff its calls resolve here; the session can't read "Customize" connectors, so ask to enable-in-Customize before any redundant OAuth) · **pre-authorize for unattended runs** (`dontAsk` settings.json) · **user-visible scheduled routines** · **narrate per-step progress** (✅/🔧/⚠️). *Phase-gated (see IMPLEMENTATION-PLAN §11): actually scheduling the routines and firing a first `act-and-decide` wait on those skills existing.*
+
 ## Practice
 Log build/design decisions to **Jupi** as finalized records as they're made.

@@ -203,12 +203,14 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 
 **Phase 1 — Brain on Supermemory**
 - Integrate Supermemory API; port `update-context` to write facts there; validate against the existing 61-entity dataset as fixtures.
+- Un-gate `setup-proactive-jupi` step 8: now that `update-context` exists, actually create its user-visible daily routine (not just describe it).
 
 **Phase 2 — Backlog pipeline**
 - Parser → Scorer → Backlog → Picker (coordination-node pass).
 
 **Phase 3 — Act-or-Decide + Action Planner**
 - Confidence×risk gate; task→N-actions expansion; recompute-on-settle.
+- Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first run at the end of setup, so onboarding proves the loop end-to-end.
 
 **Phase 4 — Closing loop + notifications**
 - Poll-detect → execute → Slack/email → log → recurse.
