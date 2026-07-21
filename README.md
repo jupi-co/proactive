@@ -11,11 +11,11 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 |---|---|
 | Facts & relationships | **Supermemory** |
 | Asset Map (capability inventory) | **`assets.md`** |
-| Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup/reference/schema.sql`) |
+| Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/schema.sql`) |
 | Decisions + lifecycle (incl. EXECUTED) | **Jupi** |
 
 ## Skills (in the plugin)
-- **`plugins/proactive-jupi/skills/setup`** — cold-start a workspace (connect tools, discover assets, apply the Neon schema, seed the brain, init backlog, cadence + guardrails). **Built.** Invoke with `/setup` once the plugin is installed.
+- **`plugins/proactive-jupi/skills/setup-proactive-jupi`** — cold-start a workspace (connect tools, discover assets, apply the Neon schema, seed the brain, init backlog, cadence + guardrails). **Built.** Invoke with `/setup-proactive-jupi` once the plugin is installed.
 - `plugins/proactive-jupi/skills/update-context` — maintain Facts in Supermemory. *(next)*
 - `plugins/proactive-jupi/skills/act-and-decide` — the automation pipeline. *(later)*
 
@@ -27,4 +27,4 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 - **Test in Cowork:** Claude Desktop → Cowork → Customize → Plugins → Personal → **+** next to "Local uploads" → select `dist/proactive-jupi.zip` (keep the `.zip` extension).
 
 ## Status
-Phase 0. `setup` skill built + packaged (`dist/proactive-jupi.zip`); Neon schema applied to project `sparkling-violet-42081696`; Supermemory connected. **Next:** the `update-context` skill (the step-5 crawl depends on it).
+Phase 0. `setup-proactive-jupi` skill built + packaged (`dist/proactive-jupi.zip`); Neon schema applied to project `sparkling-violet-42081696`; Supermemory connected. **Next:** the `update-context` skill (the step-5 crawl depends on it).

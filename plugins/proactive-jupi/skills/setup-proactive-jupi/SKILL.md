@@ -1,5 +1,5 @@
 ---
-name: setup
+name: setup-proactive-jupi
 description: Cold-start (set up) an Auto-Jupi workspace — connect to Jupi/Neon/Supermemory and the tool MCPs, discover assets, apply the Neon schema, seed the brain with a fresh 1-month crawl of the core tools, initialize the backlog, and set cadence + guardrails. Run once per workspace (re-runnable to refresh). Portable — assumes nothing is pre-connected.
 disable-model-invocation: true
 ---
