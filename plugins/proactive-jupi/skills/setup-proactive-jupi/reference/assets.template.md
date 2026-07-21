@@ -3,19 +3,19 @@
 The system's own capability inventory. **Read in full** by act-or-decide; **hand-editable**. Written/updated by the `setup` skill (steps 2–3). Not in Supermemory.
 
 ## Tools — connected MCPs + action surface
-`Connected` is ticked by setup after a successful probe. `Risk default` seeds the confidence × risk gate.
+`Connected` is ticked by setup after a successful probe.
 
-| Tool | Connected | Action surface (what Auto-Jupi may do) | Risk default |
-|---|---|---|---|
-| Gmail | ☐ | read; draft (low) · send (high — external) | draft-only |
-| Google Calendar | ☐ | read; create/update events | draft-only |
-| Google Drive | ☐ | read; comment; create docs | read-only |
-| Linear | ☐ | read; comment/create/update issues (internal) | draft-only |
-| GitHub | ☐ | read; comment; open PRs (internal) | read-only |
-| Slack | ☐ | read; reply in thread (internal, low) · DM | draft-only |
-| Jupi | ☐ | search / create / finalize decisions | enabled |
-| Supermemory | ☐ | add / search Facts (via MCP) | enabled |
-| Neon | ☐ | backlog / actions tables (via project-scoped conn string) | enabled |
+| Tool | Connected | Action surface (what Auto-Jupi may do) |
+|---|---|---|
+| Gmail | ☐ | read; draft · send (external) |
+| Google Calendar | ☐ | read; create/update events |
+| Google Drive | ☐ | read; comment; create docs |
+| Linear | ☐ | read; comment/create/update issues (internal) |
+| GitHub | ☐ | read; comment; open PRs (internal) |
+| Slack | ☐ | read; reply in thread (internal) · DM |
+| Jupi | ☐ | search / create / finalize decisions |
+| Supermemory | ☐ | add / search Facts (via MCP) |
+| Neon | ☐ | backlog / actions tables (via project-scoped conn string) |
 
 ## Agents / skills — discovered, for reuse
 *(Reuse only, no lifecycle registry.)* Populated by setup step 3.
