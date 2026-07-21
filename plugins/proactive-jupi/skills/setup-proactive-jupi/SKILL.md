@@ -40,7 +40,7 @@ Load `.claude/setup.local.json` (create from the bundled template + collect miss
 
 ### 2b · Discover the user's stack — don't assume it
 **Make no assumption about which tools the user works in.** Do not present a hardcoded list (no fixed "Gmail/Calendar/Drive/Linear/GitHub/Slack" menu).
-- Start from the essentials, asking one at a time: **main communication tool?** (e.g. Gmail / Outlook / Slack / Teams — where their work conversations actually happen), **calendar**, **file/doc storage** (Drive / Notion / Dropbox…). For each, sell the payoff ("I triage what comes in — only what needs you surfaces").
+- Ask the essentials in **one** message (not three round-trips): **main communication tool** (e.g. Gmail / Outlook / Slack / Teams — where their work conversations actually happen), **calendar**, and **file/doc storage** (Drive / Notion / Dropbox…). Give the one-line payoff for each so they answer all three at once ("I triage what comes in — only what needs you surfaces").
 - Then the work-specific tools: ask **"what's your job, and which tools do you live in day to day?"** and connect the ones they actually name (PM/eng → Linear/Jira/GitHub; sales → CRM; design → Figma; support → helpdesk). Skip what they don't use.
 - **For each tool the user confirms:** run a lightweight probe → if missing, pause and tell them exactly what to authorize → re-probe until it responds. Record each in `assets.md` (created from `reference/assets.template.md`) with its **action surface + risk default**, ticking `Connected`. Nothing here except Jupi blocks setup, but every skipped tool is value left on the table — so name the work that disappears once each is on.
 
@@ -52,7 +52,7 @@ Run the bundled `reference/schema.sql` against the project using a driver (`psql
 
 ### 5 · Seed the brain — hand off to `update-context`
 Hand off to the **`update-context`** skill (`full` mode, last `crawlWindowDays` across `seedTools` = Gmail + Calendar + Linear). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
-- *`update-context` is a separate build. Until it exists, setup stops cleanly after step 4 (schema applied).*
+- *`update-context` is a separate build. Until it exists, setup **stops cleanly after step 4**: print the setup report for steps 1–4 and stop. **Do not narrate or walk through steps 6–9** — they don't run yet, so describing them is just noise.*
 
 ### 6 · Initialize the backlog
 Parse recent signals (within the crawl window) into **candidate tasks**; score them (impact × confidence). Insert into Neon `tasks` (status `candidate`).
