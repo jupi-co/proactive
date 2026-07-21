@@ -197,7 +197,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - ✅ 3 build decisions finalized.
 - Confirm the Jupi finalized-status read when it ships (~1–2 days).
 - Rotate the leaked GitHub PAT + Tavily key in `work/.mcp.json`.
-- ✅ Scaffolded `proactive/` as a **Claude plugin** (marketplace `auto-jupi`, plugin `jupi`, per jupi-skills PR #7): `setup` skill at `plugins/jupi/skills/setup/` with bundled `reference/schema.sql`; packaging + validate scripts + `post-commit` hook; `dist/jupi.zip` builds for Cowork **Local uploads**.
+- ✅ Scaffolded `proactive/` as a **Claude plugin** (marketplace `auto-jupi`, plugin `proactive-jupi`, per jupi-skills PR #7): `setup` skill at `plugins/proactive-jupi/skills/setup/` with bundled `reference/schema.sql`; packaging + validate scripts + `post-commit` hook; `dist/proactive-jupi.zip` builds for Cowork **Local uploads**.
 - ✅ Exercised `/setup` partway: Gmail/Calendar/Linear/Drive/Jupi probed; **Supermemory connected via MCP**; **Neon schema applied** to `sparkling-violet-42081696` via project-scoped conn string (not the account-wide MCP).
 - **Next: `update-context` skill**, then finish `/setup` steps 5–8 (the fresh 30-day Gmail+Cal+Linear crawl into Supermemory).
 

@@ -11,20 +11,20 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 |---|---|
 | Facts & relationships | **Supermemory** |
 | Asset Map (capability inventory) | **`assets.md`** |
-| Task backlog + actions | **Neon Postgres** (schema: `plugins/jupi/skills/setup/reference/schema.sql`) |
+| Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup/reference/schema.sql`) |
 | Decisions + lifecycle (incl. EXECUTED) | **Jupi** |
 
 ## Skills (in the plugin)
-- **`plugins/jupi/skills/setup`** — cold-start a workspace (connect tools, discover assets, apply the Neon schema, seed the brain, init backlog, cadence + guardrails). **Built.** Invoke with `/setup` once the plugin is installed.
-- `plugins/jupi/skills/update-context` — maintain Facts in Supermemory. *(next)*
-- `plugins/jupi/skills/act-and-decide` — the automation pipeline. *(later)*
+- **`plugins/proactive-jupi/skills/setup`** — cold-start a workspace (connect tools, discover assets, apply the Neon schema, seed the brain, init backlog, cadence + guardrails). **Built.** Invoke with `/setup` once the plugin is installed.
+- `plugins/proactive-jupi/skills/update-context` — maintain Facts in Supermemory. *(next)*
+- `plugins/proactive-jupi/skills/act-and-decide` — the automation pipeline. *(later)*
 
 ## Plugin (local Cowork testing)
-`proactive/` is packaged as a Claude plugin (marketplace `auto-jupi`, plugin `jupi`), following jupi-skills.
-- **Build:** `bash scripts/package-plugin.sh` → `dist/jupi.zip` (gitignored).
+`proactive/` is packaged as a Claude plugin (marketplace `auto-jupi`, plugin `proactive-jupi`), following jupi-skills.
+- **Build:** `bash scripts/package-plugin.sh` → `dist/proactive-jupi.zip` (gitignored).
 - **Validate:** `bash scripts/validate-plugin.sh` (fails on an invalid manifest or `<…>` tags in a skill description — Cowork rejects those).
 - **Auto-build on commit:** `bash scripts/install-hooks.sh` once; the `post-commit` hook then validates + rebuilds `dist/*.zip`.
-- **Test in Cowork:** Claude Desktop → Cowork → Customize → Plugins → Personal → **+** next to "Local uploads" → select `dist/jupi.zip` (keep the `.zip` extension).
+- **Test in Cowork:** Claude Desktop → Cowork → Customize → Plugins → Personal → **+** next to "Local uploads" → select `dist/proactive-jupi.zip` (keep the `.zip` extension).
 
 ## Status
-Phase 0. `setup` skill built + packaged (`dist/jupi.zip`); Neon schema applied to project `sparkling-violet-42081696`; Supermemory connected. **Next:** the `update-context` skill (the step-5 crawl depends on it).
+Phase 0. `setup` skill built + packaged (`dist/proactive-jupi.zip`); Neon schema applied to project `sparkling-violet-42081696`; Supermemory connected. **Next:** the `update-context` skill (the step-5 crawl depends on it).

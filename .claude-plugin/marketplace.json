@@ -8,8 +8,8 @@
   "description": "Auto-Jupi — the proactive decision engine (context crawler + act-or-decide + closing loop). Local marketplace for dogfooding and Cowork testing.",
   "plugins": [
     {
-      "name": "jupi",
-      "source": "./plugins/jupi",
+      "name": "proactive-jupi",
+      "source": "./plugins/proactive-jupi",
       "description": "Auto-Jupi proactive engine. Includes the setup skill: cold-start a workspace — connect tools, apply the Neon schema, seed the Supermemory brain, init the backlog, set cadence + guardrails."
     }
   ]
