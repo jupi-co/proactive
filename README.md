@@ -1,6 +1,6 @@
-# Auto-Jupi — `proactive/`
+# Proactive-Jupi — `proactive/`
 
-Workspace + skills for the Auto-Jupi proactive engine (dogfood build). Full design in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+Workspace + skills for the Proactive-Jupi proactive engine (dogfood build). Full design in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
 
 ## What it does
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
@@ -10,7 +10,7 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 | Store | Home |
 |---|---|
 | Facts & relationships | **Supermemory** |
-| Asset Map (capability inventory) | **`assets.md`** |
+| Asset Map (capability inventory) | **`proactive-jupi/assets.md`** |
 | Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/schema.sql`) |
 | Decisions + lifecycle (incl. EXECUTED) | **Jupi** |
 
@@ -20,7 +20,7 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 - `plugins/proactive-jupi/skills/act-and-decide` — the automation pipeline. *(later)*
 
 ## Plugin (local Cowork testing)
-`proactive/` is packaged as a Claude plugin (marketplace `auto-jupi`, plugin `proactive-jupi`), following jupi-skills.
+`proactive/` is packaged as a Claude plugin (marketplace `proactive-jupi`, plugin `proactive-jupi`), following jupi-skills.
 - **Build:** `bash scripts/package-plugin.sh` → `dist/proactive-jupi.zip` (gitignored).
 - **Validate:** `bash scripts/validate-plugin.sh` (fails on an invalid manifest or `<…>` tags in a skill description — Cowork rejects those).
 - **Auto-build on commit:** `bash scripts/install-hooks.sh` once; the `post-commit` hook then validates + rebuilds `dist/*.zip`.
