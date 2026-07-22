@@ -56,7 +56,7 @@ Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budg
 2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once).
 3. For each tool in `seedTools` (from config; default **Gmail + Calendar + Linear**): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
 4. **Advance each cursor** in `crawl_state`.
-5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if stale or duplicated, `forget` + re-`save` the corrected version. This counters connector drift, since we lack `customId` updates.
+5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
 
 ### `targeted "<request>"` — focused lookup for act-and-decide
