@@ -1,7 +1,7 @@
 {
   "skill_name": "update-brain",
   "container_tag": "user_eval_scratch",
-  "note": "Every run writes ONLY to container_tag. full-mode tasks must also use crawl_state sources prefixed 'eval-'. Run purge-scratch.sh after.",
+  "note": "Every run writes ONLY to container_tag. full-mode tasks must also isolate the Neon cursor with is_eval=true (db.mjs advance-cursor brain <source> <cursor> eval). Run purge-scratch.sh after.",
   "evals": [
     {
       "id": 1,
@@ -18,8 +18,8 @@
     {
       "id": 3,
       "mode": "full",
-      "prompt": "full: refresh context from the last 14 days across Gmail + Calendar + Linear. Eval-isolated: write to container user_eval_scratch and use crawl_state sources prefixed 'eval-'.",
-      "expected": "A budget announced up front; several Facts across types (Person/Org/Project/Process); eval-prefixed cursors advanced (real ones untouched); a summary of what was drained + pushed."
+      "prompt": "full: refresh context from the last 14 days across Gmail + Calendar + Linear. Eval-isolated: write to container user_eval_scratch and isolate cursors with is_eval=true.",
+      "expected": "A budget announced up front; several Facts across types (Person/Org/Project/Process); is_eval=true cursors advanced (real ones untouched); a summary of what was drained + pushed."
     }
   ]
 }

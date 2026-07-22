@@ -15,7 +15,7 @@ The system's own capability inventory. **Read in full** by act-or-decide; **hand
 | Slack | ☐ | read; **reply in thread** (internal, low) · DM | draft-only |
 | Jupi | ☑ | search / create / finalize decisions | enabled |
 | Supermemory | ☑ | add / search Facts (via MCP) | enabled |
-| Neon | ☐ | backlog / actions tables (via project-scoped conn string, **not** the account-wide MCP) | enabled |
+| Neon | ☑ | `tasks` / `actions` / `crawl_state` tables (via project-scoped conn string + `shared/db.mjs`, **not** the account-wide MCP) | enabled |
 
 *Probed 2026-07-21: Gmail, Calendar, Linear, Drive, Jupi, Supermemory respond. Linear teams: Jupi / GTM / Tech. Primary calendar `a@jupi.co` (Europe/Paris). Supermemory user `a@jupi.co`, default project. **Neon access = project-scoped connection string via a driver, NOT the Neon MCP** — the MCP's account-wide OAuth would expose Jupi production; the conn string is scoped to project `sparkling-violet-42081696` only. GitHub + Slack not needed for the core-subset seed.*
 

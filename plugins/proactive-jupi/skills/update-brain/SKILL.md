@@ -43,18 +43,17 @@ Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-and-decide` turns recurrences into Patterns, not you.
 
 ## Incremental crawling — the `crawl_state` cursor
-Each `(user_id, source)` has a row in Neon `crawl_state` (`user_id, source, last_cursor, last_run_at`). This is our dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice.
-- Access `crawl_state` via the **project-scoped `neonConnString`** (from `.claude/setup.local.json`) with a driver (`psql` / `@neondatabase/serverless`) — the same project-scoped path setup uses, **not** the account-wide Neon MCP.
-- **Scope every `crawl_state` read and write by `user_id` = `jupiUserId`** — the same id behind the container tag `user_<jupiUserId>`. The PK is `(user_id, source)`, so `select … where user_id = $1 and source = $2` and an upsert on that key. Without the `user_id` predicate a shared DB would cross users' cursors — one user's advance would suppress another's crawl.
+Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.
+- Access via the shared helper: `node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" get-cursor brain <source> [eval]` and `advance-cursor brain <source> <cursor> [eval]`. It reads the project-scoped `neonConnString` **and** `jupiUserId` from config and **scopes every query by `user_id` automatically** (the same id behind your container tag `user_<jupiUserId>`) — so you never hand-write SQL, never pass the user id, and never touch the account-wide Neon MCP. Without that scoping a shared DB would cross users' cursors; the helper guarantees it. *(First run: `npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared"` if `node_modules` is absent.)*
 
 ## Modes
 
 ### `full` (default) — windowed sweep to build/refresh the brain
 Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budget.
-1. Read `jupiUserId` from config → container tag `user_<jupiUserId>` + `user_id`. Read this user's `crawl_state` cursors (`where user_id = $1`).
+1. Read `jupiUserId` from config → container tag `user_<jupiUserId>`. Read your cursors via `db.mjs get-cursor brain <source>` (user-scoped automatically).
 2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once).
 3. For each tool in `seedTools` (from config; default **Gmail + Calendar + Linear**): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
-4. **Advance each cursor** in `crawl_state` — upsert on `(user_id, source)`.
+4. **Advance each cursor** — `db.mjs advance-cursor brain <source> <cursor>` (user-scoped automatically).
 5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
 
