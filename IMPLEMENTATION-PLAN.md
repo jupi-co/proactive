@@ -208,9 +208,10 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 **Phase 2 — Backlog pipeline** *(detailed plan: [PHASE-2-PLAN.md](PHASE-2-PLAN.md))*
 - Parser → Scorer → Backlog. **Ends at a scored, deduped, ordered top-window** (`query-window`). **No separate Picker** — the coordination-node pass is act-or-decide's opening move (Phase 3), per §4. Built as a standalone `refresh-backlog` skill + a shared `plugins/proactive-jupi/shared/` (`schema.sql`, `db.mjs`, `signal-sources.md`); scorer axes are impact × relevance × urgency; un-gates `setup-proactive-jupi` step 7.
 
-**Phase 3 — Act-or-Decide + Action Planner**
-- **Coordination-node pass** (value-based selection over the top-window) as act-or-decide's opening move; confidence×risk gate; task→N-actions expansion; recompute-on-settle.
-- Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first run at the end of setup, so onboarding proves the loop end-to-end.
+**Phase 3 — Act-or-Decide + Action Planner** → detailed plan: [PHASE-3-PLAN.md](PHASE-3-PLAN.md)
+- **Coordination-node pass** (value-based selection over the top-window) as act-or-decide's opening move; confidence×risk gate (configurable policy matrix); task→N-actions expansion; recompute-on-settle.
+- Three-level safety ladder: `--dry-run` (classify only) → `draft` mode (default, drafts + private decisions) → `perform` mode.
+- Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
 
 **Phase 4 — Closing loop + notifications**
 - Poll-detect → execute → Slack/email → log → recurse.
