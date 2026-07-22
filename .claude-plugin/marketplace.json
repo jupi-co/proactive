@@ -1,16 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "auto-jupi",
+  "name": "proactive-jupi",
   "owner": {
     "name": "Jupi",
     "email": "a@jupi.co"
   },
-  "description": "Auto-Jupi — the proactive decision engine (context crawler + act-or-decide + closing loop). Local marketplace for dogfooding and Cowork testing.",
+  "description": "Proactive-Jupi — the proactive decision engine (context crawler + act-or-decide + closing loop). Local marketplace for dogfooding and Cowork testing.",
   "plugins": [
     {
       "name": "proactive-jupi",
       "source": "./plugins/proactive-jupi",
-      "description": "Auto-Jupi proactive engine. Includes the setup skill: cold-start a workspace — connect tools, apply the Neon schema, seed the Supermemory brain, init the backlog, set cadence + guardrails."
+      "description": "Proactive-Jupi proactive engine. Includes the setup skill: cold-start a workspace — connect tools, apply the Neon schema, seed the Supermemory brain, init the backlog, set cadence + guardrails."
     }
   ]
 }
