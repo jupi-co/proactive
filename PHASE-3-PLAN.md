@@ -20,8 +20,9 @@ The **`act-and-decide`** skill. It refreshes the backlog (Phase 2's `refresh-bac
 (`query-window`), and **clusters it by shared open-question** — tasks that share a question cluster together; a task
 with no open question is a cluster of one. It ranks clusters by **leverage** (value unblocked per decision) and, for the
 top ones within a per-run **budget**, **researches once**, then **gates** each resulting action on **confidence ×
-exposure**: it **acts** (confident + low exposure) or **posts one Jupi decision** (a genuine open question), where a
-single decision can gate actions across **every task in the cluster** — the coordination node. Acting is governed by a
+exposure**: it **acts** (confident + low exposure) or **posts a Jupi decision** (an open question, or a high-exposure
+action it shouldn't fire alone), where a single decision can gate actions across **every task in the cluster** — the
+coordination node. Acting is governed by a
 **draft-mode switch** (draft vs. perform) and previewable via a **dry-run flag** (classify only, touch nothing). The V1
 producer↔validator gate is retained. This closes the roadmap item "un-gate `setup-proactive-jupi`: create the
 `act-and-decide` routine and fire one first run at the end of setup."
@@ -37,7 +38,7 @@ producer↔validator gate is retained. This closes the roadmap item "un-gate `se
 | P3-3 | Draft mode | **Global switch, gate always applies** — `draft`/`perform`; draft caps every act at its draft verb (drops exposure → more ACT); perform still routes high-exposure to DECIDE. **Draft is Phase 3-operational; perform's real-execution path activates with Phase 4's executor (§4, §14).** |
 | P3-4 | Confidence | **Binary, from `open_questions`** — none ⇒ `high` (act-eligible); a genuine open question ⇒ `low` ⇒ DECIDE. Runtime, not persisted. *(Phase 5 rules will empty open-questions upstream — §14.)* |
 | P3-5 | Second axis | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. Stored column stays `actions.risk` (§10). |
-| P3-6 | Decision kind | **One in Phase 3: _approach_** (low confidence, "which way?"). The _authorization_ variant (high confidence + high exposure, "do exactly this?") never fires in draft-default → deferred as a perform-mode note. |
+| P3-6 | Decision mechanism | **One mechanism** — the DECIDE branch always posts a Jupi decision (Phase 3). Its options read as *"which approach?"* (low confidence) or *"do exactly this / hold / modify"* (high confidence + high exposure that can't be drafted) — option *content*, not separate machinery. Both occur in Phase 3; only *executing* a chosen action is Phase 4. |
 | P3-7 | Bound | **One per-run `actBudget`** — research the top-ranked clusters up to it; the rest wait for a later run. |
 
 ---
@@ -76,10 +77,11 @@ Default sits at the safe end, loosens as trust builds (parent §7).
 `--dry-run` short-circuits *before* any write regardless of `mode`, so it previews either policy.
 
 **Timing — Phase 3 is draft-operational; perform activates in Phase 4.** The `mode` switch and its gate semantics are
-*designed* here, and **draft mode fully runs** in Phase 3 (real Gmail/Linear *drafts* + private decisions — no external
-sends). **Perform mode's real-execution path** — firing sends/posts/commits, writing the trace on the signal, the
-EXECUTED ping, the `high × high` authorization sign-off — rides on **Phase 4's executor** (the same one the closing loop
-needs) and lights up then. Selecting `perform` before Phase 4 has no executor to run against.
+*designed* here, and **draft mode fully runs** in Phase 3 (real Gmail/Linear *drafts* + private decisions, incl.
+*authorize* decisions for non-draftable high-exposure actions — no external sends). **Perform mode's real-execution
+path** — firing sends/posts/commits/bookings, writing the trace on the signal, the EXECUTED ping — rides on **Phase 4's
+executor** (the same one the closing loop needs) and lights up then. Selecting `perform` before Phase 4 has no executor
+to run against.
 
 ---
 
@@ -90,19 +92,21 @@ Confidence is **one binary value per task** (§3); exposure is tagged **per acti
 ```jsonc
 // guardrails.policy — which cells auto-ACT vs DECIDE. Shipped default is conservative (parent §7).
 {
-  "high": { "low": "act",    "high": "decide" },   // confident + safe → act; confident + exposed → decide*
+  "high": { "low": "act",    "high": "decide" },   // confident + safe → act; confident + exposed → decide (authorize)
   "low":  { "low": "decide", "high": "decide" }     // open question → decide (approach), whatever the exposure
 }
 ```
 
 - **Confidence** — no open question ⇒ `high` ⇒ act-eligible; a live trade-off ⇒ `low` ⇒ DECIDE regardless of exposure
   (the parent §6 "hesitating on what to say → decide" case).
-- **Exposure — draft-first (P3-5).** A **draft exposes nothing** → `low`, whatever the recipient. A real send/post/commit
-  → read `tasks.external`, recipient sensitivity (peer < manager < CEO < external), irreversibility (commit, booking,
-  payment) → `high` when any bites.
-- **\* The `high × high` cell** = confident but exposed. In **draft mode** (default) this never occurs — drafting drops
-  exposure to `low` → ACT. It only bites in **perform mode**, where it becomes an *authorization* sign-off — a
-  perform-mode refinement, **not built in Phase 3** (P3-6).
+- **Exposure — draft-first (P3-5).** A **draft exposes nothing** → `low`. But **draft-first only helps actions that
+  *have* a draft form.** A **non-draftable** action (book a venue, raise an ad budget, submit a payment, merge a PR) is
+  scored by destination directly — `tasks.external`, recipient sensitivity (peer < manager < CEO < external),
+  irreversibility → `high` when any bites.
+- **The `high × high` cell** = confident but exposed → **DECIDE** (an *authorize* decision, posted like any other,
+  Phase 3). It fires in **draft mode** whenever the action **can't be drafted** (draftable ones collapse to `low` → ACT);
+  in **perform mode** it also fires for draftable actions the user opted to send for real. Either way the *decision* is
+  Phase 3; only *executing* the authorized action is Phase 4.
 - **This matrix is the "configurable threshold."** Tighten = flip cells to `decide`; loosen = to `act`. Config, §9.
 
 ---
@@ -110,16 +114,17 @@ Confidence is **one binary value per task** (§3); exposure is tagged **per acti
 ## 6. Draft mode mechanics (P3-3)
 
 `mode:"draft"` transforms the Action Planner's output *before* the gate:
-1. Every action with a draft form is **rewritten to its draft** (`send_email → create_draft`, `post_slack →
-   draft-note`, `merge_pr → draft-PR`).
-2. Drafting sets `exposure = low` → the matrix returns **ACT** for anything confident.
-3. Net: **ready-to-send drafts for nearly everything**; decisions appear only for genuine *approach* trade-offs (low
-   confidence), never for exposure.
+1. Every action **that has a draft form** is **rewritten to its draft** (`send_email → create_draft`, `post_slack →
+   draft-note`, `merge_pr → draft-PR`). Drafting sets `exposure = low` → **ACT** if confident.
+2. **Actions with no draft form don't collapse.** Low-exposure/reversible ones (RSVP, label, search, internal note) act
+   in both modes. **High-exposure non-draftable ones (book a venue, raise a budget, submit a payment) stay `high` even
+   in draft mode → DECIDE** (an authorize decision, §5). Draft mode is *not* "everything acts."
+3. Net: **ready-to-send drafts for most things**; decisions for genuine *approach* trade-offs (low confidence) **and**
+   for high-exposure actions that can't be drafted.
 
-`mode:"perform"` *(activates in Phase 4)*: the Planner emits the real verb; exposure is computed from destination;
-high-exposure confident actions hit the `high × high` cell (the deferred authorization sign-off, §5). The actual firing
-of those real verbs is Phase 4's executor (§4 timing note, §14). Actions with no draft form (RSVP, label, search) are
-intrinsically low-exposure and act in both modes.
+`mode:"perform"` *(executor is Phase 4)*: draftable actions are no longer capped to drafts, so high-exposure ones now
+also hit the `high × high` authorize cell (§5); low-exposure ones fire directly. The *decisions* are Phase 3; *executing*
+the real verbs is Phase 4's executor (§4 timing note, §14).
 
 ---
 
@@ -133,12 +138,14 @@ intrinsically low-exposure and act in both modes.
 | Sharpist brief | high | Create "Sharpist Brief" doc in GTM project | low | **ACT** | — |
 | | | Share the doc with Paul | low | **ACT** | — |
 | Renewal to CEO | high | Draft renewal email to ceo@bigco.com | low | **ACT** | — *(perform mode: send → exposure high → DECIDE)* |
-| Q3 pricing *(3 threads)* | low | *(clustered)* reply to each thread | low | **DECIDE** | "What's our Q3 pricing?" → 3 options, gates **3 tasks** |
+| Book the Q3 offsite venue | high | Reserve venue for 2026-09-15 | high | **DECIDE** | *authorize* → "Book Vault SF for the offsite?" — **no draft form, high exposure** |
+| Q3 pricing *(3 threads)* | low | *(clustered)* reply to each thread | low | **DECIDE** | *approach* → "What's our Q3 pricing?" → 3 options, gates **3 tasks** |
 
 - **Confidence is a task attribute** (blank on continuation rows); **exposure + verdict are per action**.
-- The last row is the **coordination node**: one decision gating actions across three tasks.
-- In **draft-default**, decisions appear only for genuine open questions (the pricing cluster) — exposure alone never
-  forces one. The CEO note shows where perform mode would differ.
+- The pricing row is the **coordination node**: one *approach* decision gating actions across three tasks.
+- The venue row shows a **non-draftable high-exposure** action → an *authorize* decision **even in draft mode** (drafting
+  can't collapse what has no draft). The CEO row shows a *draftable* high-exposure action that draft mode *does* collapse
+  to an ACT (perform mode would make it a DECIDE).
 - Verdict reflects the current `mode`; footer notes mode + policy. Rendered to
   `act-and-decide/runs/run-XXX/report.md`, returned as the caller summary (read-only, in-memory — §10).
 
@@ -161,8 +168,13 @@ never the account-wide MCP (Phase 2 rule); auto-scoped by `user_id`; same npm-bo
 
 - **Boot:** read `assets.md` (Asset Map, in full), `guardrails` config, Jupi slug. Parse run args → `dry_run`, `mode`.
   No tree exploration.
-- **Stage 0 — Refresh + drain the pile:** run `refresh-backlog`; gather `gating_decision_ids` across open tasks, fetch
-  from Jupi, take **FINALIZED-not-yet-EXECUTED**. *Read + recompute here; execute/notify is Phase 4.*
+- **Stage 0 — Refresh + read the pile:** two jobs, V1's "settled work before new work."
+  - **Refresh** *(Phase 3)* — run `refresh-backlog` so the run reasons over a current window.
+  - **Read the pile** *(thin in Phase 3)* — gather `gating_decision_ids` across open tasks, fetch from Jupi, take
+    **FINALIZED-not-yet-EXECUTED**. In Phase 3 this read only (a) feeds Stage 6's recompute so it can be *tested*
+    (materialize/draft a settled decision's chosen option) and (b) stops the run re-posting a decision for a task already
+    awaiting one. The **standing poll + executing settled actions + trace/notify is the Phase 4 closing loop** — Stage 0
+    is not that.
 - **Stage 1 — Read the window:** `db.mjs query-window [backlogWindowSize]`.
 - **Stage 2 — Cluster + rank + bound:** group the window by **shared open-question** (singletons for no-question
   tasks); rank clusters by **leverage** (value unblocked per decision, not per-task score); keep the **top clusters up to
@@ -300,11 +312,12 @@ the question is on record. Acceptable; named so it's a known edge.
 ## 14. Deferred to Phase 4/5 (explicit seam)
 
 - **Phase 4 — closing loop + perform mode.** Scheduled poll-detect; the **executor** (run a chosen option's ACT rows
-  post-settle, write the trace on the signal, one optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to
-  request", parent §8). **Perform mode activates here**: the same executor fires immediate perform-ACTs (real
-  sends/posts/commits), so `mode:"perform"` becomes operational — including the **`high × high` authorization sign-off**
-  (§5) and validator-gated sends (§11). Phase 3 ships and dogfoods **draft-only**; one executor serves both immediate
-  perform-ACTs and the settled-decision closing loop, so it's built once, here.
+  post-settle — including the authorized action from a Phase-3 *authorize* decision — write the trace on the signal, one
+  optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to request", parent §8). **Perform mode activates
+  here**: the same executor also fires immediate perform-ACTs (real sends/posts/commits), so `mode:"perform"` becomes
+  operational, with validator-gated sends (§11). Phase 3 ships and dogfoods **draft-only** and posts the decisions
+  (approach *and* authorize); one executor serves both immediate perform-ACTs and the settled-decision closing loop, so
+  it's built once, here.
 - **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
   running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
   1. Phases 3–4 raise + settle approach decisions → a Jupi log of *"when X, the owner chose Y."*
