@@ -16,13 +16,14 @@
 ## 1. What Phase 3 delivers (one paragraph)
 
 The **`act-and-decide`** skill: it opens by refreshing the backlog (Phase 2's `refresh-backlog` as its cheap upstream
-stage), reads the scored top-window from Neon (`query-window`), runs the **coordination-node pass** to pick the
-highest-value work across the window, gathers deep context (no blind spots), then for each candidate action runs the
-**confidence × risk gate** — **acting** when confident and safe, or **posting a structured Jupi decision** when unsure
-or risky. Acting is governed by a **draft-mode switch** (draft vs. perform) and previewable via a **dry-run flag**
-(classify only, touch nothing). The **Action Planner** expands one task into N parallel `actions` rows in Neon (via new
-`db.mjs` write-verbs), each carrying its `decision_id`/`option_id` and executable instruction, and **recomputes** when a
-decision settles. The V1 producer↔validator gate is retained. This closes the roadmap item "un-gate
+stage), reads the scored top-window from Neon (`query-window`), then runs the **coordination-node pass** — its opening move and
+intellectual core: find the **single decision that resolves the most tasks at once** (the *factorizing* decision) and
+commit the run to that highest-leverage cluster. It gathers deep context (no blind spots), then for each candidate
+action runs the **confidence × risk gate** — **acting** when the task's confidence is high and the action is low-risk,
+or **posting the structured Jupi decision** when unsure or risky. Acting is governed by a **draft-mode switch** (draft vs. perform) and previewable via a **dry-run flag**
+(classify only, touch nothing). The **Action Planner** — downstream of that selection — expands the chosen task(s) into N parallel `actions` rows in
+Neon (via new `db.mjs` write-verbs), each carrying its `decision_id`/`option_id` and executable instruction, and
+**recomputes** every task the settled decision touched. The V1 producer↔validator gate is retained. This closes the roadmap item "un-gate
 `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first run at the end of setup."
 
 ---
@@ -150,7 +151,21 @@ Jupi decision, no draft, no `actions` row inserted. One row per candidate action
 
 ---
 
-## 8. `act-and-decide` anatomy (stages)
+## 8. `act-and-decide` anatomy — the coordination-node pass at its center
+
+**The headline mechanic is not the per-task loop — it's leverage across tasks.** The Scorer already ordered the
+backlog by per-task priority; act-or-decide's job is the thing prioritization *can't* do: find the **single decision
+that resolves the most tasks at once** — the *factorizing* decision, the "coordination node." This is precisely what
+V1 deferred as "an orchestration layer for later," and what the parent §4 diagram puts as act-or-decide's **opening
+move**. The Action Planner and the gate are downstream of it. Concretely, over the window we look for a decision that
+**several windowed tasks share** — e.g. three inbound threads all blocked on *"what's our Q3 pricing?"*: one decision
+unblocks all three. We pick the task **cluster** with the highest such leverage, not the single top-scored task in
+isolation.
+
+**The schema already supports this** (no change): one Jupi `decision_id` can appear in **many tasks'**
+`gating_decision_ids`, and `actions` rows across **different `task_id`s** can carry the **same** `decision_id` /
+`option_id`. So a factorizing decision is one Jupi decision gating a fan of actions spanning multiple tasks — settle it
+once, and Stage 6 recomputes every task it touched.
 
 One skill, explicit stages (parent §4 note). All Neon access is through **`${CLAUDE_PLUGIN_ROOT}/shared/db.mjs`** —
 never hand-written SQL, never the account-wide Neon MCP (Phase 2 house rule); `db.mjs` auto-scopes every verb by
@@ -162,9 +177,20 @@ never hand-written SQL, never the account-wide Neon MCP (Phase 2 house rule); `d
   across open tasks and fetch those decisions from Jupi; take **FINALIZED-not-yet-EXECUTED**. *Phase 3 builds the read
   + recompute (Stage 6); the execute/notify half is Phase 4 (§14).* In dry-run, list what would drain.
 - **Stage 1 — Read the window:** `db.mjs query-window [backlogWindowSize]`.
-- **Stage 2 — Coordination-node pass:** over the window, find the decision/action that **unblocks the most value
-  across tasks** (value-based selection lives *here*, not upstream — parent §4; Phase 2 §6 deliberately left the
-  *global* bottleneck to us). Pick the subject(s).
+- **Stage 2 — Coordination-node pass (the centerpiece):** value-based selection lives *here*, not upstream (parent §4;
+  Phase 2 §6 left the *global* bottleneck to us). Three moves:
+  1. **Light cross-window sketch** — for each windowed task, cheaply sketch *what resolving it would take*: the
+     candidate action(s) and, if it hides a trade-off, the **gating decision** it would raise. Shallow on purpose (no
+     deep dig yet — that's Stage 3); just enough to see structure.
+  2. **Find the coordination node** — look for a **single decision shared by multiple tasks** (the factorizing
+     decision), and for decisions that unblock the highest-value / most-bottlenecked cluster. Leverage = *value
+     unblocked across tasks per decision raised*, not per-task score. One decision resolving three tasks beats three
+     top-scored tasks needing three separate decisions.
+  3. **Select the cluster** — commit the run to that task (or task cluster) and its factorizing decision. Everything
+     downstream (Stages 3–6) operates on the cluster, and a decision raised in Stage 5 can gate actions across **all**
+     tasks in it.
+  *(If nothing factorizes, this degrades gracefully to "take the top-scored task" — the pass never costs correctness,
+  only finds leverage when it exists.)*
 - **Stage 3 — Gather context (no blind spot — carried from V1) + judge task confidence:** for every
   person/org/project/tool the task touches, read Facts (deepen `relevant_facts`); for gaps, delegate to **`update-brain`
   targeted** (never write Facts here — parent golden rule). **Pull ≥10 recent messages in-channel before any message
@@ -190,7 +216,7 @@ never hand-written SQL, never the account-wide Neon MCP (Phase 2 house rule); `d
 
 | # | Deliverable | New / changed |
 |---|---|---|
-| D1 | **`act-and-decide` skill** — `plugins/proactive-jupi/skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. | new |
+| D1 | **`act-and-decide` skill** — `plugins/proactive-jupi/skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. Its **centerpiece is the coordination-node pass** (§8 Stage 2 — the factorizing-decision selection V1 deferred as "an orchestration layer for later"); the Action Planner (Stage 4) and gate (Stage 5) are downstream of it. | new |
 | D2 | **`shared/db.mjs` write-verbs** — the current helper is read/parse-oriented; Phase 3 adds: `insert-action '<json>'`, `set-action-status <id> <status> [trace_ref]`, `set-task-gating <task_id> '<decision_ids[]>'`, `close-task <id> <done\|dropped>`, `list-actions-by-decision <decision_id>` (pile drain). All parameterized, `user_id`-scoped, matching the existing verb style. | changed |
 | D3 | **Gate + draft-mode + dry-run logic** in `SKILL.md` — the §5 matrix lookup, §6 verb-capping, §7 no-write table. | new |
 | D4 | **Config** — `guardrails` block in `setup.local.json` + template (`mode`, `policy`, `executedPing`); reuse existing `backlogWindowSize` for the window (do **not** duplicate). | changed |
@@ -287,7 +313,8 @@ Phase 2 (§5) deferred several V1 behaviors *to Phase 3* — this is where they 
 3. **D4 config** — `guardrails` in template + live `setup.local.json`; skill reads it.
 4. **Stages 0–2** — refresh + pile-read; `query-window`; coordination-node pass.
 5. **Stage 3** — deep-context dig + messaging-history pull (the V1 carry-overs).
-6. **D3 Stage 4–5** — Action Planner (insert actions, tag conf/risk, draft-transform) + the gate (ACT vs DECIDE post).
+6. **D3 Stage 4–5** — Action Planner (insert actions, tag each action's risk, draft-transform) + the gate (pair task
+   confidence × action risk → ACT vs DECIDE post).
 7. **Dry-run** — the table + no-write guarantee (§7, §10).
 8. **D5 validator loop** — wire producer↔validator; extend to gate perform-ACTs.
 9. **Stage 6** — recompute-on-settle *function* (poll/execute deferred to Phase 4).
