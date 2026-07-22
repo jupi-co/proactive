@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to the workspace .claude/setup.local.json (gitignored) and fill in. Instance-specific; never commit.",
+  "_comment": "Copy to the workspace .claude/proactive-jupi.local.json (gitignored) and fill in. Instance-specific; never commit.",
   "jupiWorkspace": "<jupi-workspace-slug>",
   "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + Supermemory; leave blank>",
   "neonProjectId": "<neon-project-id>",

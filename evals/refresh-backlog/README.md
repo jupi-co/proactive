@@ -39,4 +39,4 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
 ## Prerequisites
 - Neon schema applied (`plugins/proactive-jupi/shared/schema.sql`) with the Phase-2 columns.
 - DB helper deps installed: `npm install --prefix plugins/proactive-jupi/shared`.
-- `.claude/setup.local.json` with `neonConnString` (gitignored).
+- `.claude/proactive-jupi.local.json` with `neonConnString` (gitignored).

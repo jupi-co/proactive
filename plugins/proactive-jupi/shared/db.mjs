@@ -25,8 +25,8 @@
 //
 // Config resolution — connection string + tenant id (first hit wins):
 //   1. $NEON_CONN_STRING / $DATABASE_URL  and  $JUPI_USER_ID
-//   2. <cwd>/.claude/setup.local.json  → "neonConnString" / "jupiUserId"
-//   3. walk up from cwd looking for .claude/setup.local.json
+//   2. <cwd>/.claude/proactive-jupi.local.json  → "neonConnString" / "jupiUserId"
+//   3. walk up from cwd looking for .claude/proactive-jupi.local.json
 // EVERY verb is scoped by user_id = jupiUserId — the Jupi-resolved tenant key
 // (setup step 2). Isolation is enforced in the queries, not by the DB grant.
 //
@@ -73,7 +73,7 @@ function loadConfig() {
   let userId = process.env.JUPI_USER_ID || null;
   let dir = process.cwd();
   for (let i = 0; i < 8 && (!connString || !userId); i++) {
-    const p = join(dir, ".claude", "setup.local.json");
+    const p = join(dir, ".claude", "proactive-jupi.local.json");
     if (existsSync(p)) {
       const cfg = JSON.parse(readFileSync(p, "utf8"));
       connString = connString || clean(cfg.neonConnString);
@@ -84,9 +84,9 @@ function loadConfig() {
     dir = up;
   }
   if (!connString)
-    throw new Error("no Neon connection string: set $NEON_CONN_STRING or add neonConnString to .claude/setup.local.json");
+    throw new Error("no Neon connection string: set $NEON_CONN_STRING or add neonConnString to .claude/proactive-jupi.local.json");
   if (!userId)
-    throw new Error("no tenant id: set $JUPI_USER_ID or add jupiUserId to .claude/setup.local.json (setup step 2 resolves it)");
+    throw new Error("no tenant id: set $JUPI_USER_ID or add jupiUserId to .claude/proactive-jupi.local.json (setup step 2 resolves it)");
   return { connString, userId };
 }
 

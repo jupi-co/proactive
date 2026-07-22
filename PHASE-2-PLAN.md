@@ -24,10 +24,10 @@ So Phase 2 = **two cheap, read-only, no-side-effect stages** (Parser, Scorer) + 
 | D2 | **Schema changes** — unique index for dedup, `signal_url`, rename `confidence→relevance`, add `urgency`; edit the single `shared/schema.sql`. | changed |
 | D3 | **`refresh-backlog` skill** — Parser + Scorer stages, `crawl_state` cursors, run-log, robustness, injection-safe. | new |
 | D4 | **Un-gate setup step 7** — invoke `refresh-backlog` instead of prose-describing it. | changed |
-| D5 | **Config** — add `backlogWindowSize` (default 30) to `setup.local.json` + template. | changed |
+| D5 | **Config** — add `backlogWindowSize` (default 30) to `proactive-jupi.local.json` + template. | changed |
 | D6 | **`shared/signal-sources.md`** — per-tool scan recipes, referenced by both `refresh-backlog` and `update-brain` (no drift). | new |
 | D7 | **`evals/refresh-backlog/`** — trigger + behavioral evals (scratch-isolated, matching `evals/update-brain/`) incl. a prompt-injection safety task; then a live 30-day dogfood. | new |
-| D8 | **Doc updates** — §11 roadmap (drop "Picker"), tick Neon `Connected` in `proactive-jupi/assets.md`. | changed |
+| D8 | **Doc updates** — §11 roadmap (drop "Picker"), tick Neon `Connected` in `.proactive-jupi/assets.md`. | changed |
 
 ## 1a. One `schema.sql`, and a home for shared artifacts
 
@@ -103,7 +103,7 @@ Skills can't run parameterized SQL from markdown, and hand-built SQL strings ove
 
 **Plain ESM, no TypeScript.** It's invoked as `node db.mjs <verb> <json>` from the sandbox; a build step (`tsc`/`tsx`) on the routine path buys little against a 4-verb script. Each verb does a small runtime JSON-shape check up front (the real failure mode = a malformed payload from the model).
 
-**`shared/db.mjs`** — Node, `@neondatabase/serverless` over HTTPS/443, reads `neonConnString` from `<workspace>/.claude/setup.local.json`. Verbs (all **parameterized**, never string-interpolated):
+**`shared/db.mjs`** — Node, `@neondatabase/serverless` over HTTPS/443, reads `neonConnString` from `<workspace>/.claude/proactive-jupi.local.json`. Verbs (all **parameterized**, never string-interpolated):
 
 | Verb | SQL shape | Used by |
 |---|---|---|
@@ -124,7 +124,7 @@ Skills can't run parameterized SQL from markdown, and hand-built SQL strings ove
 
 **Job:** turn fresh signals into `candidate` tasks. Cheap, read-only, inclusive.
 
-**Signals scanned** (v1 = the `seedTools`): Gmail threads, Calendar events, Linear issues; GitHub/Slack/Drive when `Connected` in `proactive-jupi/assets.md`. The per-tool scan recipes (`search_threads newer_than:`, `list_events`, `list_issues`, **filtered, never bulk**) live in the shared **`shared/signal-sources.md`** (D6) — the single source both this skill and `update-brain` point to, so they can't drift. Load MCP schemas via ToolSearch as needed.
+**Signals scanned** (v1 = the `seedTools`): Gmail threads, Calendar events, Linear issues; GitHub/Slack/Drive when `Connected` in `.proactive-jupi/assets.md`. The per-tool scan recipes (`search_threads newer_than:`, `list_events`, `list_issues`, **filtered, never bulk**) live in the shared **`shared/signal-sources.md`** (D6) — the single source both this skill and `update-brain` point to, so they can't drift. Load MCP schemas via ToolSearch as needed.
 
 **Bounded by a cursor (cost, not correctness):** reuse the **Neon `crawl_state` table** update-brain already added — "only read newer than `last_cursor`, then advance." Separation is by **explicit columns**: the Parser writes rows with **`consumer='backlog'`** (vs update-brain's `'brain'`) and **`is_eval`** false in real runs, PK `(consumer, source, is_eval)` — so the two crawlers never eat each other's windows and eval runs never touch real cursors. Correctness still comes from the `signal_ref` unique index regardless; the cursor is pure cost control. *(This supersedes both the earlier `cursors.json` idea **and** the interim source-key-suffix convention — explicit columns are the settled shape; `update-brain` was updated to match.)*
 
@@ -182,7 +182,7 @@ score = impact^Wᵢ · relevance^Wᵣ · urgency · bottleneck^W_b        (weigh
 ```
 **Product, not sum, on purpose:** a `low` on any axis tanks the score, so noise dressed as important can't ride up on one axis. **Bottleneck lifts fresh blockers** (a cofounder waiting on your decision today) that age-based urgency alone would bury — the principled fix for "important-but-fresh sinks," no urgency floor hack. All weights/turnaround constants live at the top of `db.mjs`, one-line tunable (bump `Wᵢ` to weight value harder).
 
-**Window = a read, not a write.** "Narrow to a top window" (§103) is realized purely as `query-window K` (`order by score desc limit K`), `K = backlogWindowSize` (default 30, in `setup.local.json`). The Scorer physically selects nothing — it just writes scores; the window materializes when act-or-decide reads. This keeps the backlog whole (audit/dedup) while bounding expensive reasoning.
+**Window = a read, not a write.** "Narrow to a top window" (§103) is realized purely as `query-window K` (`order by score desc limit K`), `K = backlogWindowSize` (default 30, in `proactive-jupi.local.json`). The Scorer physically selects nothing — it just writes scores; the window materializes when act-or-decide reads. This keeps the backlog whole (audit/dedup) while bounding expensive reasoning.
 
 ---
 
