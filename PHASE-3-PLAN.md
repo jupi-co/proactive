@@ -53,9 +53,14 @@ worry is **resolved** — dropped from this revision. What Phase 3 stands on:
 never reasons over a stale window. *(Phase 2 §8 flags a possible future refactor: absorb `refresh-backlog` inline as
 act-and-decide's first stage if run-length argues for it — a Phase-3 option, not required.)*
 
-Terminology fix vs v0.1: the task axis is **`relevance`** (renamed from `confidence` in #8), the noise gate — **not**
-the act-gate confidence. **Act-gate `confidence` lives on `actions`** and is assigned by the Action Planner (§5), never
-read from the task.
+Terminology — **two distinct task-level axes, don't conflate them** (CLAUDE.md):
+- **`relevance`** (Scorer, cheap, upstream; renamed from `confidence` in #8) — the **noise gate**: is this a real,
+  worth-surfacing task? Persisted on `tasks`.
+- **act-gate confidence** (act-or-decide, reasoned, downstream) — **"do I understand this task well enough to handle
+  it autonomously?"** Judged **per task** *after* the deep-context dig (§8 Stage 3), not upstream.
+
+Both are **task-level**. The **only per-action axis is `risk`** (destination — §5). The gate pairs the *task's*
+confidence with each *action's* risk. *(This diverges from Phase 2's `actions.confidence` assumption — see §10.)*
 
 ---
 
@@ -77,8 +82,10 @@ either policy. `mode` only matters on a real (non-dry) run.
 
 ## 5. The gate — a configurable policy matrix (P3-2)
 
-Each candidate **action** (not task) is tagged by the Action Planner with `confidence ∈ {low,med,high}` and
-`risk ∈ {low,high}` (both already `actions` columns). The gate is a lookup into a config-supplied matrix:
+**Confidence is task-level; risk is action-level.** Act-or-decide evaluates **one confidence per task** (after the
+context dig — "do I know how to handle this?"). The Action Planner then tags **each action** with its own `risk`
+(destination). The gate runs **per action**, pairing the parent *task's* confidence with *that action's* risk — a
+lookup into a config-supplied matrix:
 
 ```jsonc
 // guardrails.policy — which cells auto-ACT vs DECIDE. Shipped default is conservative (parent §7).
@@ -92,9 +99,10 @@ Each candidate **action** (not task) is tagged by the Action Planner with `confi
 - **Risk is destination, not verb** (parent §6). Inputs, in order: draft form → `low`; else read **`tasks.external`**
   (shipped for exactly this — external counterparty → lean `high`), recipient sensitivity (peer < manager < CEO <
   external), and irreversibility (commit, booking, payment → `high`). Internal Slack/Linear to a peer → `low`.
-- **Confidence is content/approach certainty** — is there a single obvious way to do it (`high`) or a genuine open
-  question (`low`)? Seeded from the task's `open_questions[].uncertainty_pct` and firmed up during the deep-context dig
-  (§8 Stage 3). *(v1 heuristic — see §13 open items.)*
+- **Confidence is the task's content/approach certainty** — is there a single obvious way to handle this task (`high`)
+  or a genuine open question (`low`)? One value **per task**, seeded from `open_questions[].uncertainty_pct` and firmed
+  up during the deep-context dig (§8 Stage 3). A whole-row `low` (unsure) → every action DECIDEs, regardless of risk —
+  which is exactly the §6 "hesitating on what to say → decide" case. *(v1 heuristic — see §15 open items.)*
 - A **business rule** (Phase 5) can lower a class's effective risk → a DECIDE cell graduates to ACT. Phase 3 **reads**
   `actions.rule_ref` if present but does not author rules.
 - **This matrix is the "configurable threshold."** Tighten = flip cells to `decide`; loosen = flip to `act`. Lives in
@@ -124,14 +132,17 @@ RSVP, a label, a search) are intrinsically low-risk/reversible and act in both m
 `--dry-run` runs the full pipeline (refresh → window → coordination pass → gate) but **stops before any write** — no
 Jupi decision, no draft, no `actions` row inserted. One row per candidate action:
 
-| Task | Action (what would happen) | conf | risk | Verdict | If DECIDE: decision title / options |
+| Task | conf (task) | Action (what would happen) | risk | Verdict | If DECIDE: decision title / options |
 |---|---|---|---|---|---|
-| Reply to Alice re: pricing | Draft email to alice@x.com confirming Tue 2pm | high | low | **ACT** | — |
-| Sharpist brief | Create "Sharpist Brief" doc in GTM project | med | low | **ACT** | — |
-| Renewal outreach to CEO | Send renewal email to ceo@bigco.com | high | high | **DECIDE** | *"How to frame the BigCo renewal?"* → 2 options |
-| Ambiguous Linear triage | Reassign JUPI-530 | low | low | **DECIDE** | *"Who owns JUPI-530?"* → 3 options |
+| Reply to Alice re: pricing | high | Draft email to alice@x.com confirming Tue 2pm | low | **ACT** | — |
+| Sharpist brief | high | Create "Sharpist Brief" doc in GTM project | low | **ACT** | — |
+| | | Share the doc with Paul | low | **ACT** | — |
+| Renewal outreach to CEO | high | Send renewal email to ceo@bigco.com | high | **DECIDE** | *"How to frame the BigCo renewal?"* → 2 options |
+| Ambiguous Linear triage | low | Reassign JUPI-530 | low | **DECIDE** | *"Who owns JUPI-530?"* → 3 options |
 
-- **Grouped by task** so fan-out is visible (one task → several action rows — §8 Stage 4).
+- **Confidence is a task attribute** (one value per task, blank on continuation rows); **risk + verdict are per
+  action**. The Sharpist row shows a task fanning into two actions that share the task's confidence (§8 Stage 4).
+  The Linear row shows how a task-level `low` confidence forces DECIDE even on a low-risk action.
 - The **Verdict** reflects the *current* `mode`, so the table doubles as a preview of a real run. Footer notes the mode
   + the active policy matrix.
 - Rendered to `act-and-decide/runs/run-XXX/report.md` and returned as the caller summary. *(A read-only in-memory
@@ -154,14 +165,16 @@ never hand-written SQL, never the account-wide Neon MCP (Phase 2 house rule); `d
 - **Stage 2 — Coordination-node pass:** over the window, find the decision/action that **unblocks the most value
   across tasks** (value-based selection lives *here*, not upstream — parent §4; Phase 2 §6 deliberately left the
   *global* bottleneck to us). Pick the subject(s).
-- **Stage 3 — Gather context (no blind spot — carried from V1):** for every person/org/project/tool the action
-  touches, read Facts (deepen the task's `relevant_facts`); for gaps, delegate to **`update-brain` targeted** (never
-  write Facts here — parent golden rule). **Pull ≥10 recent messages in-channel before any message draft** (V1
-  messaging rule — Phase 2 explicitly deferred this depth to us).
+- **Stage 3 — Gather context (no blind spot — carried from V1) + judge task confidence:** for every
+  person/org/project/tool the task touches, read Facts (deepen `relevant_facts`); for gaps, delegate to **`update-brain`
+  targeted** (never write Facts here — parent golden rule). **Pull ≥10 recent messages in-channel before any message
+  draft** (V1 messaging rule — Phase 2 deferred this depth to us). **Output one `confidence` for the task** — how sure
+  we are of the approach now that context is in hand.
 - **Stage 4 — Action Planner:** expand the task (+ any settled decisions) into **N concrete parallel actions**, each
-  tagged `tool`, `description` (executable instruction), `confidence`, `risk`. Apply the **draft-mode transform** (§6).
-  Insert via new `db.mjs insert-action` (`status='candidate'`).
-- **Stage 5 — Gate each action (§5):** matrix lookup →
+  tagged `tool`, `description` (executable instruction), and its own **`risk`** (destination). Apply the **draft-mode
+  transform** (§6). Insert via new `db.mjs insert-action` (`status='candidate'`). *(Confidence is the parent task's, not
+  re-judged per action.)*
+- **Stage 5 — Gate each action (§5):** matrix lookup on **(task confidence, action risk)** →
   - **ACT** → (dry-run: table only) · (draft/perform: execute per §4) → `db.mjs set-action-status executed` + `trace_ref`.
   - **DECIDE** → author the Jupi decision (one per real trade-off; V1 HTML format + validator §11), set the option's
     action rows to `pending_decision` with `decision_id`/`option_id` (`db.mjs`), and record `gating_decision_ids` on
@@ -210,9 +223,19 @@ never hand-written SQL, never the account-wide Neon MCP (Phase 2 house rule); `d
 
 ## 10. Schema touchpoints
 
-`shared/schema.sql` **already supports Phase 3** — `actions.confidence/risk/decision_id/option_id/status`
+`shared/schema.sql` **already supports Phase 3** — `actions.risk/decision_id/option_id/status`
 (`candidate|pending_decision|executed|skipped`), `tasks.gating_decision_ids`, `tasks.external`, `tasks.signal_url`,
-`user_id` on both tables all exist. **No migration needed.** Two conventions the skill enforces (behavior, not DDL):
+`user_id` on both tables all exist. **No migration strictly needed.**
+
+**One divergence to resolve (confidence placement).** Phase 2 shipped `actions.confidence` and documented "act-gate
+confidence lives on actions." Per the confirmed model (§3, §5), **confidence is task-level** — so:
+- **Recommended:** add `tasks.act_confidence text check (… low/med/high)` (distinct from the Scorer's `relevance`),
+  written by act-or-decide in Stage 3; treat `actions.confidence` as a **denormalized copy** of the parent task's value
+  (or drop it). One idempotent `alter table tasks add column if not exists act_confidence …` — cheap.
+- **Or:** keep confidence purely **runtime** (act-or-decide recomputes it each run from context; nothing persisted) and
+  leave `actions.confidence` unused. Simpler, but the dry-run table's `conf` column then isn't queryable after the fact.
+
+Two conventions the skill enforces regardless (behavior, not DDL):
 
 - **Dry-run writes nothing** — no `insert-action`, no status flips. Plan computed in-memory, rendered as the table.
 - **Sibling skip on settle** — on finalize, non-selected options' rows → `status='skipped'`; only the selected option's
@@ -294,9 +317,10 @@ Phase 4/5 (§14).
 
 ## 15. Open items / decisions you may want to flip
 
-- **Per-action confidence source** — v1 heuristic: single obvious approach = high; a task `open_questions` entry with
-  high `uncertainty_pct` = low. *Flip:* derive a numeric confidence if the categorical gate misfires (would also
-  enable a scalar threshold, which you declined for now — P3-2).
+- **Task confidence — source + placement.** v1 heuristic: single obvious approach = high; a task `open_questions`
+  entry with high `uncertainty_pct` = low. It's **one judgment per task** (§5), made in Stage 3. Placement is the §10
+  divergence — persist as `tasks.act_confidence` (recommended) vs runtime-only. *Flip:* derive a numeric confidence if
+  the categorical gate misfires (would also enable a scalar threshold, which you declined for now — P3-2).
 - **First setup run = `--dry-run`** (not a live draft run) — proves the loop end-to-end with zero side-effect on first
   contact; the user flips `mode` to `perform` when they trust it. *Flip:* fire a real draft-mode run instead.
 - **`refresh-backlog` invoked by act-and-decide vs. only chained by the routine** — plan assumes act-and-decide
