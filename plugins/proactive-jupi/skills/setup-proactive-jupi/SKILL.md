@@ -27,8 +27,14 @@ Read it; if missing, copy from the bundled `reference/setup.local.json.template`
 
 ## Steps
 
+**Front-load everything that needs a human, then run hands-off.** Steps 1–2b are the **attended prelude** — every key, OAuth consent, and stack question the user must supply happens here, up front. Everything after the **"✋ needs-you done"** boundary (steps 3–8: assets, schema, crawl, backlog, cadence) runs **unattended**, so the user can walk away once the prelude clears. Nothing downstream may introduce a fresh human prompt — anything requiring the user must be pulled forward into the prelude.
+
 ### 1 · Preflight & config
 Load `.claude/setup.local.json` (create from the bundled template + collect missing keys). Confirm the three accounts exist. Stop with a clear checklist if anything's missing.
+- **Validate the Neon `neonConnString` the moment it's collected, and prove the egress path end-to-end** — run a cheap `SELECT 1` over it (HTTPS serverless driver, the exact path step 5 will use). This single probe front-loads **both** human-gated risks step 5 would otherwise hit mid-run:
+  - **Bad credential** — a wrong, expired, or wrong-project string fails here, while the user is present. Re-collect and re-probe until it succeeds.
+  - **Blocked egress** — if the `SELECT 1` is refused (403/timeout on Neon's host), walk step 5's full fallback chain *now*: retry with the sandbox network disabled; if sandbox-disabling is itself disallowed, tell the user to allowlist **`*.neon.tech`** (Admin settings → Capabilities → network access) and re-probe until it clears.
+  Only a string that **both** authenticates **and** completes the round-trip crosses into the unattended phase — so step 5 is guaranteed promptless.
 
 ### 2 · Take inventory of what's already connected — *before* asking for anything
 **Never push a redundant OAuth/connect flow for a tool the user already has.** But note a hard limit: **the session can only see tools whose MCP is loaded here — it usually CANNOT read the user's claude.ai / Cowork "Customize" connectors** (`list_connectors` comes back empty from inside the session; an empty result means "can't see," NOT "nothing installed"). So there are **three** states, not two — handle each differently:
@@ -47,6 +53,8 @@ Load `.claude/setup.local.json` (create from the bundled template + collect miss
 - Then the work-specific tools: ask **"what's your job, and which tools do you live in day to day?"** and connect the ones they actually name (PM/eng → Linear/Jira/GitHub; sales → CRM; design → Figma; support → helpdesk). Skip what they don't use.
 - **For each tool the user confirms:** run a lightweight probe → if missing, pause and tell them exactly what to authorize → re-probe until it responds. Record each in `proactive-jupi/assets.md` (created from `reference/assets.template.md`) with its **action surface**, ticking `Connected`. Nothing here except Jupi blocks setup, but every skipped tool is value left on the table — so name the work that disappears once each is on.
 
+> **✋ needs-you done — the rest runs unattended.** Tell the user plainly: everything requiring their input (config keys, OAuth consents, tool choices, and the Neon credential + egress proven in step 1) is now complete; the remaining steps run on their own and they can step away. No downstream step may introduce a fresh human prompt — if anything environment-specific is still foreseeable, it should have been pulled into the prelude above.
+
 ### 3 · Discover assets → `proactive-jupi/assets.md`
 Read the files of the **current project or workspace** to inventory what's already here — scan the **working tree** (the project/repo root if in a project, or the Cowork workspace if in one), **not** the wider computer. Look for: existing **agents/skills** (e.g. `.claude/skills/`, `.claude/agents/`, project plugins), **tool config** (`.mcp.json`, settings), and any **documented rules/playbooks** (READMEs, docs, playbook files). Register discovered agents for reuse (reuse, not lifecycle); record findings in `proactive-jupi/assets.md`. **At Jupi today there are no business rules → record "none", skip rule-discovery.** At a partner, crawl their docs.
 
@@ -57,9 +65,9 @@ The routines run **unattended** (no human to click "Allow"), so an unconfigured 
 - **Idempotent merge** — union the allow list; never clobber other keys.
 
 ### 5 · Apply the Neon schema
-Run the bundled `reference/schema.sql` against the project over the **project-scoped `neonConnString`** — **not** the account-wide Neon MCP, whose OAuth spans every project on the account and would expose any production project. The connection string is scoped to one project: a hard isolation boundary. Idempotent — safe to re-run. Creates `tasks` + `actions` (no separate registry — the decision + its lifecycle live in Jupi).
+Run the bundled `reference/schema.sql` against the project over the **project-scoped `neonConnString`** — **not** the account-wide Neon MCP, whose OAuth spans every project on the account and would expose any production project. The connection string is scoped to one project: a hard isolation boundary. Idempotent — safe to re-run. Creates `tasks` + `actions` (no separate registry — the decision + its lifecycle live in Jupi). The string was already reachability-checked in step 1, so this runs unattended — any failure here is environment (network egress), not a bad credential.
 - **Prefer the HTTPS serverless driver** (`@neondatabase/serverless`, port 443) over direct Postgres (`psql`, port 5432): 443 is the sandbox-friendly path and the easiest host to allowlist.
-- **If network egress is blocked** — Claude's sandbox refuses Neon's hosts (403/timeout on 5432 and 443) — **don't fail: retry the same apply with the sandbox's network disabled** (the host machine reaches Neon directly; the command is unchanged). It's idempotent and safe. Because step 4 already pre-authorized this apply command, it stays **promptless on every run** (including unattended routines). Only if sandbox-disabling is itself disallowed in this environment, fall back to telling the user to allowlist **`*.neon.tech`** under **Admin settings → Capabilities → network access** and re-run. Either way the conn string is already stored and the schema applies in seconds.
+- **Egress is already proven in step 1** — the same host/port/driver completed a `SELECT 1` during the attended prelude, and any sandbox-disable or `*.neon.tech` allowlist it required is already in place. So this apply inherits a working path and runs **promptless** (step 4 also pre-authorized the command). If egress nonetheless fails here, apply the same fallback — retry with the sandbox network disabled — but treat a *new* block as a regression to flag, not a fresh user prompt: the prelude was supposed to have settled it.
 
 ### 6 · Seed the brain — run `update-brain`
 **Invoke the `update-brain` skill in `full` mode** (it reads `seedTools` + `crawlWindowDays` from config — default Gmail + Calendar + Linear, last 30 days). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
