@@ -1,13 +1,14 @@
 # Proactive-Jupi MVP — Implementation Plan
 
-> **Status:** Draft v0.2 · 2026-07-21 · Owner: Anne-Claire · Living doc.
+> **Status:** Draft v0.3 · 2026-07-22 · Owner: Anne-Claire · Living doc.
 > Reconciles three sources — Nick's value-prop doc, the review-with-Claude, and the running `BRIEF.md` — **with Anne-Claire's architecture diagram as the authority on structure.** Where sources disagreed, this plan follows the review; the divergences (and how to undo each) are in §10.
+> **v0.3:** reconciled §2/§4/§5/§6/§7/§8/§11 with the Phase-3 model refinements — **risk → exposure**, and the **`act-and-decide` (planner) / `execute-actions` (worker) split** (planner writes Neon + Jupi; worker is the only tool-writer; `perform` mode → Phase 4). Details in [PHASE-3-PLAN.md](PHASE-3-PLAN.md).
 
 ---
 
 ## 1. What we are building (one paragraph)
 
-A **proactive engine** that does the user's founder/GTM work ahead of being asked. Incoming **signals** become scored **tasks** in a backlog; a picker selects the task(s) that unlock the most value; for each, the engine either **acts** (when it's confident and the action is low-risk) or **poses a structured Jupi decision** (when it's unsure or the action is risky). Settling a decision triggers execution (the closing loop). Undocumented know-how becomes **business rules** through that same loop, so over time more tasks resolve without asking. v1 dogfoods on the owner's founder/GTM stack; it's built to port to one design partner later.
+A **proactive engine** that does the user's founder/GTM work ahead of being asked. Incoming **signals** become scored **tasks** in a backlog; the coordination-node pass selects the task(s) that unlock the most value (one decision can gate many); for each, the engine either **acts** (when it's confident and the action is low-exposure) or **poses a structured Jupi decision** (when it's unsure or the action is high-exposure). Settling a decision triggers execution (the closing loop). Undocumented know-how becomes **business rules** through that same loop, so over time more tasks resolve without asking. v1 dogfoods on the owner's founder/GTM stack; it's built to port to one design partner later.
 
 ---
 
@@ -23,7 +24,7 @@ A **proactive engine** that does the user's founder/GTM work ahead of being aske
 | A6 | v1 function | **Founder / GTM ops.** |
 | A7 | Delivery surface | **Decisions:** Jupi (+ optional Slack/email ping). **Execution:** traces flow up on the signal itself; at most one optional EXECUTED ping (email/Slack/none). No digest. |
 | A8 | Memory / brain layer | **Supermemory (hosted)** — the Facts & relationships store. |
-| A9 | Noise control | **Confidence × risk gate inside act-or-decide** (not a volume cap). See §6. |
+| A9 | Noise control | **Confidence × exposure gate inside act-or-decide** (not a volume cap). See §6. *(Renamed from "risk" during Phase-3 review — confidence owns "are we right," exposure owns "what's at stake." DB column stays `actions.risk`.)* |
 
 ### Finalized build decisions (Jupi)
 | Fork | Choice | Note |
@@ -64,7 +65,7 @@ LAYER          (signal→task)   (CHEAP: order    (scored tasks)  (top-K by scor
                                                     │    decision unlocking the most  │
                                                     │    value across tasks           │
                                                     │ 2. per candidate action, gate   │
-                                                    │    on confidence × risk:        │
+                                                    │    on confidence × exposure:    │
                                           act ◄─────┤      confident + safe           │
                                                     │      unsure OR risky ───────────┼──► Decision (Jupi)
                                                     └─────────────────────────────────┘         │
@@ -81,6 +82,8 @@ LAYER
 KNOWLEDGE      Facts (Supermemory) · Asset Map · Decision log (= Jupi) · Business rules
 LAYER          └── read by every automation stage; written by update-brain / provisioning / the loops
 ```
+
+> *Diagram note: drawn before two Phase-3 refinements — the **risk → exposure** rename, and the **planner/worker split**. "Act-or-Decide" is the `act-and-decide` planner (writes Neon + Jupi only); "Execute" is the separate `execute-actions` worker. See §4a, §6, and [PHASE-3-PLAN.md](PHASE-3-PLAN.md) §8.*
 
 ### 4a. Where state lives — three homes, by data character
 
@@ -102,11 +105,13 @@ LAYER          └── read by every automation stage; written by update-brain
 
 > **Note — there is no separate "Picker."** Value-based selection (which decision unlocks the most) *requires* deriving the tasks' actions and gating decisions, which is act-or-decide's own reasoning — so it lives **inside** act-or-decide as its opening move (the coordination-node pass). The only thing upstream is the **cheap Scorer**, whose sole job is to order the backlog and narrow to a top window so expensive reasoning doesn't scan the whole backlog every run. Split by **cost**, not by responsibility.
 
-**Two engines still exist**, but the interface between them is the **Knowledge layer**, not a folder:
+**The engines**, interfaced through the **Knowledge layer** + the Neon queue, not a folder:
 - **`update-brain`** — maintains Facts & relationships in **Supermemory** (crawler model: coverage + backlog of topics to investigate).
-- **`act-and-decide`** — the automation pipeline above (parse → score → pick → act-or-decide → plan → execute).
+- **`refresh-backlog`** *(Phase 2)* — signal → scored task (parse → score); the cheap upstream stage.
+- **`act-and-decide`** *(Phase 3, planner)* — cluster → research-once → act-or-decide → plan. **Writes only Neon + Jupi; never touches user tools.**
+- **`execute-actions`** *(Phase 3 draft path / Phase 4 full)* — the **only tool-writer**; runs `ready` action rows (draft or real), triggered at end-of-run and on decision-finalize.
 
-*(Whether the pipeline stages are one skill with clear stages or several specialized skills is an implementation choice — leaning one skill with explicit stages for coherence, revisit if runs get too long.)*
+*(The split by responsibility — planner writes the queue, worker drains it — replaces the earlier "one skill, execute inline" leaning: separating them keeps the planner side-effect-free and lets the closing loop reuse the same worker. See PHASE-3-PLAN §8.)*
 
 ---
 
@@ -114,25 +119,27 @@ LAYER          └── read by every automation stage; written by update-brain
 
 1. **Parser**: signal → a Task (short label + standalone summary + relevant facts + candidate open questions).
 2. **Scorer** *(cheap, upstream)*: impact × confidence, giving the backlog its order and narrowing to a **top window**. No reasoning about decisions here — pure prioritization. This is the only "picking" done outside act-or-decide, and it exists purely to bound cost.
-3. **Act-or-Decide** *(over the window)*: its **opening move is the coordination-node pass** — find the decision that unblocks the most actions across the windowed tasks (value-based selection lives here, not upstream). Then, per candidate action, run the **confidence × risk gate** (§6): act now, or raise the decision.
-4. **Action Planner**: expand the task (+ any settled decisions) into **one or several concrete parallel actions**. The action set is **not fixed** — a settled decision can spawn new actions and new decisions, so it's recomputed as decisions resolve.
-5. **Execute**: run the actions (gated by guardrails), notify, log.
+3. **Act-or-Decide** *(over the window)*: its **opening move is the coordination-node pass** — cluster the windowed tasks by **shared open-question** so one decision can gate actions across many (value-based selection lives here, not upstream). Then, per candidate action, run the **confidence × exposure gate** (§6): mark it `ready` to act, or raise the decision.
+4. **Action Planner**: expand the task (+ any settled decisions) into **one or several concrete parallel actions**, materialized as Neon `actions` rows. The set is **not fixed** — a settled decision can spawn new actions/decisions, recomputed as decisions resolve.
+5. **Execute** *(separate `execute-actions` worker — PHASE-3-PLAN §8b)*: runs the `ready` rows against the user's tools (draft or, in `perform`/Phase 4, real send), notify, log. Triggered at the end of an act-and-decide run and on decision-finalize.
 
 ---
 
-## 6. The confidence × risk gate (act OR decide)
+## 6. The confidence × exposure gate (act OR decide)
 
-The noise control. For each candidate action:
+The noise control. Confidence is **task-level** (do we know how to handle it? — binary: are the open questions empty?); exposure is **per action** (what's at stake if it fires?). For each candidate action:
 
-| | **Low risk** — internal / reversible (draft, label, note, Slack to a peer) | **High risk** — external or sensitive (email to a client, msg to the CEO, commit, irreversible) |
+| | **Low exposure** — internal / reversible (draft, label, note, Slack to a peer) | **High exposure** — external or sensitive (email to a client, msg to the CEO, commit, booking, payment, irreversible) |
 |---|---|---|
-| **High confidence** | **ACT** — just do it | **DECIDE** (or act only if a rule authorizes it) |
-| **Low confidence** | **DECIDE** — content/approach is genuinely open | **DECIDE** |
+| **High confidence** | **ACT** — just do it | **DECIDE** — *authorize* ("do exactly this?"), or act if a rule authorizes it |
+| **Low confidence** | **DECIDE** — *approach* (content/approach is genuinely open) | **DECIDE** |
 
-- *Example:* the reply's content is known → **act**: draft the email (low risk, nothing sent). Hesitating on what to say → **decide**: raise the trade-off.
-- **Risk is mostly about *destination*, not the verb.** Drafting is always low-risk (nothing leaves). The real gate on *send/post* is **internal vs external**: an internal Slack to a peer is low-risk; an external email to a client is high-risk. Refine further by **recipient sensitivity** — peer < manager < CEO < external counterparty. Irreversibility compounds it.
-- A **rule** can lower the effective risk of a class of actions → they graduate from "decide every time" to "act."
+- *Example:* the reply's content is known → **act**: draft the email (drafting exposes nothing). Hesitating on what to say → **decide**: raise the trade-off.
+- **Exposure is draft-first, then destination.** A **draft exposes nothing** → low, whatever the recipient — *but only actions that **have** a draft form collapse this way*. A **non-draftable** high-exposure action (book a venue, raise a budget, submit a payment, merge a PR) stays high even in draft mode → DECIDE. For real sends, refine by **internal vs external**, **recipient sensitivity** (peer < manager < CEO < external), and **irreversibility**.
+- A **rule** (Phase 5) raises **confidence** by pre-empting the open question → a task graduates from "decide every time" to "act." *(Earlier framed as lowering risk; the Phase-3 model routes it through confidence instead.)*
 - Result: the user is interrupted **only for genuine trade-offs.** No artificial per-day cap.
+
+*Phase-3 refinements (PHASE-3-PLAN §5): the gate is a **configurable 2×2** (`guardrails.policy`); the DECIDE verdict just writes a Neon row status (`ready` vs `pending_decision`) — the `act-and-decide` planner never executes; `execute-actions` does (§4a, §11 Phase 3).*
 
 ---
 
@@ -145,7 +152,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 3. **Seed the brain:** run `update-brain` **full** crawl into Supermemory from **the last 1 month** of tool history to start (widen later once the loop is stable) — facts about people, orgs, projects, processes, tools.
 4. **Initialize the backlog:** parse recent signals into candidate tasks; score them.
 5. **Set cadence / triggers:** schedule runs (tie to one recurring ritual; cadence decides the responsiveness).
-6. **Set guardrails:** the initial confidence×risk policy — which action classes may auto-act vs always-decide. **Default conservative** (draft-only), loosen as trust builds.
+6. **Set guardrails:** the initial confidence×exposure policy (the configurable 2×2) — which action classes may auto-act vs always-decide, plus the `mode` (draft/perform) and `actBudget`. **Default conservative** (draft-only), loosen as trust builds.
 
 **Outputs:** connected tools · seeded Supermemory · initial scored backlog · schedule · guardrail config. → I can scaffold this as the first module (see §11).
 
@@ -157,7 +164,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 
 1. **The pile = gated action rows:** for each created decision, its options' actions sit in `actions` with `status='pending_decision'` (`decision_id` + `option_id` set) and the instruction in `description`.
 2. **Detect (pull):** each run, gather `gating_decision_ids` across `open` tasks and fetch those decisions from Jupi; take the **FINALIZED** ones not yet **EXECUTED** (finalized-status read arriving in ~1–2 days). Push later = Jupi POSTs the routine's run endpoint (§ execution model).
-3. **Execute:** run the actions matching the **selected** option (guardrail-gated per §6); skip siblings on other options; then **set the Jupi decision to EXECUTED**.
+3. **Execute** *(the `execute-actions` worker)*: flip the **selected** option's rows `pending_decision → ready`, skip siblings (`skipped`), run them against the tools; then **set the Jupi decision to EXECUTED**. Same worker as immediate acts (PHASE-3-PLAN §8b).
 4. **Trace = the natural notification.** The execution writes its result **on the originating signal itself** — a reply in the Slack thread, the sent email, the Linear comment. That *is* the notification: it flows up naturally to whoever is on that signal. Nothing extra is pushed for it.
 5. **At most one explicit ping** on the FINALIZED→EXECUTED transition, to the user: **email, Slack, or none** (configurable). The only proactive closing notification — no digest, no per-action spam.
 6. **Recurse:** if execution surfaces a new trade-off, raise a new decision.
@@ -182,7 +189,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 
 *"Blend + rescope" = I followed your review. None of these is permanent — here's the one thing to flip to switch each back, so Nick can react without a rebuild.*
 
-- **Human is upstream (sets rules, gets only real trade-offs)**, not a downstream approval inbox. → *Undo:* route every action through a decision instead of the confidence×risk gate.
+- **Human is upstream (sets rules, gets only real trade-offs)**, not a downstream approval inbox. → *Undo:* route every action through a decision instead of the confidence×exposure gate.
 - **We promise conformity, not savings.** → *Undo:* re-surface the ROI estimate to the buyer (the ranking math stays either way).
 - **One function (GTM ops), not five engines.** → *Undo:* widen scope — additive, not a rebuild (engines are bought/borrowed: Claude connectors, Supermemory, skills).
 - **Decisions reach people via Jupi + Slack/email**, not "open Jupi." → *Undo:* turn off the notification layer.
@@ -209,12 +216,15 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Parser → Scorer → Backlog. **Ends at a scored, deduped, ordered top-window** (`query-window`). **No separate Picker** — the coordination-node pass is act-or-decide's opening move (Phase 3), per §4. Built as a standalone `refresh-backlog` skill + a shared `plugins/proactive-jupi/shared/` (`schema.sql`, `db.mjs`, `signal-sources.md`); scorer axes are impact × relevance × urgency; un-gates `setup-proactive-jupi` step 7.
 
 **Phase 3 — Act-or-Decide + Action Planner** → detailed plan: [PHASE-3-PLAN.md](PHASE-3-PLAN.md)
-- **Coordination-node pass** (value-based selection over the top-window) as act-or-decide's opening move; confidence×risk gate (configurable policy matrix); task→N-actions expansion; recompute-on-settle.
-- Three-level safety ladder: `--dry-run` (classify only) → `draft` mode (default, drafts + private decisions) → `perform` mode.
+- **Two skills, split by responsibility (PHASE-3-PLAN §8):** **`act-and-decide`** (the *planner* — writes only Neon + Jupi, never touches user tools) and **`execute-actions`** (the *worker* — the only tool-writer; runs `ready` action rows). The `actions` table is the queue between them.
+- **`act-and-decide`:** cluster the window by **shared open-question** (the coordination node — one decision can gate actions across many tasks; a task with no open question is a cluster of one), rank by leverage, **research each kept cluster once** (bounded by a per-run `actBudget`), then the **confidence × exposure 2×2 gate** (§6) writes either a `ready` row or a Jupi decision. Confidence is binary (open-question or not); exposure is draft-first, then destination.
+- **`execute-actions`:** runs `ready` rows — in Phase 3, the **draft path** only (real Gmail/Linear drafts), triggered at the end of an act-and-decide run. **`perform` mode's real-send path + the on-finalize trigger are Phase 4** (one executor, built once).
+- **Safety ladder:** `--dry-run` (classify only, no writes) → `draft` (default; planner writes rows/decisions, worker drafts) → `perform` (Phase 4).
 - Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
 
-**Phase 4 — Closing loop + notifications**
-- Poll-detect → execute → Slack/email → log → recurse.
+**Phase 4 — Closing loop + notifications** (all in `execute-actions`)
+- Scheduled **poll-detect** of FINALIZED decisions → flip the chosen option's rows `pending_decision → ready` (siblings `skipped`) → run the same worker → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse.
+- **`perform` mode activates here:** the worker's real-send/post/booking path (immediate perform-ACTs and settled-decision actions), with validator-gated sends. One executor extended, not rebuilt.
 
 **Phase 5 — Rule loop**
 - Reactive rule-decisions during execution; owner-approval path → Business rules store.
