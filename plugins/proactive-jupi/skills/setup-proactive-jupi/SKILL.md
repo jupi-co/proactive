@@ -23,7 +23,7 @@ I connect to them and to the tool MCPs, but **the user must complete any OAuth c
 Setup runs **inside the user's existing repo**, so everything Proactive-Jupi owns lives under one **`proactive-jupi/`** folder at the workspace root (`proactive-jupi/assets.md` today; the data trees later) — never scatter files across their tree. Create the folder if missing. The only exception is harness-owned config in `.claude/` (`settings.json` *must* be there; `setup.local.json` by convention).
 
 ## Config — the workspace's `.claude/setup.local.json` (gitignored)
-Read it; if missing, copy from the bundled `reference/setup.local.json.template` into the workspace `.claude/setup.local.json`, then ask the user for any empty key and offer to save. Keys: `jupiWorkspace`, `neonProjectId`, `neonConnString`, `seedTools` (default `["gmail","calendar","linear"]`), `crawlWindowDays` (default `30`). **Never commit this file.** Supermemory needs **no** key here — it uses the installed connector; its container tag is hard-coded by `update-brain`, not configured here.
+Read it; if missing, copy from the bundled `reference/setup.local.json.template` into the workspace `.claude/setup.local.json`, then ask the user for any empty key and offer to save. Keys: `jupiWorkspace`, `neonProjectId`, `neonConnString`, `seedTools` (default `["gmail","calendar","linear"]`), `crawlWindowDays` (default `30`). One key is **resolved, not asked** — `jupiUserId` (the tenant identity; setup writes it in step 2 from the authenticated Jupi caller). **Never commit this file.** Supermemory needs **no** key here — it uses the installed connector; its container tag is hard-coded by `update-brain`, not configured here.
 
 ## Steps
 
@@ -43,6 +43,7 @@ Load `.claude/setup.local.json` (create from the bundled template + collect miss
   3. **Nowhere** → genuine connect flow (guide OAuth / add the server).
 - **Probe, don't assume.** Determine state by whether the tool's calls actually resolve — not by a `.mcp.json` entry (that only wires *local* Claude Code) and not by `list_connectors` (unreliable/empty here).
 - **Jupi is the blocking gate — probe it first.** Jupi is Proactive-Jupi's *only* interface; nothing downstream works without it. Probe with a cheap read-only call (e.g. `search-decisions-tool`, 1 result). If it fails, **STOP** — give the user the exact connect steps, then **re-probe in a loop; do not proceed to the rest of setup until Jupi answers.** (Every other tool is optional and non-blocking — only Jupi hard-stops.)
+- **Resolve the tenant identity here — Jupi is the reference for the userId.** Once Jupi answers, capture the **authenticated caller's Jupi user id** (the same principal Jupi assigns as a decision's default `ownerId`) and cache it as **`jupiUserId`** in `.claude/setup.local.json`. This one id is the single identity across all three stores: it is the Neon `user_id` on every row **and** the brain's Supermemory container tag `user_<jupiUserId>` — never a second source (do not derive identity from Supermemory's `whoAmI`). Resolve once; the routines read it from config.
 - **Then the rest of the required core:** **Supermemory** (the brain). Probe with a cheap read; if missing, guide the connect.
   - **Supermemory** — **use the installed MCP connector by default.** If it's already connected, use it directly and do **not** ask about, or request, an API key. Only if it is *not* connected, instruct the user to add it as a custom MCP server (`https://mcp.supermemory.ai/mcp`, header `Authorization: Bearer sm_<key>`, key from app.supermemory.ai). Prefer installation over API keys.
   - **Neon** — **project-scoped connection string via a driver, NOT the account-wide MCP** (see step 5).
@@ -65,8 +66,9 @@ The routines run **unattended** (no human to click "Allow"), so an unconfigured 
 - **Idempotent merge** — union the allow list; never clobber other keys.
 
 ### 5 · Apply the Neon schema
-Run the bundled `reference/schema.sql` against the project over the **project-scoped `neonConnString`** — **not** the account-wide Neon MCP, whose OAuth spans every project on the account and would expose any production project. The connection string is scoped to one project: a hard isolation boundary. Idempotent — safe to re-run. Creates `tasks` + `actions` (no separate registry — the decision + its lifecycle live in Jupi). The string was already reachability-checked in step 1, so this runs unattended — any failure here is environment (network egress), not a bad credential.
+Run the bundled `reference/schema.sql` against the project over the **project-scoped `neonConnString`** — **not** the account-wide Neon MCP, whose OAuth spans every project on the account and would expose any production project. The connection string is scoped to one project: a hard isolation boundary. Idempotent — safe to re-run. Creates `tasks` + `actions` + `crawl_state` (no separate registry — the decision + its lifecycle live in Jupi). The string was already reachability-checked in step 1, so this runs unattended — any failure here is environment (network egress), not a bad credential.
 - **Prefer the HTTPS serverless driver** (`@neondatabase/serverless`, port 443) over direct Postgres (`psql`, port 5432): 443 is the sandbox-friendly path and the easiest host to allowlist.
+- **Stamp the tenant key `user_id` = the `jupiUserId` resolved in step 2** (Jupi is the reference — the same id behind the brain's container tag `user_<jupiUserId>`). Every row in all three tables carries it, and every query the skills issue filters by it — the project-scoped conn string is a *physical* boundary; `user_id` is the *row-level* one that lets a shared DB (the "matches Jupi's own Postgres, scale with no migration" path) separate users. Bind it as a parameter — never string-interpolate.
 - **Egress is already proven in step 1** — the same host/port/driver completed a `SELECT 1` during the attended prelude, and any sandbox-disable or `*.neon.tech` allowlist it required is already in place. So this apply inherits a working path and runs **promptless** (step 4 also pre-authorized the command). If egress nonetheless fails here, apply the same fallback — retry with the sandbox network disabled — but treat a *new* block as a regression to flag, not a fresh user prompt: the prelude was supposed to have settled it.
 
 ### 6 · Seed the brain — run `update-brain`
@@ -75,7 +77,7 @@ Run the bundled `reference/schema.sql` against the project over the **project-sc
 - If it wrote nothing, or a tool was unreachable, **say so (⚠️)** rather than reporting success.
 
 ### 7 · Initialize the backlog
-Parse recent signals (within the crawl window) into **candidate tasks**; score them (impact × confidence). Insert into Neon `tasks` (status `candidate`).
+Parse recent signals (within the crawl window) into **candidate tasks**; score them (impact × confidence). Insert into Neon `tasks` (status `candidate`), **stamping `user_id` = the step-5 tenant key on every row** (and on any `actions` fanned out from them).
 
 ### 8 · Set cadence / triggers
 Schedule recurring **user-visible** routines: `update-brain` (daily full) and `act-and-decide` (frequent). They must be controllable by the user (create them where the user can see and edit them — a hidden scheduler is not acceptable); tie to one recurring ritual and record the cadence.

@@ -5,11 +5,11 @@
 - **`recall`** — search memories. Params: `query`, `containerTag`, `includeProfile` (default true → also returns a profile summary). **The read path** for act-and-decide.
 - **`memory-graph`** — inspect the relationship graph for a container tag.
 - **`listMemories`**, **`listProjects`** — enumerate.
-- **`whoAmI`** — current user (`userId`, `email`). Use to derive the container tag.
+- **`whoAmI`** — current Supermemory user (`userId`, `email`). Informational only — **not** the identity source: the container tag keys on the canonical `jupiUserId` (see below), not on Supermemory's own `userId`.
 
 ## Container-tag scheme
 - **One company = one Supermemory org** (the connected account).
-- **v1:** a single **user-level tag** = `user_<whoAmI.userId>`. Hard-coded scheme, derived at runtime — never asked, never configured elsewhere.
+- **v1:** a single **user-level tag** = `user_<jupiUserId>`. **Jupi is the reference for the userId** — the `jupiUserId` setup cached in `.claude/setup.local.json`, the same tenant key Neon rows carry, so the brain and the backlog share one identity. The tag *scheme* (`user_<…>`) is hard-coded here (update-brain's concern); the id is read from config, never asked, never derived from Supermemory's `whoAmI`.
 - **Later (privacy — Nick's public-vs-private split):** hierarchical `org_<id>` / `org_<id>_team_<id>` / `org_<id>_team_<id>_user_<id>`. Shared facts get the higher-level tag, private facts the user tag; Supermemory isolates by tag (a user can't read another's).
 
 ## What the connector does NOT give us — and how we compensate

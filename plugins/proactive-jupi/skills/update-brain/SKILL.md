@@ -24,7 +24,7 @@ You build and maintain **the brain**: what Proactive-Jupi knows about the user a
 ## Store: Supermemory via the connector (connector-simple)
 - **Write** with the `memory` tool (`save`); **read** with `recall`. Both take a `containerTag`.
 - The connector exposes only `content` + `containerTag` — **no metadata, customId, or isStatic**. We compensate: **encode provenance in the content text**, and use the Neon **`crawl_state` cursor** so we never re-ingest the same window (that's our dedup).
-- **Container tag** = one user-level tag from `whoAmI` → **`user_<userId>`**. Call `whoAmI` at run start to get it. (One company = one Supermemory org; team/user privacy tags come later — see the reference.)
+- **Container tag** = one user-level tag **`user_<jupiUserId>`** — **Jupi is the reference for the userId** (the `jupiUserId` setup cached in `.claude/setup.local.json`, the same tenant key Neon rows carry). Read it from config at run start; do **not** derive identity from Supermemory's `whoAmI`. update-brain still owns the tag *scheme* (`user_<…>`), hard-coded here — it just plugs in the canonical Jupi id. (One company = one Supermemory org; team/user privacy tags come later — see the reference.)
 - **After each `save`, check the confirmation names your container tag; re-save on mismatch.** The connector can misroute a save into the *wrong* tag — an isolation/privacy risk. Reproduction (2026-07-21): **single-session parallel saves route correctly**; the misroute appears only under **concurrent writes from multiple sessions sharing one Supermemory account**. So you (the single writer of Facts) are safe as long as **no second Facts-writer runs concurrently** — and verifying the confirmed tag is cheap defense-in-depth. See `references/supermemory.md`.
 
 ## What a Fact looks like
@@ -43,22 +43,23 @@ Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-and-decide` turns recurrences into Patterns, not you.
 
 ## Incremental crawling — the `crawl_state` cursor
-Each source has a row in Neon `crawl_state` (`source, last_cursor, last_run_at`). This is our dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice.
+Each `(user_id, source)` has a row in Neon `crawl_state` (`user_id, source, last_cursor, last_run_at`). This is our dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice.
 - Access `crawl_state` via the **project-scoped `neonConnString`** (from `.claude/setup.local.json`) with a driver (`psql` / `@neondatabase/serverless`) — the same project-scoped path setup uses, **not** the account-wide Neon MCP.
+- **Scope every `crawl_state` read and write by `user_id` = `jupiUserId`** — the same id behind the container tag `user_<jupiUserId>`. The PK is `(user_id, source)`, so `select … where user_id = $1 and source = $2` and an upsert on that key. Without the `user_id` predicate a shared DB would cross users' cursors — one user's advance would suppress another's crawl.
 
 ## Modes
 
 ### `full` (default) — windowed sweep to build/refresh the brain
 Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budget.
-1. `whoAmI` → container tag. Read `crawl_state` cursors.
+1. Read `jupiUserId` from config → container tag `user_<jupiUserId>` + `user_id`. Read this user's `crawl_state` cursors (`where user_id = $1`).
 2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once).
 3. For each tool in `seedTools` (from config; default **Gmail + Calendar + Linear**): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
-4. **Advance each cursor** in `crawl_state`.
+4. **Advance each cursor** in `crawl_state` — upsert on `(user_id, source)`.
 5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
 
 ### `targeted "<request>"` — focused lookup for act-and-decide
-1. `whoAmI` → tag. `recall` what we already know about the entity — don't re-fetch what's known.
+1. Read `jupiUserId` from config → tag `user_<jupiUserId>`. `recall` what we already know about the entity — don't re-fetch what's known.
 2. Pull specific **new** content from the relevant tool(s) (filtered search on the entity).
 3. Synthesize + `save` new/updated Facts.
 4. **Return a short synthesized summary (4–6 lines)** to the caller — that's the value; don't just say "done".
