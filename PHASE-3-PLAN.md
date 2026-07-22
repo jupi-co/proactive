@@ -139,13 +139,22 @@ so draft mode caps only *immediate* acts, not the outcome of a decision.
 
 ## 8. Anatomy — two components, the `actions` table between them
 
-**The `actions.status` state machine is the contract.** `act-and-decide` moves rows *into* `ready`/`pending_decision`;
-`execute-actions` moves `ready` *out* to `executed`:
+**Clean ownership: `act-and-decide` owns `tasks.status`; `execute-actions` owns `actions.status`.** Neither writes the
+other's. Two state machines run in lockstep:
 
 ```
-candidate ──gate:ACT──────────────► ready ──execute-actions──► executed
-    └─────gate:DECIDE──► pending_decision ──decision finalize──► ready (chosen) | skipped (siblings)
+TASK   (act-and-decide):  open ──dispositioned──► done (acted) | blocked (decided) | dropped (ruled out)
+                                             blocked ──its decision finalizes──► open  (recompute, Phase 4)
+
+ACTION (both):  candidate ──gate:ACT──► ready ──execute-actions──► executed
+                     └─────gate:DECIDE──► pending_decision ──finalize──► ready (chosen) | skipped (siblings)
 ```
+
+**The task status is the window filter.** `query-window` returns **`status='open'` only** — so the instant
+`act-and-decide` dispositions a task (→ `done`/`blocked`/`dropped`) it leaves the window and is never re-picked. No
+filtering on `gating_decision_ids` or execution is needed; the status carries it. A task is **`blocked`** iff it has any
+`pending_decision` action (≥1 open gating decision); **`done`** once all its actions are `ready`/`executed` with no open
+decision; **`dropped`** if ruled out.
 
 ### 8a. `act-and-decide` — the planner (writes only Neon + Jupi)
 
@@ -154,10 +163,10 @@ MCP; auto-scoped by `user_id`). Clustering is **by open-question, not by task** 
 gated by two decisions and unblocks only when **both** settle (`gating_decision_ids` is an array for this).
 
 - **Boot:** read `assets.md` (in full), `guardrails`, Jupi slug; parse `dry_run`, `mode`. No tree exploration.
-- **Stage 0 — Refresh + read the pile:** run `refresh-backlog` (fresh window); read the statuses of decisions
-  `act-and-decide` previously posted so the run doesn't re-post a decision for a task already awaiting one. *(The standing
-  poll + execution of settled decisions is the Phase 4 closing loop.)*
-- **Stage 1 — Read the window:** `query-window [backlogWindowSize]`.
+- **Stage 0 — Refresh:** run `refresh-backlog` so the run reasons over a current window. **That's all** — because
+  processed tasks are already out of `open` (they're `done`/`blocked`/`dropped`), there's no pile to re-read here.
+  Detecting settled decisions and reopening `blocked` tasks is the **Phase 4 closing loop**, not this stage.
+- **Stage 1 — Read the window:** `query-window [backlogWindowSize]` (returns `status='open'` only — §8 state machine).
 - **Stage 2 — Cluster + rank + bound:** group the window by **shared open-question** (singletons for no-question tasks);
   rank clusters by **leverage** (value unblocked per decision, not per-task score); keep the **top clusters up to
   `actBudget`** (P3-7); the rest wait.
@@ -172,18 +181,22 @@ gated by two decisions and unblocks only when **both** settle (`gating_decision_
   insert the action(s) directly (`decision_id` null, `exposure` tagged), verb per `mode`.
 - **Stage 5 — Gate + emit (status only, no execution):** per action `(confidence × exposure)` → **ACT** sets the row
   `ready`; **DECIDE** authors the Jupi decision (V1 HTML + validator §11) and leaves its rows `pending_decision` with
-  `gating_decision_ids` set. Resolve tasks `done`/`dropped` (a ruled-out task → `dropped`, the V1 `_ruled-out` memory).
-  In dry-run, none of this writes — it renders the §7 table.
+  `gating_decision_ids` set. **Then set the task's status** (act-and-decide owns it, §8): **`blocked`** if it has any
+  `pending_decision` action, else **`done`** (acted / nothing to do); a ruled-out task → **`dropped`** (the V1
+  `_ruled-out` memory). This is what removes it from the `open` window. In dry-run, none of this writes — it renders the
+  §7 table.
 - **Hand-off:** on a real (non-dry) run, invoke **`execute-actions`** on the rows just set `ready` (trigger *a*).
 
 ### 8b. `execute-actions` — the worker (the only tool-writer)
 
-Dead-simple: **`SELECT ready rows; run each; mark `executed` + `trace_ref`.`** Runs the verb the row carries — draft
-(Phase 3) or real send (perform, Phase 4). Two triggers, same core:
+Dead-simple: **`SELECT ready rows; run each; mark `executed` + `trace_ref`.`** It touches **only `actions.status`** —
+never `tasks.status` (that's act-and-decide's, §8). Runs the verb the row carries — draft (Phase 3) or real send
+(perform, Phase 4). Two triggers, same core:
 - **(a) end of an `act-and-decide` run** — the immediate ACTs just queued.
 - **(b) decision finalize** *(Phase 4 closing loop)* — flip the chosen option's rows `pending_decision → ready`, siblings
-  → `skipped`, then run. If executing surfaces a new trade-off, **re-invoke `act-and-decide` on that task** (recursion) —
-  that's "recompute-on-settle," just a scoped planner run.
+  → `skipped`, run them, then **reopen the `blocked` task (`→ open`)** so act-and-decide re-dispositions it next pass
+  (folding in the chosen option; it may act → `done`, or spawn a fresh decision → `blocked` again). That re-disposition
+  *is* "recompute-on-settle." Reopening keeps the task-status owner (act-and-decide) the one that closes it.
 
 *Phase 3 builds trigger (a) with the **draft path**. Phase 4 adds the **real-verb path**, trigger (b), the trace on the
 signal, the EXECUTED ping, and Jupi `EXECUTED` (§14).*
@@ -198,7 +211,7 @@ question invisible at the shallow stage — is missed within a run; they cluster
 | # | Deliverable | New / changed |
 |---|---|---|
 | D1 | **`act-and-decide` skill** — planner: `skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. Writes only Neon + Jupi (§8a). | new |
-| D2 | **`shared/db.mjs` write-verbs** — `insert-action '<json>'`, `set-action-status <id> <status> [trace_ref]`, `set-task-gating <task_id> '<decision_ids[]>'`, `close-task <id> <done\|dropped>`, `list-actions <status\|decision_id>` (queue read for the worker). Parameterized, `user_id`-scoped. | changed |
+| D2 | **`shared/db.mjs` write-verbs** — `insert-action '<json>'`, `set-action-status <id> <status> [trace_ref]`, `set-task-status <id> <open\|blocked\|done\|dropped>`, `set-task-gating <task_id> '<decision_ids[]>'`, `list-actions <status\|decision_id>` (queue read for the worker). Parameterized, `user_id`-scoped. *(act-and-decide calls `set-task-status`; execute-actions calls `set-action-status` — §10 ownership.)* | changed |
 | D3 | **`execute-actions` skill** — the worker: reads `ready` rows, runs the draft path, marks `executed`+`trace_ref`; invoked at end of an act-and-decide run. Perform path + finalize trigger + trace/notify are Phase 4 (§14). | new |
 | D4 | **Gate + draft-mode + dry-run** in `act-and-decide` — §5 2×2, §6 verb form, §7 no-write table. | new |
 | D5 | **Config** — `guardrails` (`mode`, `actBudget`, `policy`, `executedPing`); reuse `backlogWindowSize`. | changed |
@@ -227,16 +240,21 @@ question invisible at the shallow stage — is missed within a run; they cluster
 
 ## 10. Schema touchpoints
 
-`shared/schema.sql` needs **one small change** — a `ready` status:
-- **Add `ready`** to `actions.status` (`candidate|ready|pending_decision|executed|skipped`) — the queue handoff between
-  the planner and the worker (§8). One idempotent CHECK-constraint update.
-- `actions.risk` **stores the *exposure* value** (P3-5); keep the column name, prose says "exposure." *(Optional rename.)*
+`shared/schema.sql` needs **two small status additions** (both idempotent CHECK-constraint updates):
+- **`ready` on `actions.status`** (`candidate|ready|pending_decision|executed|skipped`) — the queue handoff between the
+  planner and the worker (§8).
+- **`blocked` on `tasks.status`** (`candidate|open|blocked|done|dropped`) — a task awaiting a decision. This is what
+  keeps `query-window` (`status='open'` only) from re-surfacing a task act-and-decide already handled — **the status is
+  the filter** (§8).
+- **Status ownership** (mirrors the split): **`act-and-decide` writes `tasks.status`** (`open → done|blocked|dropped`,
+  and `blocked → open` on settle); **`execute-actions` writes `actions.status`** (`ready → executed`). Enforced by
+  convention in the skills, not the DB.
+- `actions.risk` **stores the *exposure* value** (P3-5); keep the column name. *(Optional rename.)*
 - `decision_id`/`option_id`, `tasks.gating_decision_ids` (array → multi-gating), `tasks.external`, `tasks.signal_url`,
-  `user_id` everywhere — all already present.
-- **Confidence isn't stored** — derived from `open_questions` each run (§3). Phase 2's `actions.confidence` is redundant;
-  leave unused.
+  `user_id` everywhere — already present.
+- **Confidence isn't stored** — derived from `open_questions` each run (§3). Phase 2's `actions.confidence` is redundant.
 - **Conventions:** dry-run writes nothing; on settle, chosen option's rows (across **all** gated tasks) → `ready`,
-  siblings → `skipped` (§8b).
+  siblings → `skipped`, the `blocked` task → `open` (§8b).
 
 ---
 
@@ -269,7 +287,7 @@ question invisible at the shallow stage — is missed within a run; they cluster
 
 ## 13. Build sequence
 
-1. **D2 `db.mjs` write-verbs** + **`ready` status** (§10) — the foundation; smoke-test each verb.
+1. **D2 `db.mjs` write-verbs** + **`ready` (actions) & `blocked` (tasks) statuses** (§10) — the foundation; smoke-test each verb.
 2. **D1 `act-and-decide` skeleton** — port `SKILL.md` + `reference/*`, re-anchored on `db.mjs` + the window.
 3. **D5 config** — `guardrails`.
 4. **§8a Stages 0–2** — refresh + pile-read; `query-window`; cluster + rank + `actBudget`.
@@ -284,9 +302,10 @@ question invisible at the shallow stage — is missed within a run; they cluster
 - `--dry-run` → table: ACT/DECIDE sane under the default 2×2?
 - Seed **two tasks sharing a question** → confirm **one** decision gating both.
 - Flip a policy cell → verdict changes. `actBudget:1` → only the top cluster is resolved.
-- `mode:draft` real run → `act-and-decide` writes `ready` rows + a private decision; `execute-actions` turns the `ready`
-  rows into **real drafts** in Gmail/Linear. *(Non-draftable high-exposure decisions post but don't execute until
-  Phase 4 — expected, not a defect.)*
+- `mode:draft` real run → `act-and-decide` writes `ready` rows + a private decision, and sets each task's status
+  (**`done`** for acted, **`blocked`** for decided); `execute-actions` turns the `ready` rows into **real drafts** in
+  Gmail/Linear. Re-run → the `done`/`blocked` tasks **don't** reappear in the window (status is the filter). *(Non-draftable
+  high-exposure decisions post but don't execute until Phase 4 — expected, not a defect.)*
 
 **Out of Phase 3:** poll-detect loop, perform-path execution, trace/notify, EXECUTED write, rule authoring — Phase 4/5.
 
@@ -295,10 +314,11 @@ question invisible at the shallow stage — is missed within a run; they cluster
 ## 14. Deferred to Phase 4/5 (explicit seam)
 
 - **Phase 4 — closing loop + perform mode**, all in `execute-actions`. Scheduled **poll-detect** of FINALIZED decisions →
-  flip chosen rows `pending_decision → ready`, siblings `skipped` (trigger *b*); the **real-verb path** (sends/posts/
-  bookings) so `mode:"perform"` and settled-decision actions actually fire; the **trace** on the signal; one optional
-  **EXECUTED ping** (`executedPing`); set Jupi **`EXECUTED`** (backend write still "to request", parent §8);
-  validator-gated sends (§11). One worker, extended — not rebuilt.
+  flip chosen rows `pending_decision → ready`, siblings `skipped`, **reopen the `blocked` task (`→ open`)** for
+  re-disposition (trigger *b*); the **real-verb path** (sends/posts/bookings) so `mode:"perform"` and settled-decision
+  actions actually fire; the **trace** on the signal; one optional **EXECUTED ping** (`executedPing`); set Jupi
+  **`EXECUTED`** (backend write still "to request", parent §8); validator-gated sends (§11). One worker, extended — not
+  rebuilt.
 - **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
   running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
   1. Phases 3–4 raise + settle decisions → a Jupi log of *"when X, the owner chose Y."*
