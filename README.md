@@ -11,7 +11,7 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 |---|---|
 | Facts & relationships | **Supermemory** |
 | Asset Map (capability inventory) | **`proactive-jupi/assets.md`** |
-| Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/schema.sql`) — every row keyed by `user_id` = `whoAmI.userId` (same identity as the brain's container tag) |
+| Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/schema.sql`) — every row keyed by `user_id` = the **Jupi user id** (same identity as the brain's container tag) |
 | Decisions + lifecycle (incl. EXECUTED) | **Jupi** |
 
 ## Skills (in the plugin)
