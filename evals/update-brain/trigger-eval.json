@@ -1,0 +1,22 @@
+[
+  {"query": "can you refresh what we know about my contacts and current projects before I dive into the day", "should_trigger": true},
+  {"query": "update the context — I just wrapped a bunch of calls with Batch and lemlist this week", "should_trigger": true},
+  {"query": "who is Hassan at EcoVadis and what's our history with him? pull together whatever you can find", "should_trigger": true},
+  {"query": "the brain feels stale, re-crawl my gmail and linear from the last month", "should_trigger": true},
+  {"query": "get me up to speed on the Mirakl account — the people, the deal, where it stands — before the review", "should_trigger": true},
+  {"query": "run update-brain", "should_trigger": true},
+  {"query": "we onboarded a new prospect, Choose. go learn everything you can about them from my inbox and calendar", "should_trigger": true},
+  {"query": "make sure Proactive-Jupi knows about my current projects and the people I work with", "should_trigger": true},
+  {"query": "what do we actually know about the Worldia pilot and who's involved?", "should_trigger": true},
+  {"query": "refresh the facts about my org and team", "should_trigger": true},
+  {"query": "set up my workspace — connect my tools and get the backlog going", "should_trigger": false},
+  {"query": "have we already decided which e-signature tool to use?", "should_trigger": false},
+  {"query": "draft a reply to Hassan's email about the pilot timeline", "should_trigger": false},
+  {"query": "log that we're going with Yousign for signatures", "should_trigger": false},
+  {"query": "add a task to follow up with Batch next week", "should_trigger": false},
+  {"query": "remember that I prefer concise summaries and no emojis", "should_trigger": false},
+  {"query": "what's on my calendar tomorrow?", "should_trigger": false},
+  {"query": "summarize this Google Doc for me", "should_trigger": false},
+  {"query": "escalate the discount question to the CRO", "should_trigger": false},
+  {"query": "clean up my inbox and archive the old newsletters", "should_trigger": false}
+]

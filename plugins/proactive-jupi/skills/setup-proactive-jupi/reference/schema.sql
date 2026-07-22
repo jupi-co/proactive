@@ -56,3 +56,15 @@ create table if not exists actions (
 create index if not exists actions_task_idx     on actions (task_id);
 create index if not exists actions_status_idx   on actions (status);
 create index if not exists actions_decision_idx on actions (decision_id);
+
+-- ── CRAWL_STATE ───────────────────────────────────────────────────────
+-- update-brain's incremental cursor. One row per source: the crawler only
+-- ingests content NEWER than last_cursor, then advances it. This is our dedup
+-- + credit control on the Supermemory connector (which has no customId): we
+-- never re-read or re-ingest the same window twice.
+create table if not exists crawl_state (
+  source       text primary key,      -- 'gmail' | 'calendar' | 'linear' | finer key
+  last_cursor  text,                   -- last-ingested marker (ISO timestamp / id / page token)
+  last_run_at  timestamptz,
+  updated_at   timestamptz not null default now()
+);

@@ -16,8 +16,8 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 
 ## Skills (in the plugin)
 - **`plugins/proactive-jupi/skills/setup-proactive-jupi`** — cold-start a workspace (connect tools, discover assets, apply the Neon schema, seed the brain, init backlog, cadence + guardrails). **Built.** Invoke with `/setup-proactive-jupi` once the plugin is installed.
-- `plugins/proactive-jupi/skills/update-context` — maintain Facts in Supermemory. *(next)*
-- `plugins/proactive-jupi/skills/act-and-decide` — the automation pipeline. *(later)*
+- **`plugins/proactive-jupi/skills/update-brain`** — the brain crawler: reads tools (read-only), writes Facts to Supermemory via the connector, incremental via the Neon `crawl_state` cursor. **Built.** Modes: `full` / `targeted`.
+- `plugins/proactive-jupi/skills/act-and-decide` — the automation pipeline. *(next)*
 
 ## Plugin (local Cowork testing)
 `proactive/` is packaged as a Claude plugin (marketplace `proactive-jupi`, plugin `proactive-jupi`), following jupi-skills.
@@ -27,4 +27,4 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 - **Test in Cowork:** Claude Desktop → Cowork → Customize → Plugins → Personal → **+** next to "Local uploads" → select `dist/proactive-jupi.zip` (keep the `.zip` extension).
 
 ## Status
-Phase 0. `setup-proactive-jupi` skill built + packaged (`dist/proactive-jupi.zip`); Neon schema applied to project `sparkling-violet-42081696`; Supermemory connected. **Next:** the `update-context` skill (the step-5 crawl depends on it).
+Phase 0. `setup-proactive-jupi` + `update-brain` skills built + packaged (`dist/proactive-jupi.zip`); Neon schema (`tasks`, `actions`, `crawl_state`) applied to project `sparkling-violet-42081696`; Supermemory connected (connector-simple). **Next:** the `act-and-decide` engine.
