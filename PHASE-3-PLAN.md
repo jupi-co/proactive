@@ -37,7 +37,7 @@ routine and fire one first run at the end of setup."
 | P3-5 | Second axis | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. Stored column stays `actions.risk` (§10). |
 | P3-6 | Decision mechanism | **One mechanism** — DECIDE posts a Jupi decision (Phase 3). Options read as *"which approach?"* (low confidence) or *"do exactly this / hold / modify"* (high confidence + high exposure, can't draft) — content, not machinery. |
 | P3-7 | Bound | **One per-run `actBudget`** — research the top-ranked clusters up to it; the rest wait. |
-| P3-8 | **Plan/execute split** | **`act-and-decide` writes only Neon + Jupi; `execute-actions` is the only tool-writer.** The `actions` table is the queue; `execute-actions` runs `ready` rows, triggered at end-of-run and on decision-finalize (§8). |
+| P3-8 | **Plan/execute split** | **`act-and-decide` writes only Neon + Jupi; `execute-actions` is the only tool-writer — a draft is a tool write, so it too runs through `execute-actions`.** The `actions` table is the queue; `execute-actions` runs `ready` rows, triggered at end-of-run and on decision-finalize (§8). |
 
 ---
 
@@ -154,9 +154,9 @@ MCP; auto-scoped by `user_id`). Clustering is **by open-question, not by task** 
 gated by two decisions and unblocks only when **both** settle (`gating_decision_ids` is an array for this).
 
 - **Boot:** read `assets.md` (in full), `guardrails`, Jupi slug; parse `dry_run`, `mode`. No tree exploration.
-- **Stage 0 — Refresh + read the pile:** run `refresh-backlog` (fresh window); read the statuses of decisions this task
-  set previously posted so the run doesn't re-post a decision for a task already awaiting one. *(The standing poll +
-  execution of settled decisions is the Phase 4 closing loop.)*
+- **Stage 0 — Refresh + read the pile:** run `refresh-backlog` (fresh window); read the statuses of decisions
+  `act-and-decide` previously posted so the run doesn't re-post a decision for a task already awaiting one. *(The standing
+  poll + execution of settled decisions is the Phase 4 closing loop.)*
 - **Stage 1 — Read the window:** `query-window [backlogWindowSize]`.
 - **Stage 2 — Cluster + rank + bound:** group the window by **shared open-question** (singletons for no-question tasks);
   rank clusters by **leverage** (value unblocked per decision, not per-task score); keep the **top clusters up to
@@ -314,7 +314,5 @@ question invisible at the shallow stage — is missed within a run; they cluster
 ## 15. Open items / decisions you may want to flip
 
 - **`actBudget` default (5).** Bounds clusters researched per run; interacts with cadence. Tune on dogfood.
-- **`execute-actions` scope in Phase 3** — plan builds the **draft path** so dogfooding shows real drafts. *Flip:* make
-  `execute-actions` entirely Phase 4 (Phase 3 stops at `ready` rows, no drafts) for a strictly side-effect-free planner.
 - **`risk → exposure` column rename** — deferred (kept `actions.risk`). Rename if the mismatch grates.
 - **First setup run = `--dry-run`** — proves the loop with zero side-effect. *Flip:* a real draft-mode run.
