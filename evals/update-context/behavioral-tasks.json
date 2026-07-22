@@ -1,0 +1,25 @@
+{
+  "skill_name": "update-context",
+  "container_tag": "user_eval_scratch",
+  "note": "Every run writes ONLY to container_tag. full-mode tasks must also use crawl_state sources prefixed 'eval-'. Run purge-scratch.sh after.",
+  "evals": [
+    {
+      "id": 1,
+      "mode": "targeted",
+      "prompt": "targeted: who is our contact at Batch and where does the pilot stand?",
+      "expected": "Entity-centric Facts on Batch (org), Simon Dawlat and Antoine Guénard (people), and the pilot (project), each with inline provenance; a 4-6 line synthesized summary returned."
+    },
+    {
+      "id": 2,
+      "mode": "targeted",
+      "prompt": "targeted: what do we know about the lemlist account and the people there?",
+      "expected": "Facts on lemlist (people, deal state) with provenance — or an honest 'thin coverage' note if little is found. No invention."
+    },
+    {
+      "id": 3,
+      "mode": "full",
+      "prompt": "full: refresh context from the last 14 days across Gmail + Calendar + Linear. Eval-isolated: write to container user_eval_scratch and use crawl_state sources prefixed 'eval-'.",
+      "expected": "A budget announced up front; several Facts across types (Person/Org/Project/Process); eval-prefixed cursors advanced (real ones untouched); a summary of what was drained + pushed."
+    }
+  ]
+}

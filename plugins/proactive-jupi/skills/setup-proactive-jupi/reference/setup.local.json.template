@@ -3,6 +3,7 @@
   "jupiWorkspace": "<jupi-workspace-slug>",
   "neonProjectId": "<neon-project-id>",
   "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
+  "supermemoryApiKey": "<optional: sm_... — ONLY for HTTP-API ops (reliable delete/correct) + the eval purge script; the Supermemory connector does NOT need it>",
   "seedTools": ["gmail", "calendar", "linear"],
   "crawlWindowDays": 30
 }
