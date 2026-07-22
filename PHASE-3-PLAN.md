@@ -1,5 +1,10 @@
 # Phase 3 — Act-or-Decide + Action Planner (Implementation Plan)
 
+> **Implementation status (2026-07-22):** ✅ **built** — `shared/schema.sql` (`ready`/`blocked` statuses +
+> migrations), `shared/db.mjs` (queue write-verbs), `guardrails` config, the **`act-and-decide`** planner skill
+> (+ `ORCHESTRATION.md`/`VALIDATOR.md`), the **`execute-actions`** worker skill, setup step-8 un-gate, and
+> `evals/act-and-decide/`. Not yet exercised against the live Neon instance / in a real run — see §13 dogfood.
+>
 > **Status:** Draft v0.5 · 2026-07-22 · Owner: Anne-Claire · Living doc.
 > Companion to [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §5, §6, §11 and to [PHASE-2-PLAN.md](PHASE-2-PLAN.md).
 > Ports the V1 `act-and-decide` (`jupi-skills` @ `auto-jupi`); the carry-over ledger (§12) tracks what must survive.
@@ -164,7 +169,8 @@ One skill, explicit stages. All Neon via **`${CLAUDE_PLUGIN_ROOT}/shared/db.mjs`
 MCP; auto-scoped by `user_id`). Clustering is **by open-question, not by task** — a task with two open questions is
 gated by two decisions and unblocks only when **both** settle (`gating_decision_ids` is an array for this).
 
-- **Boot:** read `assets.md` (in full), `guardrails`, Jupi slug; parse `dry_run`, `mode`. No tree exploration.
+- **Boot:** read `.proactive-jupi/assets.md` (in full), `.claude/proactive-jupi.local.json` (`guardrails`, Jupi slug);
+  parse `dry_run`, `mode`. No tree exploration.
 - **Stage 0 — Refresh:** run `refresh-backlog` so the run reasons over a current window. **That's all** — because
   processed tasks are already out of `open` (they're `done`/`blocked`/`dropped`), there's no pile to re-read here.
   Detecting settled decisions and reopening `blocked` tasks is the **Phase 4 closing loop**, not this stage.
@@ -232,7 +238,7 @@ question invisible at the shallow stage — is missed within a run; they cluster
 ### Config surface (front-loaded, per CLAUDE.md)
 
 ```jsonc
-// .claude/setup.local.json + reference/setup.local.json.template — set in setup's attended prelude
+// .claude/proactive-jupi.local.json + reference/proactive-jupi.local.json.template — set in setup's attended prelude
 "guardrails": {
   "mode": "draft",            // "draft" (default) | "perform"  — read by the gate, applied by execute-actions
   "actBudget": 5,             // max clusters researched + resolved per run (P3-7); rest wait
@@ -333,7 +339,7 @@ question invisible at the shallow stage — is missed within a run; they cluster
   1. Phases 3–4 raise + settle decisions → a Jupi log of *"when X, the owner chose Y."*
   2. Phase 5: before re-raising, `act-and-decide` spots the recurrence (`search-decisions`) and posts a **rule-decision**
      — *"When X, always Y?"* (V1 types 2/4) — bundled with the live instance.
-  3. **Owner approves** → the rule is a resolved rule-decision in Jupi, **indexed in `proactive-jupi/assets.md`**.
+  3. **Owner approves** → the rule is a resolved rule-decision in Jupi, **indexed in `.proactive-jupi/assets.md`**.
   4. **Read-side:** a matching task's open-question is then **pre-empted against the rules index → confidence high → act
      without asking** — "graduates from decide to act" (parent §9). Write + read need rules to exist → both Phase 5. In
      Phase 3, confidence is driven purely by the parser's `open_questions`.
