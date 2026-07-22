@@ -34,7 +34,7 @@ producer↔validator gate is retained. This closes the roadmap item "un-gate `se
 |---|---|---|
 | P3-1 | Task source | **Backlog-read only** — consume Phase 2's scored tasks via `query-window`. |
 | P3-2 | Gate model | **Configurable 2×2 matrix** — `confidence (high/low) × exposure (low/high)`; config decides which cells ACT vs DECIDE (the parent §6 table). |
-| P3-3 | Draft mode | **Global switch, gate always applies** — `draft`/`perform`; draft caps every act at its draft verb (drops exposure → more ACT); perform still routes high-exposure to DECIDE. |
+| P3-3 | Draft mode | **Global switch, gate always applies** — `draft`/`perform`; draft caps every act at its draft verb (drops exposure → more ACT); perform still routes high-exposure to DECIDE. **Draft is Phase 3-operational; perform's real-execution path activates with Phase 4's executor (§4, §14).** |
 | P3-4 | Confidence | **Binary, from `open_questions`** — none ⇒ `high` (act-eligible); a genuine open question ⇒ `low` ⇒ DECIDE. Runtime, not persisted. *(Phase 5 rules will empty open-questions upstream — §14.)* |
 | P3-5 | Second axis | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. Stored column stays `actions.risk` (§10). |
 | P3-6 | Decision kind | **One in Phase 3: _approach_** (low confidence, "which way?"). The _authorization_ variant (high confidence + high exposure, "do exactly this?") never fires in draft-default → deferred as a perform-mode note. |
@@ -71,9 +71,15 @@ Default sits at the safe end, loosens as trust builds (parent §7).
 |---|---|---|---|---|
 | **0 · dry-run** | `--dry-run` (run arg) | *nothing* — "Act" in the table | *nothing* — decision **not** created | **None.** Table (§7). |
 | **1 · draft (default)** | `guardrails.mode:"draft"` | create the **draft** | **create the STARTED Jupi decision** + gated action rows | No external send. |
-| **2 · perform** | `guardrails.mode:"perform"` | **execute** the real action — *iff the gate says ACT* | same as level 1 | Real side effects, gate-permitting. |
+| **2 · perform** *(Phase 4)* | `guardrails.mode:"perform"` | **execute** the real action — *iff the gate says ACT* | same as level 1 | Real side effects, gate-permitting. |
 
 `--dry-run` short-circuits *before* any write regardless of `mode`, so it previews either policy.
+
+**Timing — Phase 3 is draft-operational; perform activates in Phase 4.** The `mode` switch and its gate semantics are
+*designed* here, and **draft mode fully runs** in Phase 3 (real Gmail/Linear *drafts* + private decisions — no external
+sends). **Perform mode's real-execution path** — firing sends/posts/commits, writing the trace on the signal, the
+EXECUTED ping, the `high × high` authorization sign-off — rides on **Phase 4's executor** (the same one the closing loop
+needs) and lights up then. Selecting `perform` before Phase 4 has no executor to run against.
 
 ---
 
@@ -110,9 +116,10 @@ Confidence is **one binary value per task** (§3); exposure is tagged **per acti
 3. Net: **ready-to-send drafts for nearly everything**; decisions appear only for genuine *approach* trade-offs (low
    confidence), never for exposure.
 
-`mode:"perform"`: the Planner emits the real verb; exposure is computed from destination; high-exposure confident
-actions hit the `high × high` cell (the deferred authorization sign-off, §5). Actions with no draft form (RSVP, label,
-search) are intrinsically low-exposure and act in both modes.
+`mode:"perform"` *(activates in Phase 4)*: the Planner emits the real verb; exposure is computed from destination;
+high-exposure confident actions hit the `high × high` cell (the deferred authorization sign-off, §5). The actual firing
+of those real verbs is Phase 4's executor (§4 timing note, §14). Actions with no draft form (RSVP, label, search) are
+intrinsically low-exposure and act in both modes.
 
 ---
 
@@ -243,7 +250,9 @@ the question is on record. Acceptable; named so it's a known edge.
 - Every DECIDE draft passes the **validator** (opens real sources, verifies each claim; HTML breathing;
   links-everywhere — cheap now, `signal_url` pre-captured; relative dates; plain language; elevate vague actions). Max 3
   iterations; never clears → **deliver nothing** for that item (run proceeds).
-- **New:** the validator also gates **ACT-in-perform** actions before execution. Draft-mode ACTs and dry-run need no gate.
+- **Extends in Phase 4:** the validator will also gate **ACT-in-perform** actions before real execution (designed here,
+  exercised when perform activates — §4, §14). In Phase 3 it gates DECIDE drafts only; draft-mode ACTs and dry-run need
+  no gate.
 - Orchestrator persists `report.md`/`validation.md` (sub-agents return text, don't write files — V1 harness note).
 
 ---
@@ -273,7 +282,7 @@ the question is on record. Acceptable; named so it's a known edge.
 5. **Stage 3** — research-once per cluster; the resolve/flip logic both ways (singleton backstop; question-resolves).
 6. **D3 Stage 4–5** — full materialization + the 2×2 gate.
 7. **Dry-run** — table + no-write guarantee (§7, §10).
-8. **D5 validator loop** — wire it; gate perform-ACTs.
+8. **D5 validator loop** — wire it to gate DECIDE drafts (perform-ACT gating lands with Phase 4's executor).
 9. **Stage 6** — recompute-on-settle function (poll/execute → Phase 4).
 10. **D6 setup un-gating**; **D7 evals** alongside D1/D3; **D8 doc ticks**.
 
@@ -290,9 +299,12 @@ the question is on record. Acceptable; named so it's a known edge.
 
 ## 14. Deferred to Phase 4/5 (explicit seam)
 
-- **Phase 4 — closing loop.** Scheduled poll-detect; executor (run the chosen option's ACT rows post-settle, write the
-  trace on the signal, one optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to request", parent §8).
-  Also the **perform-mode authorization sign-off** (§5's `high × high` cell) belongs here, alongside real sends.
+- **Phase 4 — closing loop + perform mode.** Scheduled poll-detect; the **executor** (run a chosen option's ACT rows
+  post-settle, write the trace on the signal, one optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to
+  request", parent §8). **Perform mode activates here**: the same executor fires immediate perform-ACTs (real
+  sends/posts/commits), so `mode:"perform"` becomes operational — including the **`high × high` authorization sign-off**
+  (§5) and validator-gated sends (§11). Phase 3 ships and dogfoods **draft-only**; one executor serves both immediate
+  perform-ACTs and the settled-decision closing loop, so it's built once, here.
 - **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
   running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
   1. Phases 3–4 raise + settle approach decisions → a Jupi log of *"when X, the owner chose Y."*
