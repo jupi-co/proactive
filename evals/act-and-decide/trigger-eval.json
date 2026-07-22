@@ -1,0 +1,22 @@
+[
+  {"query": "run act-and-decide", "should_trigger": true},
+  {"query": "work my backlog — act on what's safe and raise decisions for the rest", "should_trigger": true},
+  {"query": "what should Jupi do now?", "should_trigger": true},
+  {"query": "triage the top of my backlog and either act or decide", "should_trigger": true},
+  {"query": "dry-run act-and-decide and show me the table of what you'd do", "should_trigger": true},
+  {"query": "look at my top tasks and draft what you can, decide where you can't", "should_trigger": true},
+  {"query": "find the highest-leverage thing to do and handle it", "should_trigger": true},
+  {"query": "go through my backlog and post Jupi decisions for the real trade-offs", "should_trigger": true},
+  {"query": "refresh the backlog before I start my day", "should_trigger": false},
+  {"query": "parse my inbox into tasks and score them", "should_trigger": false},
+  {"query": "who is Hassan at EcoVadis and what's our history with him?", "should_trigger": false},
+  {"query": "update the brain from the last month of Gmail and Linear", "should_trigger": false},
+  {"query": "execute the ready actions — flush the drafts", "should_trigger": false},
+  {"query": "run the queue and send whatever's ready", "should_trigger": false},
+  {"query": "set up my workspace — connect my tools and apply the schema", "should_trigger": false},
+  {"query": "have we already decided which e-signature tool to use?", "should_trigger": false},
+  {"query": "log that we're going with Yousign for signatures", "should_trigger": false},
+  {"query": "escalate the discount question to the CRO", "should_trigger": false},
+  {"query": "what's on my calendar tomorrow?", "should_trigger": false},
+  {"query": "summarize this Google Doc for me", "should_trigger": false}
+]

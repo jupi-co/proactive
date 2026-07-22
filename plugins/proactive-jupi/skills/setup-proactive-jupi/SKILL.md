@@ -81,9 +81,10 @@ Run the bundled `../../shared/schema.sql` (the plugin's DB contract) against the
 - When it returns, fold its summary into the setup report: sources scanned, candidate tasks created, the current top window. If a source was unreachable, **say so (⚠️)**.
 - It shares the `crawl_state` table with `update-brain`, separated by the `consumer` column (`backlog` vs `brain`), so the two don't interfere.
 
-### 8 · Set cadence / triggers
-Schedule recurring **user-visible** routines: `update-brain` (daily full) and `act-and-decide` (frequent). They must be controllable by the user (create them where the user can see and edit them — a hidden scheduler is not acceptable); tie to one recurring ritual and record the cadence.
-- *`update-brain` and `act-and-decide` are later-phase builds. Until they exist, describe the intended schedule and stop — do not schedule a routine that points at a skill that isn't there, and do not fire a first `act-and-decide` run yet.*
+### 8 · Set cadence / triggers, then prove the loop
+Schedule recurring **user-visible** routines: `update-brain` (daily full) and `act-and-decide` (frequent — its Stage 0 refreshes the backlog itself). They must be controllable by the user (create them where the user can see and edit them — a hidden scheduler is not acceptable); tie to one recurring ritual and record the cadence.
+- **Prove the loop end-to-end:** fire **one first `act-and-decide` run in `--dry-run`** at the end of setup. Dry-run writes nothing (no rows, no decisions, no external side-effect on first contact) and returns the classification table — so onboarding shows the user exactly what Jupi *would* act on and decide, before anything happens. They flip `guardrails.mode` toward `perform` when trust builds.
+- *All four skills now exist (`update-brain`, `refresh-backlog`, `act-and-decide`, `execute-actions`), so schedule for real. The **closing loop** (executing settled decisions) is a later phase — a decision posted now is settled by the user but not yet auto-executed; that's expected.*
 
 ## Output — setup report
 Print a **per-step status line** (✅/🔧/⚠️) so the run is legible end-to-end: which tools were **already connected** vs newly connected vs skipped (+ the capability lost by each skip), any pending OAuth, schema applied, Facts seeded (counts by type), candidate tasks created, schedules set. Flag anything that needs the user.
