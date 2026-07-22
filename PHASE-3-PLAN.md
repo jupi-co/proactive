@@ -194,9 +194,10 @@ never the account-wide MCP (Phase 2 rule); auto-scoped by `user_id`; same npm-bo
   - **Act task:** materialize the action(s) directly (`status='candidate'`, `decision_id` null, `exposure` tagged).
     Apply the **draft-mode transform** (§6).
 - **Stage 5 — Gate + emit:**
-  - **Act task** → per-action `(high × exposure)`: `low` → **ACT** (dry-run: table; else draft/perform →
-    `set-action-status executed` + `trace_ref`); `high` → perform-mode authorization sign-off (deferred, §5) / else the
-    draft already dropped it to ACT.
+  - **Act task** → per-action `(high × exposure)`: `low` → **ACT** (dry-run: table; else draft it, or perform via the
+    Phase-4 executor → `set-action-status executed` + `trace_ref`); `high` (a non-draftable high-exposure action, or a
+    draftable one in perform mode) → **author an _authorize_ decision** (same mechanism as below; executing its chosen
+    action is Phase 4).
   - **Decision cluster** → author the **approach** decision in Jupi (V1 HTML format + validator §11), set the cluster's
     action rows' `gating_decision_ids`. One decision, many tasks.
   - Set tasks `done`/`dropped` as resolved; a ruled-out task → `dropped` (V1 `_ruled-out` memory, §12).
