@@ -267,7 +267,7 @@ question invisible at the shallow stage — is missed within a run; they cluster
 - `actions.risk` **stores the *exposure* value** (P3-5); keep the column name. *(Optional rename.)*
 - `decision_id`/`option_id`, `tasks.gating_decision_ids` (array → multi-gating), `tasks.external`, `tasks.signal_url`,
   `user_id` everywhere — already present.
-- **Confidence isn't stored** — derived from `open_questions` each run (§3). Phase 2's `actions.confidence` is redundant.
+- **Confidence isn't stored** — derived from `open_questions` each run (§3). Phase 2's `actions.confidence` is **dropped** (`alter table actions drop column if exists confidence`).
 - **Conventions:** dry-run writes nothing; on settle, chosen option's rows (across **all** gated tasks) → `ready`,
   siblings → `skipped`, the `blocked` task → `open` (§8b).
 

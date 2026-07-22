@@ -80,7 +80,8 @@ create table if not exists actions (
   description   text not null,                         -- the executable action-instruction ("send email to X saying Y")
   rule_ref      text,                                  -- business rule (Jupi) that justified acting, if any
   risk          text check (risk in ('low','high')),   -- EXPOSURE (Phase-3 name): draft-first, then destination/irreversibility. Column kept as `risk`.
-  confidence    text check (confidence in ('low','medium','high')),   -- unused in Phase 3 (confidence is task-level, derived from open_questions each run)
+  -- (no confidence column: confidence is a TASK-level, runtime judgment derived from
+  --  open_questions each run — never stored on an action.)
   -- candidate → ready (gated to ACT, queued for execute-actions) → executed;
   --           → pending_decision (gated to a Jupi option) → ready (chosen) | skipped (sibling).
   -- execute-actions owns this column (ready → executed); it never writes tasks.status.
@@ -184,6 +185,9 @@ alter table tasks   add  constraint tasks_status_check
 alter table actions drop constraint if exists actions_status_check;
 alter table actions add  constraint actions_status_check
   check (status in ('candidate','ready','pending_decision','executed','skipped'));
+-- Drop the vestigial actions.confidence (Phase 2 shipped it; the Phase-3 gate reads
+-- confidence at the TASK level from open_questions, never off an action row).
+alter table actions drop column if exists confidence;
 
 -- ── OPTIONAL HARDENING: Row-Level Security ────────────────────────────
 -- Filtering by user_id in every query is sufficient for the single-writer skill
