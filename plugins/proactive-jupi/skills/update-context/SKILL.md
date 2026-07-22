@@ -1,10 +1,10 @@
 ---
 name: update-context
 description: >-
-  Auto-Jupi's context crawler — the single writer of Facts about the user's world (people,
+  Proactive-Jupi's context crawler — the single writer of Facts about the user's world (people,
   orgs, projects, processes, tools, goals), built by reading the user's connected tools
   (Gmail, Calendar, Linear, and so on) and stored in Supermemory. Use it whenever the goal is
-  to build up, refresh, extend, or correct what Auto-Jupi knows: "update the context",
+  to build up, refresh, extend, or correct what Proactive-Jupi knows: "update the context",
   "refresh my context", "crawl my world", "update-context", "the brain feels stale", or an
   entity lookup such as "who is this person?", "what do we know about this company or
   project?", "get me up to speed on an account before a meeting". Also runs from the daily
@@ -13,14 +13,14 @@ description: >-
   returns a short summary). Read-only on the tools — it never acts, drafts, or decides. Not
   for: the initial workspace cold-start (that is setup-proactive-jupi, which then calls
   this), doing a task or drafting a reply (act-and-decide), or looking up past decisions
-  (search-decisions). Reach for it any time the work is about enriching what Auto-Jupi knows
+  (search-decisions). Reach for it any time the work is about enriching what Proactive-Jupi knows
   — don't wait for the word "skill".
 disable-model-invocation: false
 ---
 
-# update-context — Auto-Jupi's context crawler
+# update-context — Proactive-Jupi's context crawler
 
-You build and maintain **the brain**: what Auto-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
+You build and maintain **the brain**: what Proactive-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
 
 **Read `references/supermemory.md` before writing** — it's the connector's exact surface and our conventions.
 
@@ -28,6 +28,7 @@ You build and maintain **the brain**: what Auto-Jupi knows about the user and th
 - **Write** with the `memory` tool (`save`); **read** with `recall`. Both take a `containerTag`.
 - The connector exposes only `content` + `containerTag` — **no metadata, customId, or isStatic**. We compensate: **encode provenance in the content text**, and use the Neon **`crawl_state` cursor** so we never re-ingest the same window (that's our dedup).
 - **Container tag** = one user-level tag from `whoAmI` → **`user_<userId>`**. Call `whoAmI` at run start to get it. (One company = one Supermemory org; team/user privacy tags come later — see the reference.)
+- **After each `save`, check the confirmation names your container tag; re-save on mismatch.** The connector can misroute a save into the *wrong* tag — an isolation/privacy risk. Reproduction (2026-07-21): **single-session parallel saves route correctly**; the misroute appears only under **concurrent writes from multiple sessions sharing one Supermemory account**. So you (the single writer of Facts) are safe as long as **no second Facts-writer runs concurrently** — and verifying the confirmed tag is cheap defense-in-depth. See `references/supermemory.md`.
 
 ## What a Fact looks like
 Every saved memory is a compact, standalone statement with its **type and provenance inline**, so semantic recall carries the structure the connector won't store as metadata:

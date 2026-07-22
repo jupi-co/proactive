@@ -61,9 +61,10 @@ Run the bundled `reference/schema.sql` against the project over the **project-sc
 - **Prefer the HTTPS serverless driver** (`@neondatabase/serverless`, port 443) over direct Postgres (`psql`, port 5432): 443 is the sandbox-friendly path and the easiest host to allowlist.
 - **If network egress is blocked** — Claude's sandbox refuses Neon's hosts (403/timeout on 5432 and 443) — **don't fail: retry the same apply with the sandbox's network disabled** (the host machine reaches Neon directly; the command is unchanged). It's idempotent and safe. Because step 4 already pre-authorized this apply command, it stays **promptless on every run** (including unattended routines). Only if sandbox-disabling is itself disallowed in this environment, fall back to telling the user to allowlist **`*.neon.tech`** under **Admin settings → Capabilities → network access** and re-run. Either way the conn string is already stored and the schema applies in seconds.
 
-### 6 · Seed the brain — hand off to `update-context`
-Hand off to the **`update-context`** skill (`full` mode, last `crawlWindowDays` across `seedTools` = Gmail + Calendar + Linear). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
-- *`update-context` is a separate build. Until it exists, setup **stops cleanly after step 5**: print the setup report for steps 1–5 and stop. **Do not narrate or walk through steps 7–8** — they don't run yet, so describing them is just noise.*
+### 6 · Seed the brain — run `update-context`
+**Invoke the `update-context` skill in `full` mode** (it reads `seedTools` + `crawlWindowDays` from config — default Gmail + Calendar + Linear, last 30 days). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
+- When it returns, **verify it actually wrote Facts** — a quick `recall` on the container tag should return results — and fold its seed summary (facts by type, any unreachable tool) into the setup report.
+- If it wrote nothing, or a tool was unreachable, **say so (⚠️)** rather than reporting success.
 
 ### 7 · Initialize the backlog
 Parse recent signals (within the crawl window) into **candidate tasks**; score them (impact × confidence). Insert into Neon `tasks` (status `candidate`).

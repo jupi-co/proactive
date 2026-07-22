@@ -28,5 +28,9 @@
 - Types: `Person · Org · Project · Process · Tool · Goal`.
 - Provenance always; `confirmed` vs `inferred`; never a deduction as certainty.
 
+## Verified connector findings (2026-07-21)
+- **`save` can misroute a container tag under concurrency — verify each confirmed tag.** Single-session parallel saves route correctly (6/6 in test); the misroute was observed only under **concurrent writes from two sessions sharing one Supermemory account** (tags cross-applied both ways) — root cause looks server-side. **Guard:** don't run concurrent Facts-writers, and verify each save's confirmed tag, re-saving on mismatch. *Multi-user future: prefer per-user API tokens over container-tag isolation alone.*
+- **`save` is async-rewritten/retitled** and extracted into *multiple* memories (tests: 4 saved docs → 11 memories; 5 → 19). The stored form differs from what you sent — which is also why `forget`-by-content fails (see the tool note).
+
 ## Upgrade trigger
 Noisy recall (duplicate/contradictory facts) or a need for structured filtering/enumeration → add the **HTTP API**: `POST /v3/documents` (raw content, `customId`, `metadata`) and `POST /v4/memories` (entity-centric, `isStatic`), authenticated with the Supermemory API key. Re-introduce the key in `setup.local.json` only when this trigger fires.
