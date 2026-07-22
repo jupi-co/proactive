@@ -1,47 +1,44 @@
 # Phase 3 — Act-or-Decide + Action Planner (Implementation Plan)
 
-> **Status:** Draft v0.3 · 2026-07-22 · Owner: Anne-Claire · Living doc.
+> **Status:** Draft v0.4 · 2026-07-22 · Owner: Anne-Claire · Living doc.
 > Companion to [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §5, §6, §11 and to [PHASE-2-PLAN.md](PHASE-2-PLAN.md).
 > Builds the **downstream half** of the `act-and-decide` pipeline on top of Phase 2's scored Neon backlog. Ports the V1
-> `act-and-decide` (`jupi-skills` @ `auto-jupi`, `plugins/jupi/skills/act-and-decide/`); the carry-over ledger (§12)
-> tracks what must survive.
+> `act-and-decide` (`jupi-skills` @ `auto-jupi`); the carry-over ledger (§12) tracks what must survive.
 >
-> **v0.3 — the model settled through review.** Two corrections shape everything below: **(1)** confidence is
-> *task-level* and driven by open-questions **after** rules/habits pre-empt them; **(2)** the second gate axis is renamed
-> **exposure** (draft-first, then destination). And the pipeline is **one path with two branches** off a single
-> question — *does this task have a genuinely-open question?* — where the coordination node's value is to **research and
-> ask a shared question once** across the tasks it blocks. (v0.2 reconciled with merged Phase 2: #7 tenancy, #8
-> `refresh-backlog` + `shared/db.mjs`; the backlog contract is satisfied — §3.)
+> **v0.4 — simplified.** One loop, not two branches: cluster the window by shared open-question (a task with no open
+> question is a cluster of one), rank by leverage, research the top clusters within one budget, then gate. Confidence is
+> **binary** (open-question or not) → the gate is the parent §6 **2×2**. One decision kind (**approach**) in Phase 3;
+> the high-exposure "authorize this" variant is a perform-mode concern noted for later. Business **rules don't exist
+> until Phase 5** (§14), so confidence here is driven purely by the parser's `open_questions`. (v0.2 reconciled with
+> merged Phase 2; v0.3 introduced the model — confidence from open-questions, `risk → exposure`.)
 
 ---
 
 ## 1. What Phase 3 delivers (one paragraph)
 
 The **`act-and-decide`** skill. It refreshes the backlog (Phase 2's `refresh-backlog`), reads the scored top-window
-(`query-window`), and splits it on one question — **does the task carry a genuinely-open question** (after rules/habits
-were consulted)? **Tasks with an open question** are clustered by the **coordination node** — tasks that *share* a
-question — and each cluster is **researched once**; that research either **resolves** the question (the cluster's tasks
-act) or leaves a real trade-off, raised as **one Jupi decision gating per-task actions across the whole cluster**.
-**Tasks without an open question** take the high-confidence fast path: the top-scored ones (up to a per-run budget) get
-a deep-context dig, then either an action (via the Action Planner) or — if the dig surfaces a hidden trade-off, or the
-action is high-**exposure** — a decision. Acting is governed by a **draft-mode switch** (draft vs. perform) and
-previewable via a **dry-run flag** (classify only, touch nothing). The V1 producer↔validator gate is retained. This
-closes the roadmap item "un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first run at
-the end of setup."
+(`query-window`), and **clusters it by shared open-question** — tasks that share a question cluster together; a task
+with no open question is a cluster of one. It ranks clusters by **leverage** (value unblocked per decision) and, for the
+top ones within a per-run **budget**, **researches once**, then **gates** each resulting action on **confidence ×
+exposure**: it **acts** (confident + low exposure) or **posts one Jupi decision** (a genuine open question), where a
+single decision can gate actions across **every task in the cluster** — the coordination node. Acting is governed by a
+**draft-mode switch** (draft vs. perform) and previewable via a **dry-run flag** (classify only, touch nothing). The V1
+producer↔validator gate is retained. This closes the roadmap item "un-gate `setup-proactive-jupi`: create the
+`act-and-decide` routine and fire one first run at the end of setup."
 
 ---
 
 ## 2. Steering decisions (locked through review)
 
-| # | Fork | Choice | Consequence |
-|---|---|---|---|
-| P3-1 | Task source | **Backlog-read only** — consume Phase 2's scored tasks via `query-window`. | Satisfied by merged Phase 2 (§3). |
-| P3-2 | Gate model | **Configurable matrix cells** — categorical `confidence × exposure`; config decides which cells ACT vs DECIDE. | The "threshold" *is* the policy matrix (§5). |
-| P3-3 | Draft mode | **Global switch, gate always applies** — `draft`/`perform`; draft caps every act at its draft verb (drops exposure → more ACT); perform still routes high-exposure to DECIDE. | Draft mode changes the *verb*, never bypasses the gate (§6). |
-| P3-4 | Confidence source | **Open-questions, after rules/habits pre-empt them.** `refresh-backlog` empties any `open_question` a rule/habit answers (upstream); the deep dig is the backstop. | Rules/habits raise **confidence**, not lower exposure. Empty open-questions ⇒ high confidence (§5). |
-| P3-5 | Second axis name | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. | "Risk" over-claimed; confidence owns *are-we-right*, exposure owns *what's-at-stake*. Stored column stays `actions.risk` (§10). |
-| P3-6 | Two decision *kinds* | **approach** (triggered by low confidence — "which way?") vs **authorization** (high confidence + high exposure — "do exactly this?"). | Same DECIDE branch, different framing/options (§5). |
-| P3-7 | Act-branch bound | **Per-run budget** — deep-dig + act only the top-scored no-open-question tasks up to `actBudget`; the rest wait. | The act branch's "picker"; keeps deep work bounded (§8). |
+| # | Fork | Choice |
+|---|---|---|
+| P3-1 | Task source | **Backlog-read only** — consume Phase 2's scored tasks via `query-window`. |
+| P3-2 | Gate model | **Configurable 2×2 matrix** — `confidence (high/low) × exposure (low/high)`; config decides which cells ACT vs DECIDE (the parent §6 table). |
+| P3-3 | Draft mode | **Global switch, gate always applies** — `draft`/`perform`; draft caps every act at its draft verb (drops exposure → more ACT); perform still routes high-exposure to DECIDE. |
+| P3-4 | Confidence | **Binary, from `open_questions`** — none ⇒ `high` (act-eligible); a genuine open question ⇒ `low` ⇒ DECIDE. Runtime, not persisted. *(Phase 5 rules will empty open-questions upstream — §14.)* |
+| P3-5 | Second axis | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. Stored column stays `actions.risk` (§10). |
+| P3-6 | Decision kind | **One in Phase 3: _approach_** (low confidence, "which way?"). The _authorization_ variant (high confidence + high exposure, "do exactly this?") never fires in draft-default → deferred as a perform-mode note. |
+| P3-7 | Bound | **One per-run `actBudget`** — research the top-ranked clusters up to it; the rest wait for a later run. |
 
 ---
 
@@ -49,20 +46,18 @@ the end of setup."
 
 Phase 3 stands on merged Phase 2:
 - **`refresh-backlog`** — parses signals → scored `tasks` (`status='open'`), cheap/read-only.
-- **`shared/db.mjs` `query-window [K]`** — top-K open tasks by `score desc`, already `user_id`-scoped.
+- **`shared/db.mjs` `query-window [K]`** — top-K open tasks by `score desc`, `user_id`-scoped.
 - **Columns Phase 3 reads:** `summary`, `signal_url` (clickable, pre-captured — **no refetch**), `external` (**an
-  exposure input**, §5), `relevant_facts` (light recall to deepen), `open_questions` (the branch key + cluster key,
-  §8), `gating_decision_ids` (the pile, §8).
+  exposure input**, §5), `relevant_facts` (light recall to deepen), `open_questions` (the **cluster key** + confidence
+  source, §8), `gating_decision_ids` (the pile, §8).
 
-**Contract seam:** act-and-decide runs `refresh-backlog` as its opening stage; the daily routine chains them (§15 flags
-the double-refresh trade-off).
+**Contract seam:** act-and-decide runs `refresh-backlog` as its opening stage; the daily routine chains them.
 
 **Terminology — three axes, kept distinct** (CLAUDE.md "don't conflate"):
-- **`relevance`** — task-level, Scorer, cheap: *is this real / worth surfacing?* (the noise gate). Persisted.
-- **confidence** — task-level, act-or-decide: *do we know how to handle it?* **= are `open_questions` empty after
-  rules/habits pre-empted them (P3-4)?** Empty ⇒ high; a genuine open question ⇒ low. The deep dig can still flip it.
-- **exposure** — **action-level**, act-or-decide: *what's at stake if this fires?* Draft-first, then
-  destination/sensitivity/irreversibility (P3-5).
+- **`relevance`** — task-level, Scorer: *is this real / worth surfacing?* (noise gate). Persisted.
+- **confidence** — task-level, act-or-decide: *do we know how to handle it?* **Binary: are `open_questions` empty?**
+  Runtime, not stored.
+- **exposure** — **action-level**: *what's at stake if it fires?* Draft-first, then destination/irreversibility.
 
 The gate pairs the *task's* confidence with each *action's* exposure.
 
@@ -70,11 +65,11 @@ The gate pairs the *task's* confidence with each *action's* exposure.
 
 ## 4. The safety ladder — three flags, one story
 
-Default sits at the safe end, loosens as trust builds (parent §7: *"Default conservative (draft-only)"*).
+Default sits at the safe end, loosens as trust builds (parent §7).
 
 | Level | Flag / setting | ACT branch does | DECIDE branch does | Side effects |
 |---|---|---|---|---|
-| **0 · dry-run** | `--dry-run` (run arg) | *nothing* — "Act" in the table | *nothing* — decision **not** created | **None.** Reads only. Table (§7). |
+| **0 · dry-run** | `--dry-run` (run arg) | *nothing* — "Act" in the table | *nothing* — decision **not** created | **None.** Table (§7). |
 | **1 · draft (default)** | `guardrails.mode:"draft"` | create the **draft** | **create the STARTED Jupi decision** + gated action rows | No external send. |
 | **2 · perform** | `guardrails.mode:"perform"` | **execute** the real action — *iff the gate says ACT* | same as level 1 | Real side effects, gate-permitting. |
 
@@ -82,32 +77,26 @@ Default sits at the safe end, loosens as trust builds (parent §7: *"Default con
 
 ---
 
-## 5. The gate — confidence × exposure, a configurable matrix (P3-2)
+## 5. The gate — confidence × exposure, a configurable 2×2 (P3-2)
 
-Confidence is **one value per task** (§3); exposure is tagged **per action**. The gate runs per action, pairing them:
+Confidence is **one binary value per task** (§3); exposure is tagged **per action**. The gate runs per action:
 
 ```jsonc
 // guardrails.policy — which cells auto-ACT vs DECIDE. Shipped default is conservative (parent §7).
 {
-  "high":   { "low": "act",    "high": "decide" },   // confident + safe → act; confident + exposed → decide (authorization)
-  "medium": { "low": "act",    "high": "decide" },
-  "low":    { "low": "decide", "high": "decide" }     // unsure → decide (approach), whatever the exposure
+  "high": { "low": "act",    "high": "decide" },   // confident + safe → act; confident + exposed → decide*
+  "low":  { "low": "decide", "high": "decide" }     // open question → decide (approach), whatever the exposure
 }
 ```
 
-- **Confidence = open-questions after rules (P3-4).** No open question (or a rule/habit answers it) ⇒ `high` ⇒ act-eligible.
-  A live trade-off ⇒ `low` ⇒ DECIDE regardless of exposure — the parent §6 "hesitating on what to say → decide" case.
-- **Exposure = draft-first, then destination (P3-5).** A **draft exposes nothing** → `low`, whatever the recipient.
-  A real send/post/commit → read `tasks.external`, recipient sensitivity (peer < manager < CEO < external), and
-  irreversibility (commit, booking, payment) → `high` when any bites.
-- **Two decision *kinds* out of the one DECIDE branch (P3-6):**
-  - **low confidence → an _approach_ decision** — options are genuinely different ways to do it ("frame the renewal as
-    X / as Y").
-  - **high confidence + high exposure → an _authorization_ decision** — we know exactly what to do; options are
-    *"send exactly this" · "hold" · "edit first"* (and a natural **candidate-rule** moment: *"always auto-do this?"*).
-    In **draft mode** this usually never appears — drafting drops exposure to `low` → ACT.
-- A **business rule** (Phase 5) authorizes a class of high-exposure actions → the authorization decision stops firing
-  for it. Phase 3 **reads** `actions.rule_ref`; it does not author rules.
+- **Confidence** — no open question ⇒ `high` ⇒ act-eligible; a live trade-off ⇒ `low` ⇒ DECIDE regardless of exposure
+  (the parent §6 "hesitating on what to say → decide" case).
+- **Exposure — draft-first (P3-5).** A **draft exposes nothing** → `low`, whatever the recipient. A real send/post/commit
+  → read `tasks.external`, recipient sensitivity (peer < manager < CEO < external), irreversibility (commit, booking,
+  payment) → `high` when any bites.
+- **\* The `high × high` cell** = confident but exposed. In **draft mode** (default) this never occurs — drafting drops
+  exposure to `low` → ACT. It only bites in **perform mode**, where it becomes an *authorization* sign-off — a
+  perform-mode refinement, **not built in Phase 3** (P3-6).
 - **This matrix is the "configurable threshold."** Tighten = flip cells to `decide`; loosen = to `act`. Config, §9.
 
 ---
@@ -117,46 +106,44 @@ Confidence is **one value per task** (§3); exposure is tagged **per action**. T
 `mode:"draft"` transforms the Action Planner's output *before* the gate:
 1. Every action with a draft form is **rewritten to its draft** (`send_email → create_draft`, `post_slack →
    draft-note`, `merge_pr → draft-PR`).
-2. Drafting sets `exposure = low` (nothing leaves) → the matrix returns **ACT** for anything confident.
-3. Net: the user gets **ready-to-send drafts for nearly everything**; decisions appear only for genuine *approach*
-   trade-offs (low confidence), not for *exposure*.
+2. Drafting sets `exposure = low` → the matrix returns **ACT** for anything confident.
+3. Net: **ready-to-send drafts for nearly everything**; decisions appear only for genuine *approach* trade-offs (low
+   confidence), never for exposure.
 
 `mode:"perform"`: the Planner emits the real verb; exposure is computed from destination; high-exposure confident
-actions become **authorization** decisions (§5). **Draft mode never bypasses the gate** — a low-confidence action is an
-approach DECIDE in either mode. Actions with no draft form (RSVP, label, search) are intrinsically low-exposure and act
-in both modes.
+actions hit the `high × high` cell (the deferred authorization sign-off, §5). Actions with no draft form (RSVP, label,
+search) are intrinsically low-exposure and act in both modes.
 
 ---
 
 ## 7. Dry-run output — the classification table
 
-`--dry-run` runs the full pipeline (refresh → window → branch/cluster → dig → gate) but **stops before any write**:
+`--dry-run` runs the full pipeline (refresh → window → cluster → dig → gate) but **stops before any write**:
 
-| Task | conf (task) | Action (what would happen) | exposure | Verdict | Decision (kind → title / options) |
+| Task | conf | Action (what would happen) | exposure | Verdict | Decision |
 |---|---|---|---|---|---|
 | Reply to Alice re: pricing | high | Draft email to alice@x.com confirming Tue 2pm | low | **ACT** | — |
 | Sharpist brief | high | Create "Sharpist Brief" doc in GTM project | low | **ACT** | — |
 | | | Share the doc with Paul | low | **ACT** | — |
-| Renewal outreach to CEO | high | Send renewal email to ceo@bigco.com | high | **DECIDE** | *authorization* → "Send the BigCo renewal email?" |
-| Q3 pricing (3 threads) | low | *(clustered)* reply to each thread | low | **DECIDE** | *approach* → "What's our Q3 pricing?" → 3 options, gates **3 tasks** |
+| Renewal to CEO | high | Draft renewal email to ceo@bigco.com | low | **ACT** | — *(perform mode: send → exposure high → DECIDE)* |
+| Q3 pricing *(3 threads)* | low | *(clustered)* reply to each thread | low | **DECIDE** | "What's our Q3 pricing?" → 3 options, gates **3 tasks** |
 
 - **Confidence is a task attribute** (blank on continuation rows); **exposure + verdict are per action**.
-- The last row shows the **coordination node**: one *approach* decision gating actions across three tasks.
-- The CEO row shows an **authorization** decision (high confidence, high exposure) — which would collapse to **ACT** in
-  draft mode.
-- Verdict reflects the *current* `mode`; footer notes mode + policy matrix. Rendered to
-  `act-and-decide/runs/run-XXX/report.md`, returned as the caller summary (a read-only in-memory plan — §10).
+- The last row is the **coordination node**: one decision gating actions across three tasks.
+- In **draft-default**, decisions appear only for genuine open questions (the pricing cluster) — exposure alone never
+  forces one. The CEO note shows where perform mode would differ.
+- Verdict reflects the current `mode`; footer notes mode + policy. Rendered to
+  `act-and-decide/runs/run-XXX/report.md`, returned as the caller summary (read-only, in-memory — §10).
 
 ---
 
-## 8. `act-and-decide` anatomy — one path, two branches, the node in the middle
+## 8. `act-and-decide` anatomy — one loop over question-clusters
 
-**The pipeline is one algorithm** — `research → confidence×exposure gate → act, or decide (approach|authorization)` —
-where a task's `open_questions` are a **router + cluster-enabler**, not a separate code path. Two branches fall out of
-the single question *"is there a genuinely-open question?"*, and the **coordination node's** payoff is that a question
-**shared** by several tasks is **researched once and asked once**.
+**One algorithm** — `cluster → rank → research → gate → act or decide` — where a task's `open_questions` are the
+**cluster key**: tasks that share a question cluster; a task with none is a cluster of one. The coordination node's
+payoff is that a **shared** question is **researched once and asked once**.
 
-The schema already supports the node (no change): one `decision_id` sits in **many tasks'** `gating_decision_ids`, and
+The schema already supports it (no change): one `decision_id` sits in **many tasks'** `gating_decision_ids`, and
 `actions` rows across **different `task_id`s** carry the **same** `decision_id`/`option_id`. **Clustering is by
 *question*, not by task** — a task with two open questions is gated by two decisions and unblocks only when **both**
 settle (`gating_decision_ids` is an array for exactly this).
@@ -165,50 +152,42 @@ One skill, explicit stages. All Neon access via **`${CLAUDE_PLUGIN_ROOT}/shared/
 never the account-wide MCP (Phase 2 rule); auto-scoped by `user_id`; same npm-bootstrap + egress-fallback as
 `refresh-backlog`.
 
-- **Boot:** read `assets.md` (Asset Map, in full — incl. the **rules index**), `guardrails` config, Jupi slug. Parse
-  run args → `dry_run`, `mode`. No tree exploration.
-- **Stage 0 — Refresh + drain the pile:** run `refresh-backlog` (which now also **pre-empts `open_questions` against the
-  rules index**, D9); then gather `gating_decision_ids` across open tasks, fetch them from Jupi, take
-  **FINALIZED-not-yet-EXECUTED**. *Read + recompute here; execute/notify is Phase 4.*
+- **Boot:** read `assets.md` (Asset Map, in full), `guardrails` config, Jupi slug. Parse run args → `dry_run`, `mode`.
+  No tree exploration.
+- **Stage 0 — Refresh + drain the pile:** run `refresh-backlog`; gather `gating_decision_ids` across open tasks, fetch
+  from Jupi, take **FINALIZED-not-yet-EXECUTED**. *Read + recompute here; execute/notify is Phase 4.*
 - **Stage 1 — Read the window:** `db.mjs query-window [backlogWindowSize]`.
-- **Stage 2 — Route + cluster (the coordination node):**
-  - **Split** the window: tasks **with** open questions → *decide-candidates*; tasks **without** → *act-candidates*.
-  - **Cluster the decide-candidates by shared open-question** — a question several tasks hold in common is a
-    coordination node. Leverage = *value unblocked across tasks per decision*, not per-task score.
-  - **Bound the act-candidates:** keep the **top-scored up to `actBudget`** (P3-7); the rest wait for a later run.
-  - *(Degrades gracefully: nothing shared → single-task "clusters"; still correct, just no factorization.)*
-- **Stage 3 — Research (decision is the *outcome*, not the premise):**
-  - **Per decide-cluster: research the shared question ONCE** — brain (deepen `relevant_facts`; `update-brain` targeted
-    for gaps, never writing Facts), business rules, **past decisions** (`search-decisions`). Then:
-    - research **resolves** it (a rule/prior decision answers it, or context makes it obvious) → the cluster's tasks
-      **flip to act-candidates**; **or**
-    - a real trade-off remains → keep it; confidence `low` for those tasks.
-  - **Per act-candidate (within budget): deep dig** — the V1 "no-blind-spot" context + **≥10 in-channel messages before
-    any message draft**. This both (a) is the backstop that can **surface a hidden question** (→ becomes a
-    decide-candidate; **match to an existing open decision** via `search-decisions`, else a new one) and (b) supplies
-    the context to draft well. Confidence `high` if it stays clean.
+- **Stage 2 — Cluster + rank + bound:** group the window by **shared open-question** (singletons for no-question
+  tasks); rank clusters by **leverage** (value unblocked per decision, not per-task score); keep the **top clusters up to
+  `actBudget`** (P3-7); the rest wait.
+- **Stage 3 — Research each kept cluster once (decision is the *outcome*, not the premise):** deepen `relevant_facts`
+  (`update-brain` targeted for gaps — never writing Facts), read past decisions (`search-decisions`), and for any action
+  that sends a message pull **≥10 in-channel messages first** (V1 rule). Then per cluster:
+  - **no open question** (singleton) → confidence `high` → head to the gate; *but the dig is the backstop* — if it
+    surfaces a hidden trade-off, the task becomes a decision (matched to an existing open decision if one fits, else new).
+  - **open question** → research either **resolves** it (context/prior decision makes it obvious → confidence flips to
+    `high`, act) **or** leaves a real trade-off → confidence `low`, one decision for the cluster.
 - **Stage 4 — Action Planner (materialize fully):**
-  - **Decide-clusters:** for **each option**, plan the concrete per-task action(s) across the cluster and **insert all
-    of them** as `actions` (`status='pending_decision'`, `decision_id`+`option_id`, its own `exposure`). *(We keep full
-    up-front materialization — the schema's sibling-skip model assumes every option's rows exist; settle flips the
-    winner to execute and the rest to `skipped`.)*
-  - **Act-tasks:** materialize the action(s) directly (`status='candidate'`, `decision_id` null, `exposure` tagged).
+  - **Decision cluster:** for **each option**, plan the concrete per-task action(s) and **insert all of them** as
+    `actions` (`status='pending_decision'`, `decision_id`+`option_id`, its own `exposure`). *(Full up-front
+    materialization — the schema's sibling-skip model assumes every option's rows exist; settle flips the winner to
+    execute and the rest to `skipped`.)*
+  - **Act task:** materialize the action(s) directly (`status='candidate'`, `decision_id` null, `exposure` tagged).
     Apply the **draft-mode transform** (§6).
 - **Stage 5 — Gate + emit:**
-  - **Act-tasks** → per-action `(high confidence × exposure)` lookup: `low` → **ACT** (dry-run: table; else draft/perform
-    → `set-action-status executed` + `trace_ref`); `high` → **authorization DECIDE** (or ACT if a rule authorizes / if
-    draft-mode already dropped exposure).
-  - **Decide-clusters** → author the **approach** decision in Jupi (V1 HTML format + validator §11), set the cluster's
-    action rows' `gating_decision_ids` (`db.mjs`). One decision, many tasks.
-  - Set tasks `done`/`dropped` as resolved; a ruled-out task → `dropped` (the V1 `_ruled-out` memory, §12).
-- **Stage 6 — Recompute-on-settle:** Planner is a pure function of `(task, settled_decision, chosen_option)`. When
-  Stage 0 finds a newly-FINALIZED decision: the chosen option's actions **across every task it gated** become
-  executable, siblings → `skipped`, and each touched task is recomputed (may spawn new actions/decisions — recursion).
-  *Phase 3 ships the function; Phase 4 wires the poll + executor.*
+  - **Act task** → per-action `(high × exposure)`: `low` → **ACT** (dry-run: table; else draft/perform →
+    `set-action-status executed` + `trace_ref`); `high` → perform-mode authorization sign-off (deferred, §5) / else the
+    draft already dropped it to ACT.
+  - **Decision cluster** → author the **approach** decision in Jupi (V1 HTML format + validator §11), set the cluster's
+    action rows' `gating_decision_ids`. One decision, many tasks.
+  - Set tasks `done`/`dropped` as resolved; a ruled-out task → `dropped` (V1 `_ruled-out` memory, §12).
+- **Stage 6 — Recompute-on-settle:** Planner is a pure function of `(task, settled_decision, chosen_option)`. On a
+  newly-FINALIZED decision: the chosen option's actions **across every task it gated** become executable, siblings →
+  `skipped`, each touched task recomputed (may recurse). *Phase 3 ships the function; Phase 4 wires the poll + executor.*
 
-**Known limitation (write it down):** factorization that only surfaces on the **deep** dig — two act-candidates that
-turn out to share a question invisible at the shallow stage — is **missed within a run**. They'll cluster on a later run
-once the question is on record. Acceptable; named so it's a known edge, not a silent gap.
+**Known limitation (write it down):** factorization that only surfaces on the **deep** dig — two singletons that turn
+out to share a question invisible at the shallow stage — is **missed within a run**. They cluster on a later run once
+the question is on record. Acceptable; named so it's a known edge.
 
 ---
 
@@ -216,29 +195,27 @@ once the question is on record. Acceptable; named so it's a known edge, not a si
 
 | # | Deliverable | New / changed |
 |---|---|---|
-| D1 | **`act-and-decide` skill** — `skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. Centerpiece: the route+cluster+research-once coordination node (§8 Stage 2–3). | new |
+| D1 | **`act-and-decide` skill** — `skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. Centerpiece: the cluster→rank→research-once loop (§8). | new |
 | D2 | **`shared/db.mjs` write-verbs** — `insert-action '<json>'`, `set-action-status <id> <status> [trace_ref]`, `set-task-gating <task_id> '<decision_ids[]>'`, `close-task <id> <done\|dropped>`, `list-actions-by-decision <decision_id>`. Parameterized, `user_id`-scoped. | changed |
-| D3 | **Gate + draft-mode + dry-run** in `SKILL.md` — §5 matrix (confidence × exposure, two decision kinds), §6 verb-capping, §7 no-write table. | new |
-| D4 | **Config** — `guardrails` block (`mode`, `policy`, `actBudget`, `executedPing`); reuse existing `backlogWindowSize`. | changed |
+| D3 | **Gate + draft-mode + dry-run** in `SKILL.md` — §5 2×2 matrix, §6 verb-capping, §7 no-write table. | new |
+| D4 | **Config** — `guardrails` block (`mode`, `actBudget`, `policy`, `executedPing`); reuse existing `backlogWindowSize`. | changed |
 | D5 | **Producer↔validator loop** — carry `ORCHESTRATION.md`/`VALIDATOR.md`; extend the validator to gate perform-mode sends. | new/changed |
 | D6 | **Un-gate `setup-proactive-jupi`** — create the `act-and-decide` routine; fire one first run as `--dry-run`. | changed |
 | D7 | **`evals/act-and-decide/`** — trigger + behavioral evals (gate classification; a coordination-node case: 2+ tasks sharing a question → **one** decision; injection safety: a signal body must not drive an action/decision). Scratch-isolated. | new |
 | D8 | **Doc updates** — tick Phase 3 items in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) as they land. | changed |
-| D9 | **`refresh-backlog` (Phase-2 skill) — rules pre-emption** — when emitting `open_questions`, drop/mark any a rules-index (`assets.md`) rule answers, so downstream "no open question ⇒ high confidence" holds (P3-4). Cheap, per-run. *(Upstream change; near-no-op until Phase-5 rules exist, but the hook must be there.)* | changed |
 
 ### Config surface (front-loaded, per CLAUDE.md)
 
 ```jsonc
 // .claude/setup.local.json + reference/setup.local.json.template — set in setup's attended prelude
 "guardrails": {
-  "mode": "draft",              // "draft" (default) | "perform"
-  "actBudget": 5,               // max no-open-question tasks deep-dug + acted per run (P3-7); rest wait
-  "policy": {                   // the configurable confidence × exposure matrix (§5)
-    "high":   { "low": "act",    "high": "decide" },
-    "medium": { "low": "act",    "high": "decide" },
-    "low":    { "low": "decide", "high": "decide" }
+  "mode": "draft",            // "draft" (default) | "perform"
+  "actBudget": 5,             // max clusters researched + resolved per run (P3-7); rest wait
+  "policy": {                 // the configurable confidence × exposure 2×2 (§5)
+    "high": { "low": "act",    "high": "decide" },
+    "low":  { "low": "decide", "high": "decide" }
   },
-  "executedPing": "none"        // "email" | "slack" | "none" — the one closing ping (Phase 4)
+  "executedPing": "none"      // "email" | "slack" | "none" — the one closing ping (Phase 4)
 }
 // window reuses the EXISTING top-level "backlogWindowSize" (default 30) — no new key.
 ```
@@ -249,15 +226,13 @@ once the question is on record. Acceptable; named so it's a known edge, not a si
 
 ## 10. Schema touchpoints
 
-`shared/schema.sql` **already supports Phase 3** — `actions.risk/decision_id/option_id/status`
-(`candidate|pending_decision|executed|skipped`), `tasks.gating_decision_ids` (array — multi-gating, §8),
-`tasks.external`, `tasks.signal_url`, `user_id` everywhere. **No migration strictly needed.**
-
-- **`actions.risk` stores the *exposure* value (P3-5).** We keep the column name to avoid a migration; prose says
-  "exposure." *(Optional later rename `risk → exposure` if the mismatch grates — one idempotent `alter`.)*
-- **Confidence placement.** It's now largely **derivable** — "are `open_questions` empty after rules?" — so it needn't
-  be a new column. Judge it in Stage 3; **optionally** persist `tasks.act_confidence` for a queryable dry-run/audit.
-  Phase 2's `actions.confidence`, under this model, is redundant (confidence is task-level) — leave unused or drop.
+`shared/schema.sql` **already supports Phase 3** — no migration needed:
+- `actions.risk` **stores the *exposure* value** (P3-5); we keep the column name, prose says "exposure." *(Optional
+  later rename.)*
+- `actions.status` (`candidate|pending_decision|executed|skipped`), `decision_id`/`option_id`, `tasks.gating_decision_ids`
+  (array → multi-gating, §8), `tasks.external`, `tasks.signal_url`, `user_id` everywhere.
+- **Confidence isn't stored** — it's derived from `open_questions` each run (§3). Phase 2's `actions.confidence` is
+  redundant under this model; leave unused.
 - **Behavioral conventions (not DDL):** dry-run writes nothing; on settle, non-selected options' rows → `skipped`,
   winner's rows (across **all** gated tasks) → execute (§8 Stage 6).
 
@@ -266,10 +241,9 @@ once the question is on record. Acceptable; named so it's a known edge, not a si
 ## 11. Producer ↔ validator loop (carried from V1)
 
 - Every DECIDE draft passes the **validator** (opens real sources, verifies each claim; HTML breathing;
-  links-everywhere — cheap now, `signal_url` pre-captured; relative dates; plain language; elevate vague actions). Max
-  3 iterations; never clears → **deliver nothing** for that item (run proceeds).
-- **New:** the validator also gates **ACT-in-perform** actions before execution (an external send is as consequential
-  as a posted decision). Draft-mode ACTs and dry-run need no gate.
+  links-everywhere — cheap now, `signal_url` pre-captured; relative dates; plain language; elevate vague actions). Max 3
+  iterations; never clears → **deliver nothing** for that item (run proceeds).
+- **New:** the validator also gates **ACT-in-perform** actions before execution. Draft-mode ACTs and dry-run need no gate.
 - Orchestrator persists `report.md`/`validation.md` (sub-agents return text, don't write files — V1 harness note).
 
 ---
@@ -278,37 +252,35 @@ once the question is on record. Acceptable; named so it's a known edge, not a si
 
 | V1 behavior | Phase 3 home | Verdict |
 |---|---|---|
-| Derive **0/1/N decisions from an action**; obvious → just act (Case-0) | Stage 3 backstop + Stage 5 act-branch | **Preserved** — now the "no-open-question" fast path |
-| Actions live **inside decision options** (or a lone Case-0 act), never free-standing on a task | Stage 4 | **Preserved** — this was the earlier conflation, now fixed |
-| "No-blind-spot" deep context dig; ≥10 in-channel messages before a draft; mirror voice; minimal | Stage 3 | **Now owned here** (Phase 2 deferred it) |
+| Derive 0/1/N decisions from context; obvious → just act (Case-0) | Stage 3 backstop + Stage 5 act path | **Preserved** — the "no-open-question" cluster of one |
+| Actions live **inside decision options** (or a lone Case-0 act), never free-standing on a task | Stage 4 | **Preserved** — the earlier conflation, fixed |
+| "No-blind-spot" deep dig; ≥10 in-channel messages before a draft; mirror voice; minimal | Stage 3 | **Now owned here** (Phase 2 deferred it) |
 | Coordination nodes ("orchestration layer for later") | Stage 2–3 | **Now built** — research-once + ask-once across shared questions |
-| Decisions **private** (`allowWorkspaceContributions:false`), STARTED, never finalized | Stage 5 | **Preserved** |
-| Jupi HTML format + breathing + links + relative dates | Validator (§11) | **Preserved** |
-| Producer↔validator; max 3; "deliver nothing" | §11 | **Preserved** |
+| Decisions **private**, STARTED, never finalized | Stage 5 | **Preserved** |
+| Jupi HTML format + breathing + links + relative dates; producer↔validator; "deliver nothing" | §11 | **Preserved** |
 | The pile = gated `actions` rows drained each run | Stage 0 / Stage 6 | **Read+recompute here; execute Phase 4** |
-| `_ruled-out` negative memory | `status='dropped'` + Parser no-resurrect (Phase 2) | **Preserved**; Stage 5 sets `dropped` on rule-out |
-| Pattern → *rule* engine | Rule loop (Phase 5) | **Deferred** — Phase 3 reads `rule_ref`, doesn't author |
+| `_ruled-out` negative memory | `status='dropped'` + no-resurrect (Phase 2) | **Preserved**; Stage 5 sets `dropped` on rule-out |
+| Pattern → *rule* engine | Rule loop (Phase 5) | **Deferred** — Phase 3 has no rules (§14) |
 
 ---
 
 ## 13. Build sequence
 
-1. **D9 `refresh-backlog` rules pre-emption** — small upstream change; makes "no open question ⇒ high confidence" true.
-2. **D2 `db.mjs` write-verbs** — foundation; smoke-test each.
-3. **D1 skill skeleton** — port `SKILL.md` + `reference/*`, re-anchored on `db.mjs` + the window.
-4. **D4 config** — `guardrails` (`mode`, `actBudget`, `policy`, `executedPing`).
-5. **Stages 0–2** — refresh + pile-read; `query-window`; route + cluster + `actBudget` bound.
-6. **Stage 3** — research-once per cluster; budgeted deep dig for act-candidates; the resolve/flip logic both ways.
-7. **D3 Stage 4–5** — full materialization (all options) + the gate (confidence × exposure; two decision kinds).
-8. **Dry-run** — table + no-write guarantee (§7, §10).
-9. **D5 validator loop** — wire it; gate perform-ACTs.
-10. **Stage 6** — recompute-on-settle function (poll/execute → Phase 4).
-11. **D6 setup un-gating**; **D7 evals** alongside D1/D3; **D8 doc ticks**.
+1. **D2 `db.mjs` write-verbs** — foundation; smoke-test each.
+2. **D1 skill skeleton** — port `SKILL.md` + `reference/*`, re-anchored on `db.mjs` + the window.
+3. **D4 config** — `guardrails` (`mode`, `actBudget`, `policy`, `executedPing`).
+4. **Stages 0–2** — refresh + pile-read; `query-window`; cluster + rank + `actBudget` bound.
+5. **Stage 3** — research-once per cluster; the resolve/flip logic both ways (singleton backstop; question-resolves).
+6. **D3 Stage 4–5** — full materialization + the 2×2 gate.
+7. **Dry-run** — table + no-write guarantee (§7, §10).
+8. **D5 validator loop** — wire it; gate perform-ACTs.
+9. **Stage 6** — recompute-on-settle function (poll/execute → Phase 4).
+10. **D6 setup un-gating**; **D7 evals** alongside D1/D3; **D8 doc ticks**.
 
 **Dogfood checkpoints (`sparkling-violet-42081696`):**
-- `refresh-backlog` → `--dry-run` → table: ACT/DECIDE sane? kinds right (approach vs authorization)?
+- `refresh-backlog` → `--dry-run` → table: ACT/DECIDE sane under the default 2×2?
 - Seed **two tasks sharing a question** → confirm **one** decision gating both (the node).
-- Flip a policy cell → verdict changes. Set `actBudget:1` → only the top no-open-question task is dug/acted.
+- Flip a policy cell → verdict changes. Set `actBudget:1` → only the top cluster is researched/resolved.
 - `mode:draft` real run → drafts appear; one private approach decision; `actions` rows correct + `user_id`.
 - Finalize by hand → Stage 6: winner's actions across **all** gated tasks execute; siblings `skipped`.
 
@@ -318,22 +290,26 @@ once the question is on record. Acceptable; named so it's a known edge, not a si
 
 ## 14. Deferred to Phase 4/5 (explicit seam)
 
-- **Phase 4** — scheduled poll-detect; executor (run the chosen option's ACT rows post-settle, write the trace on the
-  signal, one optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to request", parent §8).
-- **Phase 5** — reactive rule authoring (incl. the "always auto-do this?" candidate-rule moment from §5's authorization
-  decisions); Phase 3 only *reads* `rule_ref` and *consumes* the rules index for pre-emption (D9).
+- **Phase 4 — closing loop.** Scheduled poll-detect; executor (run the chosen option's ACT rows post-settle, write the
+  trace on the signal, one optional EXECUTED ping, set Jupi `EXECUTED` — backend write still "to request", parent §8).
+  Also the **perform-mode authorization sign-off** (§5's `high × high` cell) belongs here, alongside real sends.
+- **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
+  running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
+  1. Phases 3–4 raise + settle approach decisions → a Jupi log of *"when X, the owner chose Y."*
+  2. Phase 5: before raising the same decision again, act-and-decide spots the recurrence (`search-decisions`) and
+     instead posts a **rule-decision** — *"When X, always Y?"* (V1 types 2/4) — bundled with the live instance.
+  3. **Owner approves** → the rule is a resolved rule-decision in Jupi, **indexed in `proactive-jupi/assets.md`** (empty
+     today).
+  4. **Read-side** (the deferred "D9"): a matching task's open-question is then **pre-empted against the rules index →
+     confidence high → act without asking** — the task type "graduates from decide to act" (parent §9). Write side and
+     read side are one feature; both need rules to exist → both Phase 5. In Phase 3, confidence is driven purely by the
+     parser's `open_questions`, which is complete on its own.
 
 ---
 
 ## 15. Open items / decisions you may want to flip
 
-- **`actBudget` default (5).** Bounds deep digs per run; interacts with cadence (parent §7). Too low → slow throughput;
-  too high → expensive runs. Tune on dogfood.
-- **Rules pre-emption upstream vs downstream.** D9 puts the cheap rules-index check in `refresh-backlog`; the expensive
-  prior-decision/context-dependent check stays in Stage 3. *Flip:* move all rule-matching downstream if the parser
-  shouldn't grow a rules dependency.
-- **Confidence persistence.** Derivable from open-questions; persist `tasks.act_confidence` only if you want it
-  queryable (§10). *Flip:* numeric confidence if the categorical gate misfires (also enables a scalar threshold, P3-2).
+- **`actBudget` default (5).** Bounds clusters researched per run; interacts with cadence (parent §7). Tune on dogfood.
 - **`risk → exposure` column rename** — deferred (kept `actions.risk` as the store). Rename if the prose/DDL mismatch grates.
 - **First setup run = `--dry-run`** — proves the loop with zero side-effect. *Flip:* a real draft-mode run.
 - **Perform-mode validator latency** — a round-trip per external send; fine at low volume, revisit at scale.
