@@ -109,7 +109,7 @@ LAYER          └── read by every automation stage; written by update-brain
 - **`update-brain`** — maintains Facts & relationships in **Supermemory** (crawler model: coverage + backlog of topics to investigate).
 - **`refresh-backlog`** *(Phase 2)* — signal → scored task (parse → score); the cheap upstream stage.
 - **`act-and-decide`** *(Phase 3, planner)* — cluster → research-once → act-or-decide → plan. **Writes only Neon + Jupi; never touches user tools.**
-- **`execute-actions`** *(Phase 3 draft path / Phase 4 full)* — the **only tool-writer**; runs `ready` action rows (draft or real), triggered at end-of-run and on decision-finalize.
+- **`execute-actions`** *(Phase 3)* — the **only tool-writer**; **one executor** that runs a `ready` row's verb (draft or real — same tool-call), triggered at end-of-run. The **closing loop** (settle-trigger + `EXECUTED` bookkeeping) is Phase 4; `perform` mode is config on the same executor, not a separate build.
 
 *(The split by responsibility — planner writes the queue, worker drains it — replaces the earlier "one skill, execute inline" leaning: separating them keeps the planner side-effect-free and lets the closing loop reuse the same worker. See PHASE-3-PLAN §8.)*
 
@@ -218,13 +218,13 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 **Phase 3 — Act-or-Decide + Action Planner** → detailed plan: [PHASE-3-PLAN.md](PHASE-3-PLAN.md)
 - **Two skills, split by responsibility (PHASE-3-PLAN §8):** **`act-and-decide`** (the *planner* — writes only Neon + Jupi, never touches user tools) and **`execute-actions`** (the *worker* — the only tool-writer; runs `ready` action rows). The `actions` table is the queue between them.
 - **`act-and-decide`:** cluster the window by **shared open-question** (the coordination node — one decision can gate actions across many tasks; a task with no open question is a cluster of one), rank by leverage, **research each kept cluster once** (bounded by a per-run `actBudget`), then the **confidence × exposure 2×2 gate** (§6) writes either a `ready` row or a Jupi decision. Confidence is binary (open-question or not); exposure is draft-first, then destination.
-- **`execute-actions`:** runs `ready` rows — in Phase 3, the **draft path** only (real Gmail/Linear drafts), triggered at the end of an act-and-decide run. **`perform` mode's real-send path + the on-finalize trigger are Phase 4** (one executor, built once).
+- **`execute-actions`:** **one executor** — runs a `ready` row's verb (draft or real, same tool-call), triggered at the end of an act-and-decide run. Phase 3 defaults to `draft`; `perform` is a config flip on the *same* executor. What lands in **Phase 4 is the closing loop** (poll settled decisions → execute → `EXECUTED` + ping + reopen the `blocked` task), which is what makes high-exposure/external actions fire.
 - **Safety ladder:** `--dry-run` (classify only, no writes) → `draft` (default; planner writes rows/decisions, worker drafts) → `perform` (Phase 4).
 - Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
 
-**Phase 4 — Closing loop + notifications** (all in `execute-actions`)
-- Scheduled **poll-detect** of FINALIZED decisions → flip the chosen option's rows `pending_decision → ready` (siblings `skipped`) → run the same worker → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse.
-- **`perform` mode activates here:** the worker's real-send/post/booking path (immediate perform-ACTs and settled-decision actions), with validator-gated sends. One executor extended, not rebuilt.
+**Phase 4 — Closing loop + notifications** (the second *trigger* of the same `execute-actions` worker — not a new execution path; blocked on the Jupi FINALIZED read + EXECUTED-write)
+- Scheduled **poll-detect** of FINALIZED decisions → flip the chosen option's rows `pending_decision → ready` (siblings `skipped`) → run the same worker → **reopen the `blocked` task** → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse. This is what makes settled decisions — hence every high-exposure/external action — fire.
+- *(`perform` mode is config on the Phase-3 executor, not a Phase-4 build; validator-gated sends run whenever it's enabled.)*
 
 **Phase 5 — Rule loop**
 - Reactive rule-decisions during execution; owner-approval path → Business rules store.

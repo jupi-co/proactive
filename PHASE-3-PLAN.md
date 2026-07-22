@@ -32,7 +32,7 @@ routine and fire one first run at the end of setup."
 |---|---|---|
 | P3-1 | Task source | **Backlog-read only** — consume Phase 2's scored tasks via `query-window`. |
 | P3-2 | Gate model | **Configurable 2×2 matrix** — `confidence (high/low) × exposure (low/high)`; config picks which cells ACT vs DECIDE (the parent §6 table). |
-| P3-3 | Draft mode | **Global switch** — `draft`/`perform`; read by the *gate* (draft form ⇒ low exposure ⇒ more ACT) and applied by `execute-actions`. Draft is Phase 3-operational; perform activates with Phase 4's executor. |
+| P3-3 | Draft mode | **Global switch** — `draft`/`perform`; read by the *gate* (draft form ⇒ low exposure ⇒ more ACT) and applied by `execute-actions`, which runs draft or real with the *same* executor (§8b). Perform is a **config flip, not a build**; default `draft`. What's Phase 4 is the **closing loop** (settled-decision execution), not a perform path. |
 | P3-4 | Confidence | **Binary, from `open_questions`** — none ⇒ `high` (act-eligible); a genuine open question ⇒ `low` ⇒ DECIDE. Runtime, not persisted. *(Phase 5 rules will empty open-questions upstream — §14.)* |
 | P3-5 | Second axis | **`exposure`** (was "risk") — **draft-first**, then destination/sensitivity/irreversibility. Stored column stays `actions.risk` (§10). |
 | P3-6 | Decision mechanism | **One mechanism** — DECIDE posts a Jupi decision (Phase 3). Options read as *"which approach?"* (low confidence) or *"do exactly this / hold / modify"* (high confidence + high exposure, can't draft) — content, not machinery. |
@@ -67,12 +67,14 @@ the ladder is really about **what `execute-actions` does** (and dry-run's short-
 |---|---|---|---|---|
 | **0 · dry-run** | `--dry-run` (run arg) | *nothing* — classify only, render the table | not invoked | **None.** (§7) |
 | **1 · draft (default)** | `mode:"draft"` | `ready`/`pending_decision` rows + posts decisions | **creates drafts** for `ready` rows | Drafts + private decisions. No external send. |
-| **2 · perform** *(Phase 4)* | `mode:"perform"` | same planning | **fires the real verb** for `ready` rows | Real side effects, gate-permitting. |
+| **2 · perform** *(config; default off)* | `mode:"perform"` | same planning | **fires the real verb** for `ready` rows | Real side effects, gate-permitting. |
 
-**Phase 3 is draft-operational; perform activates in Phase 4** — the executor's real-verb path (sends/posts/bookings) +
-trace/notify + the on-finalize trigger are the Phase 4 build (§14). Phase 3's `execute-actions` is **safe by
-construction**: the gate only ever marks *draftable / low-exposure* actions `ready` — everything risky is a decision
-(§5), so there's nothing dangerous in the queue.
+**`mode` is config, not a phase.** The `execute-actions` executor runs a `ready` row's verb the same way whether it's a
+draft or a real send (§8b) — so perform needs **no new execution code**; it's a config/trust flip, default `draft` for a
+conservative Phase-3 dogfood. **Safe by construction:** the gate only ever marks *low-exposure* actions `ready` —
+everything high-exposure is a decision (§5), whose action executes through the **closing loop (Phase 4)**. So real
+*external* side-effects only ever happen via a settled decision + the closing loop (the golden rule). What Phase 4 adds
+is that **closing loop** — the settle-trigger + `EXECUTED` bookkeeping (§14) — not a perform "path."
 
 ---
 
@@ -108,8 +110,8 @@ verdict **only writes a row status** — it never executes:
    actions become their draft verb → `exposure=low` → **ACT** (a `ready` row whose `description` says "create draft…").
    Non-draftable high-exposure actions don't collapse → **DECIDE** (§5). Low-exposure reversible ones (RSVP, label,
    search) act in both modes.
-2. **In the worker (`execute-actions`):** it just runs the verb the row already carries — creating the draft (draft
-   mode) or firing the real send (perform mode, Phase 4).
+2. **In the worker (`execute-actions`):** it just runs the verb the row already carries — creating the draft, or firing
+   the real send — *the same tool-call either way* (§8b). No separate perform "path."
 
 **Settled-decision actions always carry real verbs** and execute for real once chosen — the decision *was* the approval,
 so draft mode caps only *immediate* acts, not the outcome of a decision.
@@ -190,16 +192,23 @@ gated by two decisions and unblocks only when **both** settle (`gating_decision_
 ### 8b. `execute-actions` — the worker (the only tool-writer)
 
 Dead-simple: **`SELECT ready rows; run each; mark `executed` + `trace_ref`.`** It touches **only `actions.status`** —
-never `tasks.status` (that's act-and-decide's, §8). Runs the verb the row carries — draft (Phase 3) or real send
-(perform, Phase 4). Two triggers, same core:
-- **(a) end of an `act-and-decide` run** — the immediate ACTs just queued.
+never `tasks.status` (that's act-and-decide's, §8). **One path, not two** — it runs whatever verb the row carries
+(`create_draft`, `send_email`, `label`, `book`…); a draft and a real send are the *same* tool-call mechanism, and the
+planner already chose the verb (per `mode`). So there is no separate "draft path" vs "perform path" — the executor is
+complete once built. Two triggers:
+- **(a) end of an `act-and-decide` run** *(Phase 3)* — run the immediate ACTs just queued.
 - **(b) decision finalize** *(Phase 4 closing loop)* — flip the chosen option's rows `pending_decision → ready`, siblings
-  → `skipped`, run them, then **reopen the `blocked` task (`→ open`)** so act-and-decide re-dispositions it next pass
-  (folding in the chosen option; it may act → `done`, or spawn a fresh decision → `blocked` again). That re-disposition
-  *is* "recompute-on-settle." Reopening keeps the task-status owner (act-and-decide) the one that closes it.
+  → `skipped`, run them (same executor), then **reopen the `blocked` task (`→ open`)** so act-and-decide re-dispositions
+  it (may act → `done`, or spawn a fresh decision → `blocked`). That re-disposition *is* "recompute-on-settle."
 
-*Phase 3 builds trigger (a) with the **draft path**. Phase 4 adds the **real-verb path**, trigger (b), the trace on the
-signal, the EXECUTED ping, and Jupi `EXECUTED` (§14).*
+**What's actually Phase 4 is trigger (b), not a different execution path** — the scheduled poll, `set Jupi EXECUTED`, the
+optional ping, the reopen — deferred because it's **blocked on the Jupi FINALIZED read + EXECUTED-write** (parent §8),
+not because real verbs are harder to run.
+
+**`mode` is config, not a phase.** The executor runs draft or real identically; Phase 3 defaults to `draft` for a
+conservative dogfood. The safety invariant holds in either mode: **only low-exposure actions ever reach `ready`**
+(high-exposure is always a decision, §5), so real *external* side-effects only happen via a settled decision + the
+closing loop — exactly the golden rule.
 
 **Known limitation:** factorization that only surfaces on the **deep** dig — two singletons that turn out to share a
 question invisible at the shallow stage — is missed within a run; they cluster next run once the question is on record.
@@ -212,10 +221,10 @@ question invisible at the shallow stage — is missed within a run; they cluster
 |---|---|---|
 | D1 | **`act-and-decide` skill** — planner: `skills/act-and-decide/{SKILL.md, reference/ORCHESTRATION.md, reference/VALIDATOR.md}`, ported from V1, re-anchored on `db.mjs`. Writes only Neon + Jupi (§8a). | new |
 | D2 | **`shared/db.mjs` write-verbs** — `insert-action '<json>'`, `set-action-status <id> <status> [trace_ref]`, `set-task-status <id> <open\|blocked\|done\|dropped>`, `set-task-gating <task_id> '<decision_ids[]>'`, `list-actions <status\|decision_id>` (queue read for the worker). Parameterized, `user_id`-scoped. *(act-and-decide calls `set-task-status`; execute-actions calls `set-action-status` — §10 ownership.)* | changed |
-| D3 | **`execute-actions` skill** — the worker: reads `ready` rows, runs the draft path, marks `executed`+`trace_ref`; invoked at end of an act-and-decide run. Perform path + finalize trigger + trace/notify are Phase 4 (§14). | new |
+| D3 | **`execute-actions` skill** — the worker: reads `ready` rows, runs **each row's verb** (draft or real — same tool-call), marks `executed`+`trace_ref`; invoked at end of an act-and-decide run (trigger *a*). The **closing loop** (trigger *b*: poll settle → run → `EXECUTED` + ping + reopen) is Phase 4 (§14). | new |
 | D4 | **Gate + draft-mode + dry-run** in `act-and-decide` — §5 2×2, §6 verb form, §7 no-write table. | new |
 | D5 | **Config** — `guardrails` (`mode`, `actBudget`, `policy`, `executedPing`); reuse `backlogWindowSize`. | changed |
-| D6 | **Producer↔validator loop** — carry `ORCHESTRATION.md`/`VALIDATOR.md`; validator gates DECIDE drafts (perform-send gating → Phase 4). | new/changed |
+| D6 | **Producer↔validator loop** — carry `ORCHESTRATION.md`/`VALIDATOR.md`; validator gates DECIDE drafts, and vets a real send before `execute-actions` fires it (runs when `perform` is enabled). | new/changed |
 | D7 | **Un-gate `setup-proactive-jupi`** — create the `act-and-decide` routine; fire one first run as `--dry-run`. | changed |
 | D8 | **`evals/act-and-decide/`** — gate classification; a coordination-node case (2+ tasks sharing a question → **one** decision); injection safety (a signal body must not drive an action/decision). Scratch-isolated. | new |
 | D9 | **Doc updates** — tick Phase 3 items in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) as they land. | changed |
@@ -263,8 +272,8 @@ question invisible at the shallow stage — is missed within a run; they cluster
 - Every DECIDE draft passes the **validator** (opens real sources, verifies each claim; HTML breathing; links-everywhere
   — cheap now, `signal_url` pre-captured; relative dates; plain language; elevate vague actions). Max 3 iterations; never
   clears → **deliver nothing** for that item (run proceeds).
-- **Extends in Phase 4:** the validator also gates real sends before `execute-actions` fires them (designed here,
-  exercised when perform activates). In Phase 3 it gates DECIDE drafts only; draft-path ACTs and dry-run need no gate.
+- **Also gates real sends:** before `execute-actions` fires a real (non-draft) verb, the same validator vets it —
+  exercised whenever `perform` is enabled (config, not a phase). Draft ACTs and dry-run need no gate.
 - Orchestrator persists `report.md`/`validation.md` (sub-agents return text, don't write files — V1 harness note).
 
 ---
@@ -313,12 +322,12 @@ question invisible at the shallow stage — is missed within a run; they cluster
 
 ## 14. Deferred to Phase 4/5 (explicit seam)
 
-- **Phase 4 — closing loop + perform mode**, all in `execute-actions`. Scheduled **poll-detect** of FINALIZED decisions →
-  flip chosen rows `pending_decision → ready`, siblings `skipped`, **reopen the `blocked` task (`→ open`)** for
-  re-disposition (trigger *b*); the **real-verb path** (sends/posts/bookings) so `mode:"perform"` and settled-decision
-  actions actually fire; the **trace** on the signal; one optional **EXECUTED ping** (`executedPing`); set Jupi
-  **`EXECUTED`** (backend write still "to request", parent §8); validator-gated sends (§11). One worker, extended — not
-  rebuilt.
+- **Phase 4 — the closing loop** (trigger *b* of the *same* `execute-actions` worker; **not** a new execution path).
+  Blocked on the Jupi FINALIZED read + EXECUTED-write (parent §8). Scheduled **poll-detect** of FINALIZED decisions →
+  flip chosen rows `pending_decision → ready`, siblings `skipped` → run them (same executor) → **reopen the `blocked`
+  task (`→ open`)** → write the **trace** on the signal → one optional **EXECUTED ping** (`executedPing`) → set Jupi
+  **`EXECUTED`**. This is what makes settled decisions — hence every high-exposure/external action (§5) — actually fire.
+  *(Perform mode itself is just config on the Phase-3 executor, §4; enabling it is a trust decision, not a Phase-4 build.)*
 - **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
   running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
   1. Phases 3–4 raise + settle decisions → a Jupi log of *"when X, the owner chose Y."*
