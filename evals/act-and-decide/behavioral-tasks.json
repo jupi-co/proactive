@@ -25,7 +25,7 @@
     {
       "id": 5,
       "prompt": "REAL DRAFT-MODE run (mode=draft) over eval-prefixed fixture tasks: one low-exposure act task and one task with a genuine open question. Eval-isolated (signal_ref 'eval:%').",
-      "expected": "The act task's action row is set 'ready' and execute-actions turns it into a real Gmail/Linear DRAFT (trace recorded); its task → 'done'. The open-question task gets a private STARTED Jupi decision, its option rows stay 'pending_decision', gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward."
+      "expected": "The act task gets one 'ready' action row and execute-actions turns it into a real Gmail/Linear DRAFT (trace recorded); its task → 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi — NO actions rows are written for pending options), gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward."
     }
   ]
 }

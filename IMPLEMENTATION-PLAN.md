@@ -139,7 +139,7 @@ The noise control. Confidence is **task-level** (do we know how to handle it? �
 - A **rule** (Phase 5) raises **confidence** by pre-empting the open question → a task graduates from "decide every time" to "act." *(Earlier framed as lowering risk; the Phase-3 model routes it through confidence instead.)*
 - Result: the user is interrupted **only for genuine trade-offs.** No artificial per-day cap.
 
-*Phase-3 refinements (PHASE-3-PLAN §5): the gate is a **configurable 2×2** (`guardrails.policy`); the DECIDE verdict just writes a Neon row status (`ready` vs `pending_decision`) — the `act-and-decide` planner never executes; `execute-actions` does (§4a, §11 Phase 3).*
+*Phase-3 refinements (PHASE-3-PLAN §5): the gate is a **configurable 2×2** (`guardrails.policy`); an ACT writes a `ready` Neon row and a DECIDE posts a Jupi decision (its options live in Jupi, not Neon) — the `act-and-decide` planner never executes; `execute-actions` does (§4a, §11 Phase 3).*
 
 ---
 
@@ -162,9 +162,9 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 
 **Decision lifecycle — in Jupi:** `STARTED → FINALIZED (user settles) → EXECUTED (loop ran the action)`. **EXECUTED is a status on the Jupi decision itself** (a Jupi backend addition to request), so the full lifecycle lives in the decision log. **No separate registry:** the executable instruction lives in the **`actions` rows** (each gated by `decision_id` + `option_id`); the decision + authoritative status live in Jupi. This is what stops a finalized decision being missed or run twice.
 
-1. **The pile = gated action rows:** for each created decision, its options' actions sit in `actions` with `status='pending_decision'` (`decision_id` + `option_id` set) and the instruction in `description`.
+1. **The pile = `blocked` tasks:** each carries `gating_decision_ids`. The options' actions are **not** duplicated in Neon — they live in the Jupi decision (each option's `Action:` list); the chosen one is materialized as a `ready` `actions` row only at settle.
 2. **Detect (pull):** each run, gather `gating_decision_ids` across **`blocked`** tasks (those awaiting a decision — `act-and-decide` parked them there, PHASE-3-PLAN §8) and fetch those decisions from Jupi; take the **FINALIZED** ones not yet **EXECUTED** (finalized-status read arriving in ~1–2 days). Push later = Jupi POSTs the routine's run endpoint (§ execution model).
-3. **Execute** *(the `execute-actions` worker)*: flip the **selected** option's rows `pending_decision → ready`, skip siblings (`skipped`), run them against the tools, **reopen the `blocked` task (`→ open`)** so `act-and-decide` re-dispositions it; then **set the Jupi decision to EXECUTED**. Same worker as immediate acts (PHASE-3-PLAN §8b).
+3. **Execute** *(the `execute-actions` worker)*: **materialize the selected option's action as `ready` rows** (per gated task, from the Jupi option), run them against the tools, **reopen the `blocked` task (`→ open`)** so `act-and-decide` re-dispositions it; then **set the Jupi decision to EXECUTED**. Same worker as immediate acts (PHASE-3-PLAN §8b).
 4. **Trace = the natural notification.** The execution writes its result **on the originating signal itself** — a reply in the Slack thread, the sent email, the Linear comment. That *is* the notification: it flows up naturally to whoever is on that signal. Nothing extra is pushed for it.
 5. **At most one explicit ping** on the FINALIZED→EXECUTED transition, to the user: **email, Slack, or none** (configurable). The only proactive closing notification — no digest, no per-action spam.
 6. **Recurse:** if execution surfaces a new trade-off, raise a new decision.
@@ -223,7 +223,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
 
 **Phase 4 — Closing loop + notifications** (the second *trigger* of the same `execute-actions` worker — not a new execution path; blocked on the Jupi FINALIZED read + EXECUTED-write)
-- Scheduled **poll-detect** of FINALIZED decisions → flip the chosen option's rows `pending_decision → ready` (siblings `skipped`) → run the same worker → **reopen the `blocked` task** → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse. This is what makes settled decisions — hence every high-exposure/external action — fire.
+- Scheduled **poll-detect** of FINALIZED decisions → **materialize the chosen option's action as `ready` rows** (per gated task, from the Jupi option) → run the same worker → **reopen the `blocked` task** → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse. This is what makes settled decisions — hence every high-exposure/external action — fire.
 - *(`perform` mode is config on the Phase-3 executor, not a Phase-4 build; validator-gated sends run whenever it's enabled.)*
 
 **Phase 5 — Rule loop**

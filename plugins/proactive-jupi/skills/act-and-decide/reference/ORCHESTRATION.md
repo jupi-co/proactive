@@ -13,7 +13,7 @@ chaining contract for the runner. The producer is `SKILL.md`; the validator is `
 1. PRODUCER (SKILL.md) ────► decision draft (Stages 3–4: researched, actions materialized)
 1b. PLAIN-LANGUAGE PASS ───► re-read every user-facing word; rewrite plain & non-cryptic, before the gate
 2. VALIDATOR (reference/VALIDATOR.md) reads the draft + OPENS THE REAL SOURCES
-      ├─ PASS            ──► POST it in Jupi (create-decision-tool, private, STARTED) + leave rows pending_decision
+      ├─ PASS            ──► POST it in Jupi (create-decision-tool, private, STARTED) + set-task-gating the task(s)
       └─ RETURN (flags)  ──► back to the PRODUCER with the flags
 3. PRODUCER resumes: opens the sources, verifies, fixes, resubmits.
 4. Loop back (return to step 2).
