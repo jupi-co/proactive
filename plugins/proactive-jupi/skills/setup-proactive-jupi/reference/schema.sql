@@ -1,4 +1,4 @@
--- Auto-Jupi backlog store — Neon Postgres.
+-- Proactive-Jupi backlog store — Neon Postgres.
 -- Applied by the setup skill (step 4). Idempotent.
 --
 -- Two tables: TASKS (the backlog) and ACTIONS (units of execution).

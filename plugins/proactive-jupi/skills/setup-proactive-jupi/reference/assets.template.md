@@ -5,7 +5,7 @@ The system's own capability inventory. **Read in full** by act-or-decide; **hand
 ## Tools — connected MCPs + action surface
 `Connected` is ticked by setup after a successful probe.
 
-| Tool | Connected | Action surface (what Auto-Jupi may do) |
+| Tool | Connected | Action surface (what Proactive-Jupi may do) |
 |---|---|---|
 | Gmail | ☐ | read; draft · send (external) |
 | Google Calendar | ☐ | read; create/update events |

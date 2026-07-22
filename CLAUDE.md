@@ -11,9 +11,10 @@ Conventions for any Claude session operating this workspace. Full rationale in [
 - **Fact** = knowledge about people/orgs/projects, in Supermemory.
 
 ## State homes (authoritative)
+Setup runs **inside the user's existing repo**, so everything Proactive-Jupi owns is namespaced under a single **`proactive-jupi/`** data folder at the workspace root — it must not scatter files across the user's tree. Only harness-owned config stays in `.claude/` (`settings.json` *must* live there; `setup.local.json` by convention).
 - **Facts → Supermemory.** Only `update-context` writes them.
 - **Backlog + actions → Neon** (`db/schema.sql`); each action carries `decision_id`/`option_id` (no separate registry).
-- **Asset Map → `assets.md`** (hand-editable; read in full).
+- **Asset Map → `proactive-jupi/assets.md`** (hand-editable; read in full).
 - **Decisions + lifecycle (`STARTED → FINALIZED → EXECUTED`) → Jupi.**
 
 ## Golden rules

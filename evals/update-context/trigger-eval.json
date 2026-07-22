@@ -6,7 +6,7 @@
   {"query": "get me up to speed on the Mirakl account — the people, the deal, where it stands — before the review", "should_trigger": true},
   {"query": "run update-context", "should_trigger": true},
   {"query": "we onboarded a new prospect, Choose. go learn everything you can about them from my inbox and calendar", "should_trigger": true},
-  {"query": "make sure Auto-Jupi knows about my current projects and the people I work with", "should_trigger": true},
+  {"query": "make sure Proactive-Jupi knows about my current projects and the people I work with", "should_trigger": true},
   {"query": "what do we actually know about the Worldia pilot and who's involved?", "should_trigger": true},
   {"query": "refresh the facts about my org and team", "should_trigger": true},
   {"query": "set up my workspace — connect my tools and get the backlog going", "should_trigger": false},

@@ -1,10 +1,10 @@
 ---
 name: update-context
 description: >-
-  Auto-Jupi's context crawler — the single writer of Facts about the user's world (people,
+  Proactive-Jupi's context crawler — the single writer of Facts about the user's world (people,
   orgs, projects, processes, tools, goals), built by reading the user's connected tools
   (Gmail, Calendar, Linear, and so on) and stored in Supermemory. Use it whenever the goal is
-  to build up, refresh, extend, or correct what Auto-Jupi knows: "update the context",
+  to build up, refresh, extend, or correct what Proactive-Jupi knows: "update the context",
   "refresh my context", "crawl my world", "update-context", "the brain feels stale", or an
   entity lookup such as "who is this person?", "what do we know about this company or
   project?", "get me up to speed on an account before a meeting". Also runs from the daily
@@ -13,14 +13,14 @@ description: >-
   returns a short summary). Read-only on the tools — it never acts, drafts, or decides. Not
   for: the initial workspace cold-start (that is setup-proactive-jupi, which then calls
   this), doing a task or drafting a reply (act-and-decide), or looking up past decisions
-  (search-decisions). Reach for it any time the work is about enriching what Auto-Jupi knows
+  (search-decisions). Reach for it any time the work is about enriching what Proactive-Jupi knows
   — don't wait for the word "skill".
 disable-model-invocation: false
 ---
 
-# update-context — Auto-Jupi's context crawler
+# update-context — Proactive-Jupi's context crawler
 
-You build and maintain **the brain**: what Auto-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
+You build and maintain **the brain**: what Proactive-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
 
 **Read `references/supermemory.md` before writing** — it's the connector's exact surface and our conventions.
 

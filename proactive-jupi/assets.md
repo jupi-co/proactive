@@ -5,7 +5,7 @@ The system's own capability inventory. **Read in full** by act-or-decide; **hand
 ## Tools — connected MCPs + action surface
 `Connected` is set by provisioning after a successful probe. `Risk default` seeds the confidence × risk gate (plan §6).
 
-| Tool | Connected | Action surface (what Auto-Jupi may do) | Risk default |
+| Tool | Connected | Action surface (what Proactive-Jupi may do) | Risk default |
 |---|---|---|---|
 | Gmail | ☑ | read; **draft** (low) · send (high — external) | draft-only |
 | Google Calendar | ☑ | read; create/update events | draft-only |
