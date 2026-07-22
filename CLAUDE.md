@@ -13,7 +13,7 @@ Conventions for any Claude session operating this workspace. Full rationale in [
 ## State homes (authoritative)
 Setup runs **inside the user's existing repo**, so everything Proactive-Jupi owns is namespaced under a single **`proactive-jupi/`** data folder at the workspace root — it must not scatter files across the user's tree. Only harness-owned config stays in `.claude/` (`settings.json` *must* live there; `setup.local.json` by convention).
 - **Facts → Supermemory.** Only `update-brain` writes them.
-- **Backlog + actions → Neon** (`db/schema.sql`); each action carries `decision_id`/`option_id` (no separate registry).
+- **Backlog + actions → Neon** (`db/schema.sql`); each action carries `decision_id`/`option_id` (no separate registry). **Every row is keyed by `user_id` = `whoAmI.userId`** — the same identity as the brain's container tag `user_<userId>`, one identity across both stores. The project-scoped conn string is a physical boundary; `user_id` is the row-level one (a shared DB separates users by it). Every query filters by `user_id`.
 - **Asset Map → `proactive-jupi/assets.md`** (hand-editable; read in full).
 - **Decisions + lifecycle (`STARTED → FINALIZED → EXECUTED`) → Jupi.**
 
