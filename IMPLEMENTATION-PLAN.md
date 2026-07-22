@@ -88,15 +88,15 @@ LAYER          └── read by every automation stage; written by update-brain
 |---|---|---|
 | **Facts & relationships** (people/orgs/projects/processes) | **Supermemory** | built for semantic recall; written by `update-brain` |
 | **Task backlog** + **actions** (each action carries its `decision_id`/`option_id` + the executable instruction) | **Neon Postgres** (serverless) — `tasks` + `actions` tables (no separate registry). **Flat-file fallback** for data-wall accounts. | mutable, ordered, exactly-enumerated, recomputed each run — a DB does `ORDER BY score` / `WHERE status='open'` / transactional updates natively; an LLM rewriting a markdown table each run is brittle |
-| **Asset Map** (tools + action surfaces, agents-for-reuse, rules index) | **`proactive-jupi/assets.md`** — flat markdown, read in full, hand-edited. **No Supermemory mirror.** | config you enumerate in full and edit by hand; markdown is the right size |
+| **Asset Map** (tools + action surfaces, agents-for-reuse, rules index) | **`.proactive-jupi/assets.md`** — flat markdown, read in full, hand-edited. **No Supermemory mirror.** | config you enumerate in full and edit by hand; markdown is the right size |
 | **Decisions + full lifecycle** (incl. EXECUTED) | **Jupi** | Jupi is the decision log (§8) |
-| **Business rules** (*when X, always Y*) | Jupi (resolved rule-decisions) → indexed in `proactive-jupi/assets.md` | empty today; accretes reactively via task→decision→rule |
+| **Business rules** (*when X, always Y*) | Jupi (resolved rule-decisions) → indexed in `.proactive-jupi/assets.md` | empty today; accretes reactively via task→decision→rule |
 
-**`proactive-jupi/assets.md` is plain markdown, no Supermemory mirror.** You read an asset map *in full* and edit it by hand — never top-K semantic retrieval — so markdown is the right size; act-or-decide just reads the whole (small) file. *Upgrade trigger:* revisit only if the map grows large, needs programmatic filtering, or goes multi-user.
+**`.proactive-jupi/assets.md` is plain markdown, no Supermemory mirror.** You read an asset map *in full* and edit it by hand — never top-K semantic retrieval — so markdown is the right size; act-or-decide just reads the whole (small) file. *Upgrade trigger:* revisit only if the map grows large, needs programmatic filtering, or goes multi-user.
 
 **Backlog + decision registry → Neon Postgres (serverless).** The backlog is the one genuinely structured-mutable store (scores/statuses recomputed each run) — exactly where a file is weakest and a DB strongest. Neon is trivial to stand up and **matches Jupi's own Postgres**, so we build the real store once and scale to a partner with **no migration**. It also dissolves the file-explosion worry: done tasks carry `status='done'` and drop out of the active `WHERE status='open'` query — dedup + audit history retained for free, no wiping. Access via the Neon MCP / serverless driver (*confirm at build time*). **Data-wall accounts** that refuse cloud keep a flat-file backlog fallback.
 
-**Only Facts live in Supermemory** — the backlog (Neon) and `proactive-jupi/assets.md` *read* Facts from it but don't live there.
+**Only Facts live in Supermemory** — the backlog (Neon) and `.proactive-jupi/assets.md` *read* Facts from it but don't live there.
 
 **Execution leaves a trace where the work happened.** Every executed action writes its proof next to the originating signal (the Slack reply, the sent email or draft, the Linear comment) — so any random check finds *why* and *what*, in place (§8).
 
