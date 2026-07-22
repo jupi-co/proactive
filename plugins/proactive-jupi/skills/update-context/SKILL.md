@@ -28,6 +28,7 @@ You build and maintain **the brain**: what Auto-Jupi knows about the user and th
 - **Write** with the `memory` tool (`save`); **read** with `recall`. Both take a `containerTag`.
 - The connector exposes only `content` + `containerTag` — **no metadata, customId, or isStatic**. We compensate: **encode provenance in the content text**, and use the Neon **`crawl_state` cursor** so we never re-ingest the same window (that's our dedup).
 - **Container tag** = one user-level tag from `whoAmI` → **`user_<userId>`**. Call `whoAmI` at run start to get it. (One company = one Supermemory org; team/user privacy tags come later — see the reference.)
+- **Save memories ONE AT A TIME — never in parallel — and check that each save's confirmation names your container tag.** The connector has been observed to **misroute parallel/batched `save` calls into a different container tag** (verified 2026-07-21), which would leak Facts across the isolation boundary — a privacy break. So: issue saves sequentially; if a confirmation reports the wrong tag, re-save that one. Do not fan out saves.
 
 ## What a Fact looks like
 Every saved memory is a compact, standalone statement with its **type and provenance inline**, so semantic recall carries the structure the connector won't store as metadata:
