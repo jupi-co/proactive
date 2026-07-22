@@ -34,7 +34,10 @@ create table if not exists tasks (
   signal_type     text,                                -- gmail | calendar | linear | slack | github | drive
   signal_url      text,                                -- permalink to the signal, captured at parse time (clickable <a href> for Phase-3 decisions)
   status          text not null default 'candidate'
-                    check (status in ('candidate','open','done','dropped')),
+                    -- candidate → open (scored) → blocked (awaiting a decision) | done | dropped.
+                    -- act-and-decide owns this column; 'blocked' is what keeps query-window
+                    -- (status='open' only) from re-surfacing a task it already handled.
+                    check (status in ('candidate','open','blocked','done','dropped')),
   -- observed signal facts (parser) — feed the computed urgency
   signal_at       timestamptz,                         -- when the ball entered your court (last inbound / assigned / event time) — drives urgency's age
   external        boolean not null default false,      -- counterparty outside the org — feeds urgency AND the Phase-3 risk gate
@@ -76,10 +79,13 @@ create table if not exists actions (
   tool          text not null,                         -- where the action runs
   description   text not null,                         -- the executable action-instruction ("send email to X saying Y")
   rule_ref      text,                                  -- business rule (Jupi) that justified acting, if any
-  risk          text check (risk in ('low','high')),   -- internal/reversible vs external/sensitive
-  confidence    text check (confidence in ('low','medium','high')),
+  risk          text check (risk in ('low','high')),   -- EXPOSURE (Phase-3 name): draft-first, then destination/irreversibility. Column kept as `risk`.
+  confidence    text check (confidence in ('low','medium','high')),   -- unused in Phase 3 (confidence is task-level, derived from open_questions each run)
+  -- candidate → ready (gated to ACT, queued for execute-actions) → executed;
+  --           → pending_decision (gated to a Jupi option) → ready (chosen) | skipped (sibling).
+  -- execute-actions owns this column (ready → executed); it never writes tasks.status.
   status        text not null default 'candidate'
-                  check (status in ('candidate','pending_decision','executed','skipped')),
+                  check (status in ('candidate','ready','pending_decision','executed','skipped')),
   trace_ref     text,                                  -- execution trace on the signal (slack msg, email id…)
   created_at    timestamptz not null default now(),
   executed_at   timestamptz
@@ -164,6 +170,20 @@ do $$ begin
       using (case urgency when 'low' then 1 when 'medium' then 2 when 'high' then 3 else null end);
   end if;
 end $$;
+
+-- v3 (Phase 3): widen the status CHECKs on an already-applied instance —
+--   tasks: add 'blocked' (task awaiting a decision; act-and-decide parks it there).
+--   actions: add 'ready' (gated-to-ACT, queued for execute-actions).
+-- A CHECK can only be widened by drop + re-add; drop-if-exists keeps it idempotent
+-- (on a fresh install the inline CHECK above is already correct — this re-adds the
+-- identical constraint, a no-op in effect). The inline name Postgres assigns to an
+-- unnamed column CHECK is <table>_<column>_check.
+alter table tasks   drop constraint if exists tasks_status_check;
+alter table tasks   add  constraint tasks_status_check
+  check (status in ('candidate','open','blocked','done','dropped'));
+alter table actions drop constraint if exists actions_status_check;
+alter table actions add  constraint actions_status_check
+  check (status in ('candidate','ready','pending_decision','executed','skipped'));
 
 -- ── OPTIONAL HARDENING: Row-Level Security ────────────────────────────
 -- Filtering by user_id in every query is sufficient for the single-writer skill
