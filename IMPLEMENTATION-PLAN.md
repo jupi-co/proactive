@@ -79,14 +79,14 @@ ARBITRAGE      User (arbitrates decisions) · Owner (approves business rules)
 LAYER
 
 KNOWLEDGE      Facts (Supermemory) · Asset Map · Decision log (= Jupi) · Business rules
-LAYER          └── read by every automation stage; written by update-context / provisioning / the loops
+LAYER          └── read by every automation stage; written by update-brain / provisioning / the loops
 ```
 
 ### 4a. Where state lives — three homes, by data character
 
 | State | Home | Why there |
 |---|---|---|
-| **Facts & relationships** (people/orgs/projects/processes) | **Supermemory** | built for semantic recall; written by `update-context` |
+| **Facts & relationships** (people/orgs/projects/processes) | **Supermemory** | built for semantic recall; written by `update-brain` |
 | **Task backlog** + **actions** (each action carries its `decision_id`/`option_id` + the executable instruction) | **Neon Postgres** (serverless) — `tasks` + `actions` tables (no separate registry). **Flat-file fallback** for data-wall accounts. | mutable, ordered, exactly-enumerated, recomputed each run — a DB does `ORDER BY score` / `WHERE status='open'` / transactional updates natively; an LLM rewriting a markdown table each run is brittle |
 | **Asset Map** (tools + action surfaces, agents-for-reuse, rules index) | **`proactive-jupi/assets.md`** — flat markdown, read in full, hand-edited. **No Supermemory mirror.** | config you enumerate in full and edit by hand; markdown is the right size |
 | **Decisions + full lifecycle** (incl. EXECUTED) | **Jupi** | Jupi is the decision log (§8) |
@@ -103,7 +103,7 @@ LAYER          └── read by every automation stage; written by update-conte
 > **Note — there is no separate "Picker."** Value-based selection (which decision unlocks the most) *requires* deriving the tasks' actions and gating decisions, which is act-or-decide's own reasoning — so it lives **inside** act-or-decide as its opening move (the coordination-node pass). The only thing upstream is the **cheap Scorer**, whose sole job is to order the backlog and narrow to a top window so expensive reasoning doesn't scan the whole backlog every run. Split by **cost**, not by responsibility.
 
 **Two engines still exist**, but the interface between them is the **Knowledge layer**, not a folder:
-- **`update-context`** — maintains Facts & relationships in **Supermemory** (crawler model: coverage + backlog of topics to investigate).
+- **`update-brain`** — maintains Facts & relationships in **Supermemory** (crawler model: coverage + backlog of topics to investigate).
 - **`act-and-decide`** — the automation pipeline above (parse → score → pick → act-or-decide → plan → execute).
 
 *(Whether the pipeline stages are one skill with clear stages or several specialized skills is an implementation choice — leaning one skill with explicit stages for coherence, revisit if runs get too long.)*
@@ -142,7 +142,7 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 
 1. **Connect tools (MCP):** Gmail · Calendar · Drive · Linear · GitHub · Jupi · Slack · **Supermemory**. Pre-authorize; verify each connection's action surface.
 2. **Discover existing assets → write the Asset Map:** inventory connected tools/MCPs (+ each one's action surface), existing agents/skills, and any documented rules/playbooks. Record them in the **Asset Map** (§4a). *Register discovered agents for reuse* (A4 — reuse, not lifecycle). **At Jupi today there are no rules → skip rule-discovery, go straight to bootstrap.** At a partner, crawl their docs.
-3. **Seed the brain:** run `update-context` **full** crawl into Supermemory from **the last 1 month** of tool history to start (widen later once the loop is stable) — facts about people, orgs, projects, processes, tools.
+3. **Seed the brain:** run `update-brain` **full** crawl into Supermemory from **the last 1 month** of tool history to start (widen later once the loop is stable) — facts about people, orgs, projects, processes, tools.
 4. **Initialize the backlog:** parse recent signals into candidate tasks; score them.
 5. **Set cadence / triggers:** schedule runs (tie to one recurring ritual; cadence decides the responsiveness).
 6. **Set guardrails:** the initial confidence×risk policy — which action classes may auto-act vs always-decide. **Default conservative** (draft-only), loosen as trust builds.
@@ -199,11 +199,11 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Rotate the leaked GitHub PAT + Tavily key in `work/.mcp.json`.
 - ✅ Scaffolded `proactive/` as a **Claude plugin** (marketplace `proactive-jupi`, plugin `proactive-jupi`, per jupi-skills PR #7): `setup-proactive-jupi` skill at `plugins/proactive-jupi/skills/setup-proactive-jupi/` with bundled `reference/schema.sql`; packaging + validate scripts + `post-commit` hook; `dist/proactive-jupi.zip` builds for Cowork **Local uploads**.
 - ✅ Exercised `/setup-proactive-jupi` partway: Gmail/Calendar/Linear/Drive/Jupi probed; **Supermemory connected via MCP**; **Neon schema applied** to `sparkling-violet-42081696` via project-scoped conn string (not the account-wide MCP).
-- **Next: `update-context` skill**, then finish `/setup-proactive-jupi` steps 5–8 (the fresh 30-day Gmail+Cal+Linear crawl into Supermemory).
+- **Next: `update-brain` skill**, then finish `/setup-proactive-jupi` steps 5–8 (the fresh 30-day Gmail+Cal+Linear crawl into Supermemory).
 
 **Phase 1 — Brain on Supermemory**
-- Integrate Supermemory API; port `update-context` to write facts there; validate against the existing 61-entity dataset as fixtures.
-- Un-gate `setup-proactive-jupi` step 8: now that `update-context` exists, actually create its user-visible daily routine (not just describe it).
+- Integrate Supermemory API; port `update-brain` to write facts there; validate against the existing 61-entity dataset as fixtures.
+- Un-gate `setup-proactive-jupi` step 8: now that `update-brain` exists, actually create its user-visible daily routine (not just describe it).
 
 **Phase 2 — Backlog pipeline**
 - Parser → Scorer → Backlog → Picker (coordination-node pass).

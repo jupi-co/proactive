@@ -23,7 +23,7 @@ I connect to them and to the tool MCPs, but **the user must complete any OAuth c
 Setup runs **inside the user's existing repo**, so everything Proactive-Jupi owns lives under one **`proactive-jupi/`** folder at the workspace root (`proactive-jupi/assets.md` today; the data trees later) — never scatter files across their tree. Create the folder if missing. The only exception is harness-owned config in `.claude/` (`settings.json` *must* be there; `setup.local.json` by convention).
 
 ## Config — the workspace's `.claude/setup.local.json` (gitignored)
-Read it; if missing, copy from the bundled `reference/setup.local.json.template` into the workspace `.claude/setup.local.json`, then ask the user for any empty key and offer to save. Keys: `jupiWorkspace`, `neonProjectId`, `neonConnString`, `seedTools` (default `["gmail","calendar","linear"]`), `crawlWindowDays` (default `30`). **Never commit this file.** Supermemory needs **no** key here — it uses the installed connector; its container tag is hard-coded by `update-context`, not configured here.
+Read it; if missing, copy from the bundled `reference/setup.local.json.template` into the workspace `.claude/setup.local.json`, then ask the user for any empty key and offer to save. Keys: `jupiWorkspace`, `neonProjectId`, `neonConnString`, `seedTools` (default `["gmail","calendar","linear"]`), `crawlWindowDays` (default `30`). **Never commit this file.** Supermemory needs **no** key here — it uses the installed connector; its container tag is hard-coded by `update-brain`, not configured here.
 
 ## Steps
 
@@ -61,8 +61,8 @@ Run the bundled `reference/schema.sql` against the project over the **project-sc
 - **Prefer the HTTPS serverless driver** (`@neondatabase/serverless`, port 443) over direct Postgres (`psql`, port 5432): 443 is the sandbox-friendly path and the easiest host to allowlist.
 - **If network egress is blocked** — Claude's sandbox refuses Neon's hosts (403/timeout on 5432 and 443) — **don't fail: retry the same apply with the sandbox's network disabled** (the host machine reaches Neon directly; the command is unchanged). It's idempotent and safe. Because step 4 already pre-authorized this apply command, it stays **promptless on every run** (including unattended routines). Only if sandbox-disabling is itself disallowed in this environment, fall back to telling the user to allowlist **`*.neon.tech`** under **Admin settings → Capabilities → network access** and re-run. Either way the conn string is already stored and the schema applies in seconds.
 
-### 6 · Seed the brain — run `update-context`
-**Invoke the `update-context` skill in `full` mode** (it reads `seedTools` + `crawlWindowDays` from config — default Gmail + Calendar + Linear, last 30 days). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
+### 6 · Seed the brain — run `update-brain`
+**Invoke the `update-brain` skill in `full` mode** (it reads `seedTools` + `crawlWindowDays` from config — default Gmail + Calendar + Linear, last 30 days). It is the **only writer of Facts** and owns how they're stored in Supermemory — **including the hard-coded container tag; setup neither chooses nor asks for it.**
 - When it returns, **verify it actually wrote Facts** — a quick `recall` on the container tag should return results — and fold its seed summary (facts by type, any unreachable tool) into the setup report.
 - If it wrote nothing, or a tool was unreachable, **say so (⚠️)** rather than reporting success.
 
@@ -70,8 +70,8 @@ Run the bundled `reference/schema.sql` against the project over the **project-sc
 Parse recent signals (within the crawl window) into **candidate tasks**; score them (impact × confidence). Insert into Neon `tasks` (status `candidate`).
 
 ### 8 · Set cadence / triggers
-Schedule recurring **user-visible** routines: `update-context` (daily full) and `act-and-decide` (frequent). They must be controllable by the user (create them where the user can see and edit them — a hidden scheduler is not acceptable); tie to one recurring ritual and record the cadence.
-- *`update-context` and `act-and-decide` are later-phase builds. Until they exist, describe the intended schedule and stop — do not schedule a routine that points at a skill that isn't there, and do not fire a first `act-and-decide` run yet.*
+Schedule recurring **user-visible** routines: `update-brain` (daily full) and `act-and-decide` (frequent). They must be controllable by the user (create them where the user can see and edit them — a hidden scheduler is not acceptable); tie to one recurring ritual and record the cadence.
+- *`update-brain` and `act-and-decide` are later-phase builds. Until they exist, describe the intended schedule and stop — do not schedule a routine that points at a skill that isn't there, and do not fire a first `act-and-decide` run yet.*
 
 ## Output — setup report
 Print a **per-step status line** (✅/🔧/⚠️) so the run is legible end-to-end: which tools were **already connected** vs newly connected vs skipped (+ the capability lost by each skip), any pending OAuth, schema applied, Facts seeded (counts by type), candidate tasks created, schedules set. Flag anything that needs the user.

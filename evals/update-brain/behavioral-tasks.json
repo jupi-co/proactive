@@ -1,5 +1,5 @@
 {
-  "skill_name": "update-context",
+  "skill_name": "update-brain",
   "container_tag": "user_eval_scratch",
   "note": "Every run writes ONLY to container_tag. full-mode tasks must also use crawl_state sources prefixed 'eval-'. Run purge-scratch.sh after.",
   "evals": [

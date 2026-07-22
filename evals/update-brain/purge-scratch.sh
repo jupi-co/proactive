@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Purge every Supermemory memory in a container tag — eval teardown.
 # Reads the API key from the gitignored .claude/setup.local.json (never committed).
-# Usage: bash evals/update-context/purge-scratch.sh [containerTag]   (default: user_eval_scratch)
+# Usage: bash evals/update-brain/purge-scratch.sh [containerTag]   (default: user_eval_scratch)
 set -euo pipefail
 
 TAG="${1:-user_eval_scratch}"

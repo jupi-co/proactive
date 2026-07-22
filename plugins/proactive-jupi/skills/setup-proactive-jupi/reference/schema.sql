@@ -58,7 +58,7 @@ create index if not exists actions_status_idx   on actions (status);
 create index if not exists actions_decision_idx on actions (decision_id);
 
 -- ── CRAWL_STATE ───────────────────────────────────────────────────────
--- update-context's incremental cursor. One row per source: the crawler only
+-- update-brain's incremental cursor. One row per source: the crawler only
 -- ingests content NEWER than last_cursor, then advances it. This is our dedup
 -- + credit control on the Supermemory connector (which has no customId): we
 -- never re-read or re-ingest the same window twice.

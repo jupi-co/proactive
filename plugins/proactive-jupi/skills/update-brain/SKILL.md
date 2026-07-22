@@ -1,11 +1,11 @@
 ---
-name: update-context
+name: update-brain
 description: >-
-  Proactive-Jupi's context crawler — the single writer of Facts about the user's world (people,
+  Proactive-Jupi's brain crawler — the single writer of Facts about the user's world (people,
   orgs, projects, processes, tools, goals), built by reading the user's connected tools
   (Gmail, Calendar, Linear, and so on) and stored in Supermemory. Use it whenever the goal is
   to build up, refresh, extend, or correct what Proactive-Jupi knows: "update the context",
-  "refresh my context", "crawl my world", "update-context", "the brain feels stale", or an
+  "refresh my context", "crawl my world", "update-brain", "the brain feels stale", or an
   entity lookup such as "who is this person?", "what do we know about this company or
   project?", "get me up to speed on an account before a meeting". Also runs from the daily
   routine, and act-and-decide calls it when it needs context on an entity. Two modes: full
@@ -18,7 +18,7 @@ description: >-
 disable-model-invocation: false
 ---
 
-# update-context — Proactive-Jupi's context crawler
+# update-brain — Proactive-Jupi's brain crawler
 
 You build and maintain **the brain**: what Proactive-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
 
