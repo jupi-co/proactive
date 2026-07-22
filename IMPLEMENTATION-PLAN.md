@@ -205,11 +205,11 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Integrate Supermemory API; port `update-brain` to write facts there; validate against the existing 61-entity dataset as fixtures.
 - Un-gate `setup-proactive-jupi` step 8: now that `update-brain` exists, actually create its user-visible daily routine (not just describe it).
 
-**Phase 2 — Backlog pipeline**
-- Parser → Scorer → Backlog → Picker (coordination-node pass).
+**Phase 2 — Backlog pipeline** *(detailed plan: [PHASE-2-PLAN.md](PHASE-2-PLAN.md))*
+- Parser → Scorer → Backlog. **Ends at a scored, deduped, ordered top-window** (`query-window`). **No separate Picker** — the coordination-node pass is act-or-decide's opening move (Phase 3), per §4. Built as a standalone `refresh-backlog` skill + a shared `plugins/proactive-jupi/shared/` (`schema.sql`, `db.mjs`, `signal-sources.md`); scorer axes are impact × relevance × urgency; un-gates `setup-proactive-jupi` step 7.
 
 **Phase 3 — Act-or-Decide + Action Planner**
-- Confidence×risk gate; task→N-actions expansion; recompute-on-settle.
+- **Coordination-node pass** (value-based selection over the top-window) as act-or-decide's opening move; confidence×risk gate; task→N-actions expansion; recompute-on-settle.
 - Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first run at the end of setup, so onboarding proves the loop end-to-end.
 
 **Phase 4 — Closing loop + notifications**

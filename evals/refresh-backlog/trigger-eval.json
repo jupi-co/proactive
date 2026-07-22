@@ -1,0 +1,22 @@
+[
+  {"query": "refresh the backlog before I start my day", "should_trigger": true},
+  {"query": "parse my inbox into tasks", "should_trigger": true},
+  {"query": "turn my recent emails and Linear issues into a scored task list", "should_trigger": true},
+  {"query": "top up the backlog with anything new from the last few days", "should_trigger": true},
+  {"query": "score my open tasks and show me the top ones to focus on", "should_trigger": true},
+  {"query": "run refresh-backlog", "should_trigger": true},
+  {"query": "scan Gmail, Calendar and Linear and queue up whatever I should act on", "should_trigger": true},
+  {"query": "rebuild my task list from recent signals and rank it", "should_trigger": true},
+  {"query": "what's on my plate right now — pull it from my tools and prioritize", "should_trigger": true},
+  {"query": "the backlog is stale, re-parse the last month of signals into tasks", "should_trigger": true},
+  {"query": "who is Hassan at EcoVadis and what's our history with him?", "should_trigger": false},
+  {"query": "refresh what we know about my contacts and current projects", "should_trigger": false},
+  {"query": "draft a reply to Hassan's email about the pilot timeline", "should_trigger": false},
+  {"query": "handle the Batch follow-up and post any decisions to Jupi", "should_trigger": false},
+  {"query": "set up my workspace — connect my tools and apply the schema", "should_trigger": false},
+  {"query": "have we already decided which e-signature tool to use?", "should_trigger": false},
+  {"query": "log that we're going with Yousign for signatures", "should_trigger": false},
+  {"query": "escalate the discount question to the CRO", "should_trigger": false},
+  {"query": "what's on my calendar tomorrow?", "should_trigger": false},
+  {"query": "summarize this Google Doc for me", "should_trigger": false}
+]
