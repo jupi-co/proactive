@@ -22,7 +22,7 @@
 //   ── Phase 3: the actions queue + status writes ──
 //   insert-action   '<json>'                        → { id, status }   (act-and-decide, Stage 4)
 //       json: task_id, tool, description, exposure ('low'|'high' → stored in `risk`),
-//             decision_id?, option_id?, rule_ref?, status? (default 'candidate')
+//             decision_id?, option_id? (provenance for a settled option), rule_ref?, status? (default 'ready')
 //   set-action-status <id> <status> [trace_ref]     → { id, status }   (execute-actions: 'ready'→'executed')
 //   set-task-status   <id> <status>                 → { id, status }   (act-and-decide: open→blocked|done|dropped, blocked→open)
 //   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-and-decide, Stage 5)
@@ -208,14 +208,15 @@ const VERBS = {
   },
 
   // ── Phase 3: actions queue + status writes ──────────────────────────────
-  // Materialize one action row (act-and-decide, Stage 4). `exposure` is stored in
-  // the `risk` column (Phase-3 rename; DB column kept as `risk`). INSERT ... SELECT
-  // guards tenant integrity: the row is written only if task_id belongs to this user.
+  // Materialize one action row that will RUN — an immediate act, or a settled
+  // decision's chosen option (at settle). Defaults to status 'ready'. `exposure` is
+  // stored in the `risk` column (Phase-3 rename; DB column kept as `risk`).
+  // INSERT ... SELECT guards tenant integrity: written only if task_id is this user's.
   async "insert-action"(sql, [jsonArg], userId) {
     const a = JSON.parse(jsonArg);
     const rows = await sql.query(
       `insert into actions (user_id, task_id, decision_id, option_id, tool, description, rule_ref, risk, status)
-       select $1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'candidate')
+       select $1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'ready')
         where exists (select 1 from tasks where id = $2 and user_id = $1)
        returning id, status`,
       [
@@ -227,14 +228,13 @@ const VERBS = {
         a.description,                  // $6
         a.rule_ref ?? null,             // $7
         a.exposure ?? a.risk ?? null,   // $8  → risk column (the exposure value)
-        a.status ?? null,               // $9
+        a.status ?? "ready",            // $9  (defaults to ready — a queued action)
       ],
     );
     return rows[0] ?? { id: null, error: "no such task for this user" };
   },
 
-  // execute-actions owns this: ready → executed (+ trace_ref, executed_at). Also
-  // used by the closing loop to flip pending_decision → ready | skipped.
+  // execute-actions owns this: ready → executed (+ trace_ref, executed_at).
   async "set-action-status"(sql, [id, status, traceRef], userId) {
     const rows = await sql.query(
       `update actions

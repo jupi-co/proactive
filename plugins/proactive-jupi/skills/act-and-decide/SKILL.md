@@ -68,9 +68,10 @@ Verbs you use: `query-window [K]` · `insert-action '<json>'` · `set-action-sta
 ```
 TASK   (you own tasks.status):  open ──dispositioned──► done | blocked | dropped
                                             blocked ──its decision finalizes──► open  (closing loop, Phase 4)
-ACTION (you write ready/pending; execute-actions writes executed):
-        candidate ──gate:ACT──► ready ──execute-actions──► executed
-             └─────gate:DECIDE──► pending_decision ──finalize──► ready | skipped
+ACTION (you insert `ready`; execute-actions writes `executed`):
+        ACT    → insert a `ready` row ──execute-actions──► executed
+        DECIDE → NO row here — the option-actions live in the Jupi decision;
+                 at settle the chosen option is materialized as a `ready` row → executed
 ```
 
 **The task status is the window filter.** `query-window` returns `status='open'` only, so the moment you
@@ -118,23 +119,23 @@ Then, per cluster:
   the choice obvious → **confidence `high`**, act) **or** leaves a real trade-off → **confidence `low`**,
   one decision for the whole cluster.
 
-### Stage 4 — Action Planner (materialize fully, status only)
+### Stage 4 — Action Planner (plan the concrete actions)
 Expand each task into **one or several concrete parallel actions**, each with its `tool`, a precise
-`description` (recipient, content, location — see §Actions), and its own **`exposure`** (§The gate).
-- **Decision cluster:** for **each option**, plan the per-task action(s) and `insert-action` them **all**
-  with `status:"pending_decision"`, the `decision_id`+`option_id`, and their `exposure`. *(Full up-front
-  materialization — settle flips the winner's rows to `ready`, siblings to `skipped`.)*
-- **Act task:** `insert-action` the action(s) directly (`decision_id` null), `exposure` tagged. Apply the
-  **draft-mode transform** (§Draft mode) — in `draft` the verb is the draft form (`create draft email…`).
+`description` (recipient, content, location — see §Actions), and its own **`exposure`** (§The gate). Run
+the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is written yet** — Stage 5 emits.
+- For an **ACT** action, prepare its `insert-action` payload (`decision_id` null, `exposure` tagged). Apply
+  the **draft-mode transform** (§Draft mode) — in `draft` the verb is the draft form (`create draft email…`).
+- For a **DECIDE** action, prepare the **concrete option-actions for the Jupi decision** — each option's
+  `Action:` list, dug from the tools (see §Actions). **These are NOT Neon rows** — they live in the
+  decision; the chosen one becomes a `ready` row only when the decision settles (closing loop).
 
-### Stage 5 — Gate + emit (write status; NEVER execute)
-Per action, look up `policy[confidence][exposure]` (§The gate):
-- **ACT** → `set-action-status <id> ready`. *(dry-run: don't write — just record it for the table.)*
-- **DECIDE** → author the Jupi decision (§Posting) via the producer↔validator loop; on PASS, leave its
-  rows `pending_decision`, and `set-task-gating` the task with the decision id(s).
+### Stage 5 — Emit (write status; NEVER execute)
+- **ACT** → `insert-action '<json>'` (it lands `ready`). *(dry-run: don't write — record it for the table.)*
+- **DECIDE** → author the Jupi decision (§Posting) via the producer↔validator loop; on PASS, `set-task-gating`
+  the task(s) with the decision id. **No `actions` rows are written for pending options** — Jupi holds them.
 
-Then **set each task's status** (you own it): **`blocked`** if it has any `pending_decision` action, else
-**`done`** (acted / nothing to do); a ruled-out task → **`dropped`**. *(dry-run: don't write.)*
+Then **set each task's status** (you own it): **`blocked`** if it raised a decision (any `gating_decision_ids`
+set), else **`done`** (acted / nothing to do); a ruled-out task → **`dropped`**. *(dry-run: don't write.)*
 
 ### Hand-off — invoke `execute-actions`
 On a **real (non-dry) run**, invoke the **`execute-actions`** skill so it drains the `ready` rows you just
@@ -183,8 +184,9 @@ for that item and move on.
 - `allowWorkspaceContributions:false` → **private, owner-only**. Pass `true` only if the user explicitly
   wants the whole workspace in.
 - **Leave it STARTED — never `finalize`.** The user settles it in Jupi.
-- Capture `{ id }`; `set-task-gating` the task(s) with it; the option's actions are already
-  `pending_decision` rows carrying `decision_id`+`option_id`.
+- Capture `{ id }`; `set-task-gating` the task(s) with it. The option's actions live **in the decision's
+  `Action:` lists** (not Neon) — at settle, the closing loop materializes the chosen option as a `ready`
+  row (faithful to what the option promised).
 
 **Format (`description` is HTML — Jupi renders rich text, not Markdown).** Say **"Jupi"**, never
 "Proactive-Jupi", in posted content. Structure, in order:
@@ -224,7 +226,7 @@ changes) and **does not invoke `execute-actions`**. Emit one row per candidate a
 Footer: the active `mode` + `policy`. Write it to `act-and-decide/runs/run-<id>/report.md` and return it.
 
 ## Where you write
-- **Neon** (via `db.mjs`) — `actions` rows (`ready`/`pending_decision`), `tasks.status`, `gating_decision_ids`.
+- **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`.
 - **Jupi** — the decision(s), via `create-decision-tool` (private, STARTED).
 - `act-and-decide/runs/run-<id>/` — `report.md` (the deliverable / dry-run table), `validation.md`
   (validator passes), `log.md` (narrative).

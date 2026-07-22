@@ -64,10 +64,12 @@ create unique index if not exists tasks_user_signal_uniq on tasks (user_id, sign
 
 -- ── ACTIONS ───────────────────────────────────────────────────────────
 -- Units of execution. ONE task can fan out into several parallel actions.
--- An action is either:
---   • immediate       — decision_id null → act now (confident + low-risk, or a rule authorizes it)
---   • decision-gated  — decision_id + option_id set → executes ONLY if that Jupi option is the one selected
--- On finalize: actions matching the selected option execute; siblings on other options are skipped.
+-- A row exists ONLY for an action that will run (or has): either an immediate act,
+-- or the chosen option of a settled decision (materialized as a `ready` row at settle).
+-- Pending option-actions are NOT stored here — they live in the Jupi decision until
+-- one option is picked (no Neon duplication of what Jupi already holds).
+--   decision_id/option_id: provenance — which settled decision/option this row realizes
+--                          (null = an immediate act).
 -- `user_id` is denormalized from the parent task so action queries filter by
 -- tenant directly (no join) and RLS can apply uniformly.
 create table if not exists actions (
@@ -82,11 +84,11 @@ create table if not exists actions (
   risk          text check (risk in ('low','high')),   -- EXPOSURE (Phase-3 name): draft-first, then destination/irreversibility. Column kept as `risk`.
   -- (no confidence column: confidence is a TASK-level, runtime judgment derived from
   --  open_questions each run — never stored on an action.)
-  -- candidate → ready (gated to ACT, queued for execute-actions) → executed;
-  --           → pending_decision (gated to a Jupi option) → ready (chosen) | skipped (sibling).
-  -- execute-actions owns this column (ready → executed); it never writes tasks.status.
-  status        text not null default 'candidate'
-                  check (status in ('candidate','ready','pending_decision','executed','skipped')),
+  -- A row is queued the moment it exists: ready (to run) → executed. Nothing else —
+  -- pending option-actions live in Jupi, not here. execute-actions owns this column
+  -- (ready → executed); it never writes tasks.status.
+  status        text not null default 'ready'
+                  check (status in ('ready','executed')),
   trace_ref     text,                                  -- execution trace on the signal (slack msg, email id…)
   created_at    timestamptz not null default now(),
   executed_at   timestamptz
@@ -182,9 +184,14 @@ end $$;
 alter table tasks   drop constraint if exists tasks_status_check;
 alter table tasks   add  constraint tasks_status_check
   check (status in ('candidate','open','blocked','done','dropped'));
+-- actions hold only rows that will run: ready → executed. Pending option-actions
+-- live in Jupi (not Neon), so coerce any legacy rows, then narrow the CHECK + default.
+update actions set status = 'ready' where status = 'candidate';
+delete from actions where status in ('pending_decision','skipped');  -- redundant with Jupi
 alter table actions drop constraint if exists actions_status_check;
 alter table actions add  constraint actions_status_check
-  check (status in ('candidate','ready','pending_decision','executed','skipped'));
+  check (status in ('ready','executed'));
+alter table actions alter column status set default 'ready';
 -- Drop the vestigial actions.confidence (Phase 2 shipped it; the Phase-3 gate reads
 -- confidence at the TASK level from open_questions, never off an action row).
 alter table actions drop column if exists confidence;

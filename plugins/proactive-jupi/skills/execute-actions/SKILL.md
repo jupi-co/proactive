@@ -22,7 +22,7 @@ same operation** — the planner already chose the verb (per `mode`); you just r
 > `${CLAUDE_PLUGIN_ROOT}/shared/db.mjs`.
 
 ## Contract (hard)
-- ✅ **Run only `ready` rows.** Never `candidate`, `pending_decision`, `executed`, or `skipped`.
+- ✅ **Run only `ready` rows** (the sole not-yet-run status). Skip anything already `executed`.
 - ✅ Do **exactly** what the row's `description` says — no re-deciding, no re-drafting, no scope creep. The
   reasoning already happened in act-and-decide.
 - ❌ **Never write `tasks.status`** and never post/settle Jupi decisions.
@@ -53,11 +53,12 @@ for each row:
 ## Two triggers
 - **(a) End of an act-and-decide run** *(Phase 3)* — the planner invokes you to flush the `ready` rows it
   just queued (immediate acts: drafts in draft mode).
-- **(b) Decision finalize** *(the closing loop — Phase 4)* — when a posted decision is settled, its chosen
-  option's rows are flipped `pending_decision → ready` (siblings → `skipped`), you run them (same core),
-  and then the loop reopens the `blocked` task (`→ open`) for act-and-decide to re-disposition, sets Jupi
-  `EXECUTED`, and sends the one optional `executedPing`. *Phase 3 builds trigger (a); trigger (b) is Phase
-  4 (blocked on the Jupi FINALIZED read + EXECUTED-write).*
+- **(b) Decision finalize** *(the closing loop — Phase 4)* — when a posted decision is settled, the closing
+  loop **materializes the chosen option's action as a `ready` row** (per gated task — via act-and-decide's
+  recompute, faithful to what the option promised; pending options were never stored, they lived in Jupi).
+  You run those `ready` rows (same core). The loop then reopens the `blocked` task (`→ open`) for
+  re-disposition, sets Jupi `EXECUTED`, and sends the one optional `executedPing`. *Phase 3 builds trigger
+  (a); trigger (b) is Phase 4 (blocked on the Jupi FINALIZED read + EXECUTED-write).*
 
 ## Where you write
 - **The user's tools** (drafts / sends / comments / bookings) — you are the only skill that does.
