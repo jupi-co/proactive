@@ -23,6 +23,15 @@ for manifest in plugins/*/.claude-plugin/plugin.json; do
       printf '%s\n' "$desc" | grep -nE '<[^ >]+>'
       fail=1
     fi
+
+    # 3) description must be at most 1024 chars (Cowork rule)
+    desc_val="$(printf '%s\n' "$desc" \
+      | sed '1s/^description:[[:space:]]*[>|]\{0,1\}[+-]\{0,1\}[[:space:]]*//' \
+      | sed 's/^[[:space:]]*//' | paste -sd' ' -)"
+    len="$(printf '%s' "$desc_val" | wc -c | tr -d ' ')"
+    if [ "$len" -gt 1024 ]; then
+      echo "ERROR: ${skill}: description is ${len} chars — Cowork max is 1024"; fail=1
+    fi
   done < <(find "$plugin_dir/skills" -name SKILL.md 2>/dev/null)
 done
 

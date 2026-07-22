@@ -1,20 +1,17 @@
 ---
 name: update-brain
 description: >-
-  Proactive-Jupi's brain crawler — the single writer of Facts about the user's world (people,
-  orgs, projects, processes, tools, goals), built by reading the user's connected tools
-  (Gmail, Calendar, Linear, and so on) and stored in Supermemory. Use it whenever the goal is
-  to build up, refresh, extend, or correct what Proactive-Jupi knows: "update the context",
-  "refresh my context", "crawl my world", "update-brain", "the brain feels stale", or an
-  entity lookup such as "who is this person?", "what do we know about this company or
-  project?", "get me up to speed on an account before a meeting". Also runs from the daily
-  routine, and act-and-decide calls it when it needs context on an entity. Two modes: full
-  (windowed sweep of the tools into Supermemory) and targeted (focused lookup on one entity,
-  returns a short summary). Read-only on the tools — it never acts, drafts, or decides. Not
-  for: the initial workspace cold-start (that is setup-proactive-jupi, which then calls
-  this), doing a task or drafting a reply (act-and-decide), or looking up past decisions
-  (search-decisions). Reach for it any time the work is about enriching what Proactive-Jupi knows
-  — don't wait for the word "skill".
+  Proactive-Jupi's brain crawler and single writer of Facts into the brain (a per-user
+  Supermemory store) — what Proactive-Jupi knows about people, orgs, projects, processes,
+  tools and goals, read from the user's connected tools (Gmail, Calendar, Linear…). Use
+  whenever the goal is to build, refresh, extend, or correct that knowledge: "update the
+  brain", "refresh the context", "crawl my world", "the brain feels stale", or an entity
+  lookup — "who is this person?", "what do we know about this company or project?", "get me
+  up to speed on an account before a meeting". Also runs from the daily routine; act-and-decide
+  calls it for context on an entity. Two modes: full (windowed tool sweep) and targeted
+  (one-entity lookup → short summary). Read-only — it never acts, drafts, or decides. Not for:
+  initial workspace setup (setup-proactive-jupi), doing a task or drafting a reply
+  (act-and-decide), or looking up past decisions (search-decisions).
 disable-model-invocation: false
 ---
 
