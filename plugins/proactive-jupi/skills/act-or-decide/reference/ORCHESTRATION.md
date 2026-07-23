@@ -1,4 +1,4 @@
-# act-and-decide — ORCHESTRATION (producer ↔ validator loop)
+# act-or-decide — ORCHESTRATION (producer ↔ validator loop)
 
 How a DECIDE draft clears the gate before it reaches the user, **autonomously in a routine**. This is the
 chaining contract for the runner. The producer is `SKILL.md`; the validator is `reference/VALIDATOR.md`.
@@ -33,7 +33,7 @@ is enabled; the closing-loop execution of settled decisions lands in Phase 4.)*
 ## Files of a run
 
 ```
-act-and-decide/runs/run-<id>/
+act-or-decide/runs/run-<id>/
 ├── report.md       ← the deliverable — the dry-run table, or the posted decision(s) + acted rows
 ├── validation.md   ← history of the validator's passes (flags, verdicts, iteration #)
 └── log.md          ← the producer's narrative

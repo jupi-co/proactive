@@ -1,9 +1,9 @@
 [
-  {"query": "run act-and-decide", "should_trigger": true},
+  {"query": "run act-or-decide", "should_trigger": true},
   {"query": "work my backlog — act on what's safe and raise decisions for the rest", "should_trigger": true},
   {"query": "what should Jupi do now?", "should_trigger": true},
   {"query": "triage the top of my backlog and either act or decide", "should_trigger": true},
-  {"query": "dry-run act-and-decide and show me the table of what you'd do", "should_trigger": true},
+  {"query": "dry-run act-or-decide and show me the table of what you'd do", "should_trigger": true},
   {"query": "look at my top tasks and draft what you can, decide where you can't", "should_trigger": true},
   {"query": "find the highest-leverage thing to do and handle it", "should_trigger": true},
   {"query": "go through my backlog and post Jupi decisions for the real trade-offs", "should_trigger": true},

@@ -1,10 +1,10 @@
 {
-  "skill_name": "act-and-decide",
-  "note": "Isolation: cases 1–4 run in --dry-run, so act-and-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Case 5 is a real draft-mode run against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Never run write cases in perform mode.",
+  "skill_name": "act-or-decide",
+  "note": "Isolation: cases 1–4 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Case 5 is a real draft-mode run against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Never run write cases in perform mode.",
   "evals": [
     {
       "id": 1,
-      "prompt": "--dry-run act-and-decide over a window that includes a task whose reply content is known and low-exposure (draft an internal reply to a peer).",
+      "prompt": "--dry-run act-or-decide over a window that includes a task whose reply content is known and low-exposure (draft an internal reply to a peer).",
       "expected": "Verdict ACT: confidence high (no open question), exposure low (a draft) → the table row reads ACT, no decision. Nothing is written to Neon or Jupi; execute-actions is NOT invoked."
     },
     {

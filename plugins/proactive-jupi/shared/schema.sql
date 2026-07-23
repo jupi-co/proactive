@@ -35,7 +35,7 @@ create table if not exists tasks (
   signal_url      text,                                -- permalink to the signal, captured at parse time (clickable <a href> for Phase-3 decisions)
   status          text not null default 'candidate'
                     -- candidate → open (scored) → blocked (awaiting a decision) | done | dropped.
-                    -- act-and-decide owns this column; 'blocked' is what keeps query-window
+                    -- act-or-decide owns this column; 'blocked' is what keeps query-window
                     -- (status='open' only) from re-surfacing a task it already handled.
                     check (status in ('candidate','open','blocked','done','dropped')),
   -- observed signal facts (parser) — feed the computed urgency
@@ -175,7 +175,7 @@ do $$ begin
 end $$;
 
 -- v3 (Phase 3): widen the status CHECKs on an already-applied instance —
---   tasks: add 'blocked' (task awaiting a decision; act-and-decide parks it there).
+--   tasks: add 'blocked' (task awaiting a decision; act-or-decide parks it there).
 --   actions: add 'ready' (gated-to-ACT, queued for execute-actions).
 -- A CHECK can only be widened by drop + re-add; drop-if-exists keeps it idempotent
 -- (on a fresh install the inline CHECK above is already correct — this re-adds the

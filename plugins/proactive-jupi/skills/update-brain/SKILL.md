@@ -7,17 +7,17 @@ description: >-
   whenever the goal is to build, refresh, extend, or correct that knowledge: "update the
   brain", "refresh the context", "crawl my world", "the brain feels stale", or an entity
   lookup — "who is this person?", "what do we know about this company or project?", "get me
-  up to speed on an account before a meeting". Also runs from the daily routine; act-and-decide
+  up to speed on an account before a meeting". Also runs from the daily routine; act-or-decide
   calls it for context on an entity. Two modes: full (windowed tool sweep) and targeted
   (one-entity lookup → short summary). Read-only — it never acts, drafts, or decides. Not for:
   initial workspace setup (setup-proactive-jupi), doing a task or drafting a reply
-  (act-and-decide), or looking up past decisions (search-decisions).
+  (act-or-decide), or looking up past decisions (search-decisions).
 disable-model-invocation: false
 ---
 
 # update-brain — Proactive-Jupi's brain crawler
 
-You build and maintain **the brain**: what Proactive-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-and-decide` reads them, never writes them. You never post to Jupi and never execute anything.
+You build and maintain **the brain**: what Proactive-Jupi knows about the user and their environment. You read the connected tools (read-only) and write **Facts** to **Supermemory**. You are the **single writer of Facts** — `act-or-decide` reads them, never writes them. You never post to Jupi and never execute anything.
 
 **Read `references/supermemory.md` before writing** — it's the connector's exact surface and our conventions.
 
@@ -40,7 +40,7 @@ Every saved memory is a compact, standalone statement with its **type and proven
 Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a deduction as certainty** ("probably in Paris" → inferred). **One fact per memory** (entity-centric — Supermemory reconciles + graphs them). Keep it terse and self-contained; `recall` returns these verbatim.
 
 ## Types (the ontology)
-**Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-and-decide` turns recurrences into Patterns, not you.
+**Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
 
 ## Incremental crawling — the `crawl_state` cursor
 Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.
@@ -57,7 +57,7 @@ Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budg
 5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
 
-### `targeted "<request>"` — focused lookup for act-and-decide
+### `targeted "<request>"` — focused lookup for act-or-decide
 1. Read `jupiUserId` from config → tag `user_<jupiUserId>`. `recall` what we already know about the entity — don't re-fetch what's known.
 2. Pull specific **new** content from the relevant tool(s) (filtered search on the entity).
 3. Synthesize + `save` new/updated Facts.
@@ -72,9 +72,9 @@ Explore **what the task asks**, with filters — not exhaustive dumps. Tool name
 - If a tool is **unreachable**, note it in the summary and do the most with what's reachable — never fail silently.
 
 ## Contract (non-negotiable)
-- **ONLY writer of Facts** (Supermemory). `act-and-decide` reads, never writes.
+- **ONLY writer of Facts** (Supermemory). `act-or-decide` reads, never writes.
 - **Read-only** on the tools; no execution; no Jupi `create`/`finalize` (`search-decisions` read-only is OK for context).
 - **Provenance, never invention.**
 
 ## When to upgrade beyond the connector
-If `recall` gets noisy (duplicate/contradictory facts) or `act-and-decide` needs structured **filtering/enumeration**, that's the trigger to add the Supermemory **HTTP API** (customId dedup, metadata, isStatic — see the reference). Until then, stay connector-simple.
+If `recall` gets noisy (duplicate/contradictory facts) or `act-or-decide` needs structured **filtering/enumeration**, that's the trigger to add the Supermemory **HTTP API** (customId dedup, metadata, isStatic — see the reference). Until then, stay connector-simple.

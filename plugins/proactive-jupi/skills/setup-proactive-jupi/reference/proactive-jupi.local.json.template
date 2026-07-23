@@ -9,7 +9,7 @@
   "crawlWindowDays": 30,
   "backlogWindowSize": 30,
   "guardrails": {
-    "_comment": "act-and-decide policy (Phase 3). Default conservative; loosen as trust builds.",
+    "_comment": "act-or-decide policy (Phase 3). Default conservative; loosen as trust builds.",
     "mode": "draft",
     "actBudget": 5,
     "policy": {

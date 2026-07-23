@@ -17,7 +17,7 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
 
 ## 1. Triggering eval — does the skill fire on the right prompts?
 - Set: [`trigger-eval.json`](trigger-eval.json) — 10 should-trigger + 10 should-not
-  (near-misses vs `update-brain` / `act-and-decide` / setup / search-decisions).
+  (near-misses vs `update-brain` / `act-or-decide` / setup / search-decisions).
 - Run (needs the `claude` CLI; no side effects — only tests triggering), from the
   skill-creator dir:
   ```

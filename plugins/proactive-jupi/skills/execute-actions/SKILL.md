@@ -2,13 +2,13 @@
 name: execute-actions
 description: >-
   Proactive-Jupi's executor — the ONLY skill that touches the user's tools. It drains the `ready` action
-  rows act-and-decide queued in Neon and runs each one against its tool (create the Gmail/Linear draft,
+  rows act-or-decide queued in Neon and runs each one against its tool (create the Gmail/Linear draft,
   or — in perform mode — send/post/book for real), then marks it executed and records the trace. It owns
   `actions.status` (ready → executed) and never writes `tasks.status`. Use whenever queued actions need to
-  run: "execute the ready actions", "run the queue", "flush the drafts", "send what act-and-decide prepared",
-  or right after an act-and-decide run (which invokes it automatically). Draft actions are still actions —
+  run: "execute the ready actions", "run the queue", "flush the drafts", "send what act-or-decide prepared",
+  or right after an act-or-decide run (which invokes it automatically). Draft actions are still actions —
   they run here, not in the planner. One executor: a draft and a real send are the same tool-call; the row
-  already carries the verb. Not for: deciding WHAT to do or clustering/gating the backlog (act-and-decide),
+  already carries the verb. Not for: deciding WHAT to do or clustering/gating the backlog (act-or-decide),
   building or scoring the backlog (refresh-backlog), or building Facts (update-brain) — this skill only
   runs rows that are already `ready`.
 disable-model-invocation: false
@@ -16,20 +16,20 @@ disable-model-invocation: false
 
 # execute-actions — the worker (the only tool-writer)
 
-You run the `ready` action rows act-and-decide queued. **One job:** for each row, do exactly what its
+You run the `ready` action rows act-or-decide queued. **One job:** for each row, do exactly what its
 `description` says via its `tool`, then mark it `executed` with a trace. **A draft and a real send are the
 same operation** — the planner already chose the verb (per `mode`); you just run it.
 
 > **You are the only skill that writes to the user's tools.** You own **`actions.status`** (`ready →
-> executed`) and **never** touch `tasks.status` (that's act-and-decide's). All Neon via
+> executed`) and **never** touch `tasks.status` (that's act-or-decide's). All Neon via
 > `${CLAUDE_PLUGIN_ROOT}/shared/db.mjs`.
 
 ## Contract (hard)
 - ✅ **Run only `ready` rows** (the sole not-yet-run status). Skip anything already `executed`.
 - ✅ Do **exactly** what the row's `description` says — no re-deciding, no re-drafting, no scope creep. The
-  reasoning already happened in act-and-decide.
+  reasoning already happened in act-or-decide.
 - ❌ **Never write `tasks.status`** and never post/settle Jupi decisions.
-- ⚠️ **Perform-mode real sends pass the validator first** (`../act-and-decide/reference/VALIDATOR.md`, the
+- ⚠️ **Perform-mode real sends pass the validator first** (`../act-or-decide/reference/VALIDATOR.md`, the
   real-send branch) before you fire them. Draft creations need no gate.
 
 ## Boot
@@ -54,10 +54,10 @@ for each row:
   executed) and log it — the next run retries. Never lose a row; never double-run one.
 
 ## Two triggers
-- **(a) End of an act-and-decide run** *(Phase 3)* — the planner invokes you to flush the `ready` rows it
+- **(a) End of an act-or-decide run** *(Phase 3)* — the planner invokes you to flush the `ready` rows it
   just queued (immediate acts: drafts in draft mode).
 - **(b) Decision finalize** *(the closing loop — Phase 4)* — when a posted decision is settled, the closing
-  loop **materializes the chosen option's action as a `ready` row** (per gated task — via act-and-decide's
+  loop **materializes the chosen option's action as a `ready` row** (per gated task — via act-or-decide's
   recompute, faithful to what the option promised; pending options were never stored, they lived in Jupi).
   You run those `ready` rows (same core). The loop then reopens the `blocked` task (`→ open`) for
   re-disposition, sets Jupi `EXECUTED`, and sends the one optional `executedPing`. *Phase 3 builds trigger

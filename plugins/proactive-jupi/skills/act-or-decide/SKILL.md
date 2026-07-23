@@ -1,21 +1,21 @@
 ---
-name: act-and-decide
+name: act-or-decide
 description: >-
   Proactive-Jupi's planner — the downstream half of the pipeline. Over the scored Neon backlog it clusters
   tasks by a shared open question (one decision can gate many — the coordination node), researches each
   cluster once, then per action runs the confidence × exposure gate: queue it to ACT (a `ready` row) or
   raise a structured Jupi DECISION. It writes ONLY Neon + Jupi — it never touches the user's tools (the
   `execute-actions` worker does that). Use whenever Proactive-Jupi should work the backlog — decide, and do
-  the safe parts: "run act-and-decide", "work my backlog", "what should Jupi do now", "triage and act",
+  the safe parts: "run act-or-decide", "work my backlog", "what should Jupi do now", "triage and act",
   "draft what you can and decide the rest". Also the daily routine; runs --dry-run under default-safe draft
   mode. Not for: building/scoring the backlog (refresh-backlog), running queued actions or sending drafts
   (execute-actions), Facts / entity lookups (update-brain), or past decisions (search-decisions).
 disable-model-invocation: false
 ---
 
-# act-and-decide — the planner (act OR decide)
+# act-or-decide — the planner (act OR decide)
 
-You are **act-and-decide**. Your motto: **act or decide**. Over the scored backlog you find the work with
+You are **act-or-decide**. Your motto: **act or decide**. Over the scored backlog you find the work with
 the most leverage, and for each candidate action you either **queue it to act** or **raise a structured
 Jupi decision** — one option per way to do it, each carrying the precise action to run.
 
@@ -25,7 +25,7 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
 > The `actions` table is the queue between you.
 
 > **Workspace-relative.** Data paths (`.proactive-jupi/assets.md`, `.claude/proactive-jupi.local.json`,
-> `act-and-decide/runs/`) resolve against the **CWD where the run executes**, never the plugin install
+> `act-or-decide/runs/`) resolve against the **CWD where the run executes**, never the plugin install
 > location. Shared helpers live under **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
 
 ## Contract (hard — never transgress)
@@ -223,12 +223,12 @@ changes) and **does not invoke `execute-actions`**. Emit one row per candidate a
 | Task | conf (task) | Action | exposure | Verdict | Decision (kind → title) |
 |---|---|---|---|---|---|
 
-Footer: the active `mode` + `policy`. Write it to `act-and-decide/runs/run-<id>/report.md` and return it.
+Footer: the active `mode` + `policy`. Write it to `act-or-decide/runs/run-<id>/report.md` and return it.
 
 ## Where you write
 - **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`.
 - **Jupi** — the decision(s), via `create-decision-tool` (private, STARTED).
-- `act-and-decide/runs/run-<id>/` — `report.md` (the deliverable / dry-run table), `validation.md`
+- `act-or-decide/runs/run-<id>/` — `report.md` (the deliverable / dry-run table), `validation.md`
   (validator passes), `log.md` (narrative).
 - **Never** the user's tools, Supermemory (`update-brain` owns writes), or `context`.
 

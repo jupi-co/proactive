@@ -2,7 +2,7 @@
 
 > **Status:** Draft v0.3 · 2026-07-22 · Owner: Anne-Claire · Living doc.
 > Reconciles three sources — Nick's value-prop doc, the review-with-Claude, and the running `BRIEF.md` — **with Anne-Claire's architecture diagram as the authority on structure.** Where sources disagreed, this plan follows the review; the divergences (and how to undo each) are in §10.
-> **v0.3:** reconciled §2/§4/§5/§6/§7/§8/§11 with the Phase-3 model refinements — **risk → exposure**, and the **`act-and-decide` (planner) / `execute-actions` (worker) split** (planner writes Neon + Jupi; worker is the only tool-writer; `perform` mode → Phase 4). Details in [PHASE-3-PLAN.md](PHASE-3-PLAN.md).
+> **v0.3:** reconciled §2/§4/§5/§6/§7/§8/§11 with the Phase-3 model refinements — **risk → exposure**, and the **`act-or-decide` (planner) / `execute-actions` (worker) split** (planner writes Neon + Jupi; worker is the only tool-writer; `perform` mode → Phase 4). Details in [PHASE-3-PLAN.md](PHASE-3-PLAN.md).
 
 ---
 
@@ -83,7 +83,7 @@ KNOWLEDGE      Facts (Supermemory) · Asset Map · Decision log (= Jupi) · Busi
 LAYER          └── read by every automation stage; written by update-brain / provisioning / the loops
 ```
 
-> *Diagram note: drawn before two Phase-3 refinements — the **risk → exposure** rename, and the **planner/worker split**. "Act-or-Decide" is the `act-and-decide` planner (writes Neon + Jupi only); "Execute" is the separate `execute-actions` worker. See §4a, §6, and [PHASE-3-PLAN.md](PHASE-3-PLAN.md) §8.*
+> *Diagram note: drawn before two Phase-3 refinements — the **risk → exposure** rename, and the **planner/worker split**. "Act-or-Decide" is the `act-or-decide` planner (writes Neon + Jupi only); "Execute" is the separate `execute-actions` worker. See §4a, §6, and [PHASE-3-PLAN.md](PHASE-3-PLAN.md) §8.*
 
 ### 4a. Where state lives — three homes, by data character
 
@@ -108,7 +108,7 @@ LAYER          └── read by every automation stage; written by update-brain
 **The engines**, interfaced through the **Knowledge layer** + the Neon queue, not a folder:
 - **`update-brain`** — maintains Facts & relationships in **Supermemory** (crawler model: coverage + backlog of topics to investigate).
 - **`refresh-backlog`** *(Phase 2)* — signal → scored task (parse → score); the cheap upstream stage.
-- **`act-and-decide`** *(Phase 3, planner)* — cluster → research-once → act-or-decide → plan. **Writes only Neon + Jupi; never touches user tools.**
+- **`act-or-decide`** *(Phase 3, planner)* — cluster → research-once → act-or-decide → plan. **Writes only Neon + Jupi; never touches user tools.**
 - **`execute-actions`** *(Phase 3)* — the **only tool-writer**; **one executor** that runs a `ready` row's verb (draft or real — same tool-call), triggered at end-of-run. The **closing loop** (settle-trigger + `EXECUTED` bookkeeping) is Phase 4; `perform` mode is config on the same executor, not a separate build.
 
 *(The split by responsibility — planner writes the queue, worker drains it — replaces the earlier "one skill, execute inline" leaning: separating them keeps the planner side-effect-free and lets the closing loop reuse the same worker. See PHASE-3-PLAN §8.)*
@@ -121,7 +121,7 @@ LAYER          └── read by every automation stage; written by update-brain
 2. **Scorer** *(cheap, upstream)*: impact × confidence, giving the backlog its order and narrowing to a **top window**. No reasoning about decisions here — pure prioritization. This is the only "picking" done outside act-or-decide, and it exists purely to bound cost.
 3. **Act-or-Decide** *(over the window)*: its **opening move is the coordination-node pass** — cluster the windowed tasks by **shared open-question** so one decision can gate actions across many (value-based selection lives here, not upstream). Then, per candidate action, run the **confidence × exposure gate** (§6): mark it `ready` to act, or raise the decision.
 4. **Action Planner**: expand the task (+ any settled decisions) into **one or several concrete parallel actions**, materialized as Neon `actions` rows. The set is **not fixed** — a settled decision can spawn new actions/decisions, recomputed as decisions resolve.
-5. **Execute** *(separate `execute-actions` worker — PHASE-3-PLAN §8b)*: runs the `ready` rows against the user's tools (draft or, in `perform`/Phase 4, real send), notify, log. Triggered at the end of an act-and-decide run and on decision-finalize.
+5. **Execute** *(separate `execute-actions` worker — PHASE-3-PLAN §8b)*: runs the `ready` rows against the user's tools (draft or, in `perform`/Phase 4, real send), notify, log. Triggered at the end of an act-or-decide run and on decision-finalize.
 
 ---
 
@@ -139,7 +139,7 @@ The noise control. Confidence is **task-level** (do we know how to handle it? �
 - A **rule** (Phase 5) raises **confidence** by pre-empting the open question → a task graduates from "decide every time" to "act." *(Earlier framed as lowering risk; the Phase-3 model routes it through confidence instead.)*
 - Result: the user is interrupted **only for genuine trade-offs.** No artificial per-day cap.
 
-*Phase-3 refinements (PHASE-3-PLAN §5): the gate is a **configurable 2×2** (`guardrails.policy`); an ACT writes a `ready` Neon row and a DECIDE posts a Jupi decision (its options live in Jupi, not Neon) — the `act-and-decide` planner never executes; `execute-actions` does (§4a, §11 Phase 3).*
+*Phase-3 refinements (PHASE-3-PLAN §5): the gate is a **configurable 2×2** (`guardrails.policy`); an ACT writes a `ready` Neon row and a DECIDE posts a Jupi decision (its options live in Jupi, not Neon) — the `act-or-decide` planner never executes; `execute-actions` does (§4a, §11 Phase 3).*
 
 ---
 
@@ -163,8 +163,8 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 **Decision lifecycle — in Jupi:** `STARTED → FINALIZED (user settles) → EXECUTED (loop ran the action)`. **EXECUTED is a status on the Jupi decision itself** (a Jupi backend addition to request), so the full lifecycle lives in the decision log. **No separate registry:** the executable instruction lives in the **`actions` rows** (each gated by `decision_id` + `option_id`); the decision + authoritative status live in Jupi. This is what stops a finalized decision being missed or run twice.
 
 1. **The pile = `blocked` tasks:** each carries `gating_decision_ids`. The options' actions are **not** duplicated in Neon — they live in the Jupi decision (each option's `Action:` list); the chosen one is materialized as a `ready` `actions` row only at settle.
-2. **Detect (pull):** each run, gather `gating_decision_ids` across **`blocked`** tasks (those awaiting a decision — `act-and-decide` parked them there, PHASE-3-PLAN §8) and fetch those decisions from Jupi; take the **FINALIZED** ones not yet **EXECUTED** (finalized-status read arriving in ~1–2 days). Push later = Jupi POSTs the routine's run endpoint (§ execution model).
-3. **Execute** *(the `execute-actions` worker)*: **materialize the selected option's action as `ready` rows** (per gated task, from the Jupi option), run them against the tools, **reopen the `blocked` task (`→ open`)** so `act-and-decide` re-dispositions it; then **set the Jupi decision to EXECUTED**. Same worker as immediate acts (PHASE-3-PLAN §8b).
+2. **Detect (pull):** each run, gather `gating_decision_ids` across **`blocked`** tasks (those awaiting a decision — `act-or-decide` parked them there, PHASE-3-PLAN §8) and fetch those decisions from Jupi; take the **FINALIZED** ones not yet **EXECUTED** (finalized-status read arriving in ~1–2 days). Push later = Jupi POSTs the routine's run endpoint (§ execution model).
+3. **Execute** *(the `execute-actions` worker)*: **materialize the selected option's action as `ready` rows** (per gated task, from the Jupi option), run them against the tools, **reopen the `blocked` task (`→ open`)** so `act-or-decide` re-dispositions it; then **set the Jupi decision to EXECUTED**. Same worker as immediate acts (PHASE-3-PLAN §8b).
 4. **Trace = the natural notification.** The execution writes its result **on the originating signal itself** — a reply in the Slack thread, the sent email, the Linear comment. That *is* the notification: it flows up naturally to whoever is on that signal. Nothing extra is pushed for it.
 5. **At most one explicit ping** on the FINALIZED→EXECUTED transition, to the user: **email, Slack, or none** (configurable). The only proactive closing notification — no digest, no per-action spam.
 6. **Recurse:** if execution surfaces a new trade-off, raise a new decision.
@@ -216,11 +216,11 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Parser → Scorer → Backlog. **Ends at a scored, deduped, ordered top-window** (`query-window`). **No separate Picker** — the coordination-node pass is act-or-decide's opening move (Phase 3), per §4. Built as a standalone `refresh-backlog` skill + a shared `plugins/proactive-jupi/shared/` (`schema.sql`, `db.mjs`, `signal-sources.md`); scorer axes are impact × relevance × urgency; un-gates `setup-proactive-jupi` step 7.
 
 **Phase 3 — Act-or-Decide + Action Planner** ✅ *built (not yet run against live Neon)* → detailed plan: [PHASE-3-PLAN.md](PHASE-3-PLAN.md)
-- **Two skills, split by responsibility (PHASE-3-PLAN §8):** **`act-and-decide`** (the *planner* — writes only Neon + Jupi, never touches user tools) and **`execute-actions`** (the *worker* — the only tool-writer; runs `ready` action rows). The `actions` table is the queue between them.
-- **`act-and-decide`:** cluster the window by **shared open-question** (the coordination node — one decision can gate actions across many tasks; a task with no open question is a cluster of one), rank by leverage, **research each kept cluster once** (bounded by a per-run `actBudget`), then the **confidence × exposure 2×2 gate** (§6) writes either a `ready` row or a Jupi decision. Confidence is binary (open-question or not); exposure is draft-first, then destination.
-- **`execute-actions`:** **one executor** — runs a `ready` row's verb (draft or real, same tool-call), triggered at the end of an act-and-decide run. Phase 3 defaults to `draft`; `perform` is a config flip on the *same* executor. What lands in **Phase 4 is the closing loop** (poll settled decisions → execute → `EXECUTED` + ping + reopen the `blocked` task), which is what makes high-exposure/external actions fire.
+- **Two skills, split by responsibility (PHASE-3-PLAN §8):** **`act-or-decide`** (the *planner* — writes only Neon + Jupi, never touches user tools) and **`execute-actions`** (the *worker* — the only tool-writer; runs `ready` action rows). The `actions` table is the queue between them.
+- **`act-or-decide`:** cluster the window by **shared open-question** (the coordination node — one decision can gate actions across many tasks; a task with no open question is a cluster of one), rank by leverage, **research each kept cluster once** (bounded by a per-run `actBudget`), then the **confidence × exposure 2×2 gate** (§6) writes either a `ready` row or a Jupi decision. Confidence is binary (open-question or not); exposure is draft-first, then destination.
+- **`execute-actions`:** **one executor** — runs a `ready` row's verb (draft or real, same tool-call), triggered at the end of an act-or-decide run. Phase 3 defaults to `draft`; `perform` is a config flip on the *same* executor. What lands in **Phase 4 is the closing loop** (poll settled decisions → execute → `EXECUTED` + ping + reopen the `blocked` task), which is what makes high-exposure/external actions fire.
 - **Safety ladder:** `--dry-run` (classify only, no writes) → `draft` (default; planner writes rows/decisions, worker drafts) → `perform` (Phase 4).
-- Un-gate `setup-proactive-jupi`: create the `act-and-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
+- Un-gate `setup-proactive-jupi`: create the `act-or-decide` routine and fire one first (dry-run) run at the end of setup, so onboarding proves the loop end-to-end.
 
 **Phase 4 — Closing loop + notifications** (the second *trigger* of the same `execute-actions` worker — not a new execution path; blocked on the Jupi FINALIZED read + EXECUTED-write)
 - Scheduled **poll-detect** of FINALIZED decisions → **materialize the chosen option's action as `ready` rows** (per gated task, from the Jupi option) → run the same worker → **reopen the `blocked` task** → trace on the signal → optional EXECUTED ping → set Jupi `EXECUTED` → recurse. This is what makes settled decisions — hence every high-exposure/external action — fire.

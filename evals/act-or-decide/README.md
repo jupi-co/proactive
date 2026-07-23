@@ -1,8 +1,8 @@
-# act-and-decide evals
+# act-or-decide evals
 
 Two layers, matching `evals/refresh-backlog/`.
 
-- **`trigger-eval.json`** — should-fire prompts ("run act-and-decide", "what should Jupi do now",
+- **`trigger-eval.json`** — should-fire prompts ("run act-or-decide", "what should Jupi do now",
   "dry-run and show the table") vs near-misses that belong to `refresh-backlog` (parse/score),
   `update-brain` (who-is / build the brain), `execute-actions` (run the queue / send the drafts),
   `setup-proactive-jupi`, or the decision skills (search / log / submit-decision).
@@ -14,7 +14,7 @@ Two layers, matching `evals/refresh-backlog/`.
   5. Real draft-mode write path — `ready` row → real draft via `execute-actions`; decision → `blocked`
      task; status is the window filter (done/blocked don't reappear).
 
-**Isolation.** Cases 1–4 run **`--dry-run`** → act-and-decide writes nothing (no Neon rows, no Jupi
+**Isolation.** Cases 1–4 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Case 5 is a real **`mode:draft`** run over fixture tasks whose `signal_ref` is
 prefixed `eval:`; run `purge-scratch.sh` afterward to delete them (their `actions` cascade). **Never run a
 write case in `perform` mode.** Jupi decisions from a write run live in Jupi (not Neon) — keep write runs

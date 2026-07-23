@@ -7,7 +7,7 @@
 // must never be string-interpolated into SQL.
 //
 // Consumers: setup (schema apply is separate), refresh-backlog (Parser/Scorer),
-// and later act-and-decide / the closing loop. update-brain may adopt the
+// and later act-or-decide / the closing loop. update-brain may adopt the
 // crawl_state verbs to drop its inline driver access.
 //
 // Usage:  node db.mjs <verb> [args...]
@@ -20,12 +20,12 @@
 //   query-window    [K]                             → [ {task}, … ]  (default K from BACKLOG_WINDOW_SIZE or 30)
 //   list-open-refs  <signal_type>                   → [ {signal_type, signal_ref, status}, … ]
 //   ── Phase 3: the actions queue + status writes ──
-//   insert-action   '<json>'                        → { id, status }   (act-and-decide, Stage 4)
+//   insert-action   '<json>'                        → { id, status }   (act-or-decide, Stage 4)
 //       json: task_id, tool, description, exposure ('low'|'high' → stored in `risk`),
 //             decision_id?, option_id? (provenance for a settled option), rule_ref?, status? (default 'ready')
 //   set-action-status <id> <status> [trace_ref]     → { id, status }   (execute-actions: 'ready'→'executed')
-//   set-task-status   <id> <status>                 → { id, status }   (act-and-decide: open→blocked|done|dropped, blocked→open)
-//   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-and-decide, Stage 5)
+//   set-task-status   <id> <status>                 → { id, status }   (act-or-decide: open→blocked|done|dropped, blocked→open)
+//   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-or-decide, Stage 5)
 //   list-actions      <status|decision> <value>     → [ {action}, … ]  (worker reads status='ready'; closing loop reads by decision)
 //   get-cursor      <consumer> <source> [eval]      → { consumer, source, is_eval, last_cursor, last_run_at } | null
 //   advance-cursor  <consumer> <source> <cursor> [eval] → { consumer, source, is_eval, last_cursor }
@@ -248,7 +248,7 @@ const VERBS = {
     return rows[0] ?? { id: null, error: "no such action for this user" };
   },
 
-  // act-and-decide owns this: open → blocked | done | dropped (and blocked → open on settle).
+  // act-or-decide owns this: open → blocked | done | dropped (and blocked → open on settle).
   async "set-task-status"(sql, [id, status], userId) {
     const rows = await sql.query(
       `update tasks
@@ -262,7 +262,7 @@ const VERBS = {
     return rows[0] ?? { id: null, error: "no such task for this user" };
   },
 
-  // Record the Jupi decisions this task's actions wait on (act-and-decide, Stage 5).
+  // Record the Jupi decisions this task's actions wait on (act-or-decide, Stage 5).
   // The closing loop polls these to detect settled decisions.
   async "set-task-gating"(sql, [taskId, idsJson], userId) {
     const ids = JSON.parse(idsJson); // array of uuid strings
