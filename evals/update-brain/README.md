@@ -8,7 +8,7 @@ Two eval layers, both isolated so they never pollute real Facts.
 - **Teardown — one command:** `bash evals/update-brain/purge-scratch.sh [tag]` (default `user_eval_scratch`). Bulk-deletes the container via the Supermemory HTTP API, reading the key from the gitignored `.claude/proactive-jupi.local.json`. **Run it after every behavioral eval.**
 
 ## 1. Triggering eval — does the skill fire on the right prompts?
-- Set: [`trigger-eval.json`](trigger-eval.json) — 10 should-trigger + 10 should-not (near-misses vs setup / act-and-decide / search-decisions).
+- Set: [`trigger-eval.json`](trigger-eval.json) — 10 should-trigger + 10 should-not (near-misses vs setup / act-or-decide / search-decisions).
 - Run (needs the `claude` CLI; no side effects — only tests triggering), from the skill-creator dir:
   ```
   python -m scripts.run_loop \

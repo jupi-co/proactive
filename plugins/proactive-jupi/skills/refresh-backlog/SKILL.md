@@ -7,20 +7,20 @@ description: >-
   impact × relevance × urgency so the top ones surface first. Use whenever the backlog
   needs rebuilding or topping up: "refresh the backlog", "parse my inbox into tasks",
   "what's on my plate", "rebuild the task list", or as the opening stage of an
-  act-and-decide run and the daily routine. Read-only on the tools and cheap by design —
+  act-or-decide run and the daily routine. Read-only on the tools and cheap by design —
   it never drafts, sends, decides, or writes Facts. Two-stage: parse (signal → task) then
   score (order the backlog + promote to open). Not for: doing a task or drafting a reply
-  (act-and-decide), building the brain / Facts (update-brain), initial workspace setup
+  (act-or-decide), building the brain / Facts (update-brain), initial workspace setup
   (setup-proactive-jupi), or looking up past decisions (search-decisions).
 disable-model-invocation: false
 ---
 
 # refresh-backlog — signal → scored backlog
 
-You are the **cheap upstream stage** of the act-and-decide pipeline: **parse** new signals
+You are the **cheap upstream stage** of the act-or-decide pipeline: **parse** new signals
 into candidate tasks, then **score** them so the highest-value ones rise to the top of a
 persisted backlog. You are deliberately shallow — the deep context dig, decision-making,
-drafting and execution all belong to **act-and-decide** downstream. Keeping this stage cheap
+drafting and execution all belong to **act-or-decide** downstream. Keeping this stage cheap
 is what lets it scan the whole backlog every run.
 
 > **Workspace-relative.** All data paths (`.proactive-jupi/assets.md`, `.claude/proactive-jupi.local.json`,
@@ -88,7 +88,7 @@ For each connected source in `seedTools` (recipes in `signal-sources.md`):
        else omit.
    - `relevant_facts` — a **light** `recall` (containerTag `user_<whoAmI.userId>`) for the
      people/orgs/projects named: `[{summary, source}]`. Read-only, shallow. **Do not** launch
-     `update-brain targeted` and **do not** deep-dig the thread — that's act-and-decide's job.
+     `update-brain targeted` and **do not** deep-dig the thread — that's act-or-decide's job.
    - `open_questions` — surface-level uncertainties only: `[{uncertainty_pct, description}]`.
      Not resolved decisions.
    - **Upsert:** `upsert-task '<json>'` (fields: `short_label, summary, signal_type, signal_ref,

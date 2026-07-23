@@ -7,7 +7,7 @@
 // must never be string-interpolated into SQL.
 //
 // Consumers: setup (schema apply is separate), refresh-backlog (Parser/Scorer),
-// and later act-and-decide / the closing loop. update-brain may adopt the
+// and later act-or-decide / the closing loop. update-brain may adopt the
 // crawl_state verbs to drop its inline driver access.
 //
 // Usage:  node db.mjs <verb> [args...]
@@ -19,6 +19,14 @@
 //       from the row's signal_at/external/deadline (§ scoring model below), and status → 'open'.
 //   query-window    [K]                             → [ {task}, … ]  (default K from BACKLOG_WINDOW_SIZE or 30)
 //   list-open-refs  <signal_type>                   → [ {signal_type, signal_ref, status}, … ]
+//   ── Phase 3: the actions queue + status writes ──
+//   insert-action   '<json>'                        → { id, status }   (act-or-decide, Stage 4)
+//       json: task_id, tool, description, exposure ('low'|'high' → stored in `risk`),
+//             decision_id?, option_id? (provenance for a settled option), rule_ref?, status? (default 'ready')
+//   set-action-status <id> <status> [trace_ref]     → { id, status }   (execute-actions: 'ready'→'executed')
+//   set-task-status   <id> <status>                 → { id, status }   (act-or-decide: open→blocked|done|dropped, blocked→open)
+//   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-or-decide, Stage 5)
+//   list-actions      <status|decision> <value>     → [ {action}, … ]  (worker reads status='ready'; closing loop reads by decision)
 //   get-cursor      <consumer> <source> [eval]      → { consumer, source, is_eval, last_cursor, last_run_at } | null
 //   advance-cursor  <consumer> <source> <cursor> [eval] → { consumer, source, is_eval, last_cursor }
 //     consumer = 'brain' | 'backlog'; pass a truthy 4th/3rd arg ('eval'|'true'|'1') for eval runs.
@@ -197,6 +205,92 @@ const VERBS = {
          from tasks where user_id = $1 and signal_type = $2`,
       [userId, signalType],
     );
+  },
+
+  // ── Phase 3: actions queue + status writes ──────────────────────────────
+  // Materialize one action row that will RUN — an immediate act, or a settled
+  // decision's chosen option (at settle). Defaults to status 'ready'. `exposure` is
+  // stored in the `risk` column (Phase-3 rename; DB column kept as `risk`).
+  // INSERT ... SELECT guards tenant integrity: written only if task_id is this user's.
+  async "insert-action"(sql, [jsonArg], userId) {
+    const a = JSON.parse(jsonArg);
+    const rows = await sql.query(
+      `insert into actions (user_id, task_id, decision_id, option_id, tool, description, rule_ref, risk, status)
+       select $1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'ready')
+        where exists (select 1 from tasks where id = $2 and user_id = $1)
+       returning id, status`,
+      [
+        userId,                         // $1
+        a.task_id,                      // $2
+        a.decision_id ?? null,          // $3
+        a.option_id ?? null,            // $4
+        a.tool,                         // $5
+        a.description,                  // $6
+        a.rule_ref ?? null,             // $7
+        a.exposure ?? a.risk ?? null,   // $8  → risk column (the exposure value)
+        a.status ?? "ready",            // $9  (defaults to ready — a queued action)
+      ],
+    );
+    return rows[0] ?? { id: null, error: "no such task for this user" };
+  },
+
+  // execute-actions owns this: ready → executed (+ trace_ref, executed_at).
+  async "set-action-status"(sql, [id, status, traceRef], userId) {
+    const rows = await sql.query(
+      `update actions
+          set status = $3,
+              trace_ref = coalesce($4, trace_ref),
+              executed_at = case when $3 = 'executed' then now() else executed_at end
+        where id = $1 and user_id = $2
+      returning id, status`,
+      [id, userId, status, traceRef ?? null],
+    );
+    return rows[0] ?? { id: null, error: "no such action for this user" };
+  },
+
+  // act-or-decide owns this: open → blocked | done | dropped (and blocked → open on settle).
+  async "set-task-status"(sql, [id, status], userId) {
+    const rows = await sql.query(
+      `update tasks
+          set status = $3,
+              updated_at = now(),
+              closed_at = case when $3 in ('done','dropped') then now() else closed_at end
+        where id = $1 and user_id = $2
+      returning id, status`,
+      [id, userId, status],
+    );
+    return rows[0] ?? { id: null, error: "no such task for this user" };
+  },
+
+  // Record the Jupi decisions this task's actions wait on (act-or-decide, Stage 5).
+  // The closing loop polls these to detect settled decisions.
+  async "set-task-gating"(sql, [taskId, idsJson], userId) {
+    const ids = JSON.parse(idsJson); // array of uuid strings
+    const rows = await sql.query(
+      `update tasks set gating_decision_ids = $3::uuid[], updated_at = now()
+        where id = $1 and user_id = $2
+      returning id, gating_decision_ids`,
+      [taskId, userId, ids],
+    );
+    return rows[0] ?? { id: null, error: "no such task for this user" };
+  },
+
+  // The worker's queue read (`list-actions status ready`) + the closing loop's
+  // per-decision read (`list-actions decision <id>`).
+  async "list-actions"(sql, [kind, value], userId) {
+    const cols =
+      "id, task_id, decision_id, option_id, tool, description, risk, status, trace_ref, created_at";
+    if (kind === "status")
+      return sql.query(
+        `select ${cols} from actions where user_id = $1 and status = $2 order by created_at`,
+        [userId, value],
+      );
+    if (kind === "decision")
+      return sql.query(
+        `select ${cols} from actions where user_id = $1 and decision_id = $2 order by created_at`,
+        [userId, value],
+      );
+    return { error: "list-actions: first arg must be 'status' or 'decision'" };
   },
 
   async "get-cursor"(sql, [consumer, source, isEval], userId) {

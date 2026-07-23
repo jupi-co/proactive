@@ -11,7 +11,7 @@
 -- ── TENANCY ───────────────────────────────────────────────────────────
 -- Every row carries `user_id` — the tenant key. **Jupi is the reference for
 -- identity:** `user_id` is the authenticated caller's Jupi user id, resolved
--- once at setup and cached as `jupiUserId` in `.claude/setup.local.json`. The
+-- once at setup and cached as `jupiUserId` in `.claude/proactive-jupi.local.json`. The
 -- SAME id keys the brain's Supermemory container tag (`user_<jupiUserId>`), so
 -- Jupi, Neon, and Supermemory share one identity with nothing to reconcile.
 -- Each workspace also gets its own project-scoped connection string (a
@@ -34,7 +34,10 @@ create table if not exists tasks (
   signal_type     text,                                -- gmail | calendar | linear | slack | github | drive
   signal_url      text,                                -- permalink to the signal, captured at parse time (clickable <a href> for Phase-3 decisions)
   status          text not null default 'candidate'
-                    check (status in ('candidate','open','done','dropped')),
+                    -- candidate → open (scored) → blocked (awaiting a decision) | done | dropped.
+                    -- act-or-decide owns this column; 'blocked' is what keeps query-window
+                    -- (status='open' only) from re-surfacing a task it already handled.
+                    check (status in ('candidate','open','blocked','done','dropped')),
   -- observed signal facts (parser) — feed the computed urgency
   signal_at       timestamptz,                         -- when the ball entered your court (last inbound / assigned / event time) — drives urgency's age
   external        boolean not null default false,      -- counterparty outside the org — feeds urgency AND the Phase-3 risk gate
@@ -61,10 +64,12 @@ create unique index if not exists tasks_user_signal_uniq on tasks (user_id, sign
 
 -- ── ACTIONS ───────────────────────────────────────────────────────────
 -- Units of execution. ONE task can fan out into several parallel actions.
--- An action is either:
---   • immediate       — decision_id null → act now (confident + low-risk, or a rule authorizes it)
---   • decision-gated  — decision_id + option_id set → executes ONLY if that Jupi option is the one selected
--- On finalize: actions matching the selected option execute; siblings on other options are skipped.
+-- A row exists ONLY for an action that will run (or has): either an immediate act,
+-- or the chosen option of a settled decision (materialized as a `ready` row at settle).
+-- Pending option-actions are NOT stored here — they live in the Jupi decision until
+-- one option is picked (no Neon duplication of what Jupi already holds).
+--   decision_id/option_id: provenance — which settled decision/option this row realizes
+--                          (null = an immediate act).
 -- `user_id` is denormalized from the parent task so action queries filter by
 -- tenant directly (no join) and RLS can apply uniformly.
 create table if not exists actions (
@@ -76,10 +81,14 @@ create table if not exists actions (
   tool          text not null,                         -- where the action runs
   description   text not null,                         -- the executable action-instruction ("send email to X saying Y")
   rule_ref      text,                                  -- business rule (Jupi) that justified acting, if any
-  risk          text check (risk in ('low','high')),   -- internal/reversible vs external/sensitive
-  confidence    text check (confidence in ('low','medium','high')),
-  status        text not null default 'candidate'
-                  check (status in ('candidate','pending_decision','executed','skipped')),
+  risk          text check (risk in ('low','high')),   -- EXPOSURE (Phase-3 name): draft-first, then destination/irreversibility. Column kept as `risk`.
+  -- (no confidence column: confidence is a TASK-level, runtime judgment derived from
+  --  open_questions each run — never stored on an action.)
+  -- A row is queued the moment it exists: ready (to run) → executed. Nothing else —
+  -- pending option-actions live in Jupi, not here. execute-actions owns this column
+  -- (ready → executed); it never writes tasks.status.
+  status        text not null default 'ready'
+                  check (status in ('ready','executed')),
   trace_ref     text,                                  -- execution trace on the signal (slack msg, email id…)
   created_at    timestamptz not null default now(),
   executed_at   timestamptz
@@ -164,6 +173,28 @@ do $$ begin
       using (case urgency when 'low' then 1 when 'medium' then 2 when 'high' then 3 else null end);
   end if;
 end $$;
+
+-- v3 (Phase 3): widen the status CHECKs on an already-applied instance —
+--   tasks: add 'blocked' (task awaiting a decision; act-or-decide parks it there).
+--   actions: add 'ready' (gated-to-ACT, queued for execute-actions).
+-- A CHECK can only be widened by drop + re-add; drop-if-exists keeps it idempotent
+-- (on a fresh install the inline CHECK above is already correct — this re-adds the
+-- identical constraint, a no-op in effect). The inline name Postgres assigns to an
+-- unnamed column CHECK is <table>_<column>_check.
+alter table tasks   drop constraint if exists tasks_status_check;
+alter table tasks   add  constraint tasks_status_check
+  check (status in ('candidate','open','blocked','done','dropped'));
+-- actions hold only rows that will run: ready → executed. Pending option-actions
+-- live in Jupi (not Neon), so coerce any legacy rows, then narrow the CHECK + default.
+update actions set status = 'ready' where status = 'candidate';
+delete from actions where status in ('pending_decision','skipped');  -- redundant with Jupi
+alter table actions drop constraint if exists actions_status_check;
+alter table actions add  constraint actions_status_check
+  check (status in ('ready','executed'));
+alter table actions alter column status set default 'ready';
+-- Drop the vestigial actions.confidence (Phase 2 shipped it; the Phase-3 gate reads
+-- confidence at the TASK level from open_questions, never off an action row).
+alter table actions drop column if exists confidence;
 
 -- ── OPTIONAL HARDENING: Row-Level Security ────────────────────────────
 -- Filtering by user_id in every query is sufficient for the single-writer skill

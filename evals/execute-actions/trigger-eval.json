@@ -1,0 +1,22 @@
+[
+  {"query": "execute the ready actions", "should_trigger": true},
+  {"query": "run the queue and create the drafts act-or-decide lined up", "should_trigger": true},
+  {"query": "flush the drafts that are queued in Neon", "should_trigger": true},
+  {"query": "send what act-or-decide prepared for me", "should_trigger": true},
+  {"query": "there are ready action rows — go run them against Gmail and Linear", "should_trigger": true},
+  {"query": "drain the action queue and mark them executed", "should_trigger": true},
+  {"query": "actually create the Gmail drafts that are sitting ready", "should_trigger": true},
+  {"query": "work my backlog and decide what to do with the top items", "should_trigger": false},
+  {"query": "what should Jupi do now?", "should_trigger": false},
+  {"query": "draft a reply to Hassan about the pilot timeline", "should_trigger": false},
+  {"query": "triage the top of my backlog and either act or raise a decision", "should_trigger": false},
+  {"query": "refresh the backlog and parse my inbox into tasks", "should_trigger": false},
+  {"query": "update the brain from the last month of Gmail and Linear", "should_trigger": false},
+  {"query": "have we already decided which e-signature tool to use?", "should_trigger": false},
+  {"query": "log that we're going with Yousign for signatures", "should_trigger": false},
+  {"query": "who is Hassan at EcoVadis and what's our history with him?", "should_trigger": false},
+  {"query": "set up my workspace — connect my tools and apply the schema", "should_trigger": false},
+  {"query": "escalate the discount question to the CRO", "should_trigger": false},
+  {"query": "what's on my plate right now?", "should_trigger": false},
+  {"query": "summarize this Google Doc for me", "should_trigger": false}
+]

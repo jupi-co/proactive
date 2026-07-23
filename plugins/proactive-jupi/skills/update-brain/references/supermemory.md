@@ -2,7 +2,7 @@
 
 ## Tools (installed MCP connector; names may be namespaced by connection)
 - **`memory`** — save/forget a fact. Params: `content` (≤200k chars), `containerTag`, `action` (`save` | `forget`). **The only write path.** No metadata / customId / isStatic. **`forget` is best-effort** and often fails: it requires ≥0.85 semantic similarity to Supermemory's *rewritten* stored form and there is no delete-by-id, so it routinely can't remove a paraphrased fact (verified 2026-07-21). Treat reliable correction/deletion as an **HTTP-API-only** capability.
-- **`recall`** — search memories. Params: `query`, `containerTag`, `includeProfile` (default true → also returns a profile summary). **The read path** for act-and-decide.
+- **`recall`** — search memories. Params: `query`, `containerTag`, `includeProfile` (default true → also returns a profile summary). **The read path** for act-or-decide.
 - **`memory-graph`** — inspect the relationship graph for a container tag.
 - **`listMemories`**, **`listProjects`** — enumerate.
 - **`whoAmI`** — current Supermemory user (`userId`, `email`). Informational only — **not** the identity source: the container tag keys on the canonical `jupiUserId` (see below), not on Supermemory's own `userId`.

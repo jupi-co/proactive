@@ -7,5 +7,15 @@
   "supermemoryApiKey": "<optional: sm_... — ONLY for HTTP-API ops (reliable delete/correct) + the eval purge script; the Supermemory connector does NOT need it>",
   "seedTools": ["gmail", "calendar", "linear"],
   "crawlWindowDays": 30,
-  "backlogWindowSize": 30
+  "backlogWindowSize": 30,
+  "guardrails": {
+    "_comment": "act-or-decide policy (Phase 3). Default conservative; loosen as trust builds.",
+    "mode": "draft",
+    "actBudget": 5,
+    "policy": {
+      "high": { "low": "act",    "high": "decide" },
+      "low":  { "low": "decide", "high": "decide" }
+    },
+    "executedPing": "none"
+  }
 }
