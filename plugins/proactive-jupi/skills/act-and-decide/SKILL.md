@@ -7,9 +7,13 @@ description: >-
   exposure gate: queue it to ACT (a `ready` action row) or raise a structured Jupi DECISION whose
   options each carry the exact action to run. It writes ONLY Neon (action rows + task status) and Jupi
   (decisions) — it NEVER touches the user's tools; the separate `execute-actions` worker does that.
-  Use whenever Proactive-Jupi should proactively work the backlog: "run act-and-decide", "work my
-  backlog", "what should Jupi do now", "triage and act". Also launched by the daily routine. Runs in
-  --dry-run (classify only, write nothing) by default-safe draft mode.
+  Use whenever Proactive-Jupi should proactively work the backlog — decide what to do and do the safe
+  parts: "run act-and-decide", "work my backlog", "what should Jupi do now", "triage and act on my tasks",
+  "draft what you can and raise decisions for the rest". Also launched by the daily routine; runs in
+  --dry-run (classify only, write nothing) under default-safe draft mode. Not for: building or re-scoring
+  the backlog itself (refresh-backlog), running already-queued actions or sending the drafts
+  (execute-actions), building Facts / entity lookups (update-brain), or looking up past decisions
+  (search-decisions).
 disable-model-invocation: false
 ---
 

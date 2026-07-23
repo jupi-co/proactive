@@ -5,9 +5,12 @@ description: >-
   rows act-and-decide queued in Neon and runs each one against its tool (create the Gmail/Linear draft,
   or — in perform mode — send/post/book for real), then marks it executed and records the trace. It owns
   `actions.status` (ready → executed) and never writes `tasks.status`. Use whenever queued actions need to
-  run: "execute the ready actions", "run the queue", "flush the drafts", or right after an act-and-decide
-  run (which invokes it automatically). Draft actions are still actions — they run here, not in the planner.
-  One executor: a draft and a real send are the same tool-call; the row already carries the verb.
+  run: "execute the ready actions", "run the queue", "flush the drafts", "send what act-and-decide prepared",
+  or right after an act-and-decide run (which invokes it automatically). Draft actions are still actions —
+  they run here, not in the planner. One executor: a draft and a real send are the same tool-call; the row
+  already carries the verb. Not for: deciding WHAT to do or clustering/gating the backlog (act-and-decide),
+  building or scoring the backlog (refresh-backlog), or building Facts (update-brain) — this skill only
+  runs rows that are already `ready`.
 disable-model-invocation: false
 ---
 
