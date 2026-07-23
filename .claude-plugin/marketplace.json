@@ -5,7 +5,7 @@
     "name": "Jupi",
     "email": "a@jupi.co"
   },
-  "description": "Proactive-Jupi — the proactive decision engine (brain crawler + act-or-decide + closing loop). Local marketplace for dogfooding and Cowork testing.",
+  "description": "Proactive-Jupi — the proactive decision engine (brain crawler + act-or-decide + post-decision loop). Local marketplace for dogfooding and Cowork testing.",
   "plugins": [
     {
       "name": "proactive-jupi",

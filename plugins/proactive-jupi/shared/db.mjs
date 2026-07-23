@@ -7,8 +7,9 @@
 // must never be string-interpolated into SQL.
 //
 // Consumers: setup (schema apply is separate), refresh-backlog (Parser/Scorer),
-// and later act-or-decide / the closing loop. update-brain may adopt the
-// crawl_state verbs to drop its inline driver access.
+// act-or-decide (planner: queue + status writes), act-post-decision (the
+// post-decision loop: `list-blocked` poll + task completion). update-brain may
+// adopt the crawl_state verbs to drop its inline driver access.
 //
 // Usage:  node db.mjs <verb> [args...]
 //   upsert-task     '<json>'                        → { id, prior_status }
@@ -23,10 +24,11 @@
 //   insert-action   '<json>'                        → { id, status }   (act-or-decide, Stage 4)
 //       json: task_id, tool, description, exposure ('low'|'high' → stored in `risk`),
 //             decision_id?, option_id? (provenance for a settled option), rule_ref?, status? (default 'ready')
-//   set-action-status <id> <status> [trace_ref]     → { id, status }   (execute-actions: 'ready'→'executed')
-//   set-task-status   <id> <status>                 → { id, status }   (act-or-decide: open→blocked|done|dropped, blocked→open)
+//   set-action-status <id> <status> [trace_ref]     → { id, status }   (act-or-decide: 'ready'→'executed' after the worker runs it — Phase 4)
+//   set-task-status   <id> <status>                 → { id, status }   (act-or-decide: open→blocked|done|dropped · act-post-decision: blocked→done|open)
 //   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-or-decide, Stage 5)
-//   list-actions      <status|decision> <value>     → [ {action}, … ]  (worker reads status='ready'; closing loop reads by decision)
+//   list-actions      <status|decision> <value>     → [ {action}, … ]  (act-or-decide reads status='ready'; the 'decision' branch is deprecated — Phase 4)
+//   list-blocked                                    → [ {task}, … ]    (act-post-decision poll: blocked tasks + gating_decision_ids)
 //   get-cursor      <consumer> <source> [eval]      → { consumer, source, is_eval, last_cursor, last_run_at } | null
 //   advance-cursor  <consumer> <source> <cursor> [eval] → { consumer, source, is_eval, last_cursor }
 //     consumer = 'brain' | 'backlog'; pass a truthy 4th/3rd arg ('eval'|'true'|'1') for eval runs.
@@ -234,7 +236,8 @@ const VERBS = {
     return rows[0] ?? { id: null, error: "no such task for this user" };
   },
 
-  // execute-actions owns this: ready → executed (+ trace_ref, executed_at).
+  // act-or-decide owns this (Phase 4): ready → executed (+ trace_ref, executed_at),
+  // written after the pure execute-action worker performs the side-effect.
   async "set-action-status"(sql, [id, status, traceRef], userId) {
     const rows = await sql.query(
       `update actions
@@ -263,7 +266,7 @@ const VERBS = {
   },
 
   // Record the Jupi decisions this task's actions wait on (act-or-decide, Stage 5).
-  // The closing loop polls these to detect settled decisions.
+  // act-post-decision polls these (via list-blocked) to detect settled decisions.
   async "set-task-gating"(sql, [taskId, idsJson], userId) {
     const ids = JSON.parse(idsJson); // array of uuid strings
     const rows = await sql.query(
@@ -275,8 +278,11 @@ const VERBS = {
     return rows[0] ?? { id: null, error: "no such task for this user" };
   },
 
-  // The worker's queue read (`list-actions status ready`) + the closing loop's
-  // per-decision read (`list-actions decision <id>`).
+  // The ACT queue read for act-or-decide: `list-actions status ready` (its own
+  // rows to run + the orphan-sweep of `ready` rows a prior run left behind).
+  // NOTE: `list-actions decision <id>` is DEPRECATED as of Phase 4 — decided
+  // actions live only in Jupi now (never materialized into Neon), so nothing
+  // queries actions by decision_id. Kept for back-compat; safe to delete.
   async "list-actions"(sql, [kind, value], userId) {
     const cols =
       "id, task_id, decision_id, option_id, tool, description, risk, status, trace_ref, created_at";
@@ -291,6 +297,20 @@ const VERBS = {
         [userId, value],
       );
     return { error: "list-actions: first arg must be 'status' or 'decision'" };
+  },
+
+  // act-post-decision's poll input (Phase 4): every `blocked` task with the Jupi
+  // decision ids its actions wait on, plus signal refs for the trace. The loop
+  // fetches those decisions from Jupi, runs the settled ones, and completes a
+  // task (`blocked → done`) once ALL its gating decisions are FINALIZED.
+  async "list-blocked"(sql, [], userId) {
+    return sql.query(
+      `select id, gating_decision_ids, signal_type, signal_ref, signal_url, summary
+         from tasks
+        where user_id = $1 and status = 'blocked'
+        order by updated_at`,
+      [userId],
+    );
   },
 
   async "get-cursor"(sql, [consumer, source, isEval], userId) {

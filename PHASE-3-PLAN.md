@@ -146,6 +146,12 @@ so draft mode caps only *immediate* acts, not the outcome of a decision.
 
 ## 8. Anatomy — two components, the `actions` table between them
 
+> ⚠️ **Superseded by PHASE-4-PLAN §5 (v0.4).** Phase 4 refactors the worker to *purely functional*: `execute-actions` →
+> **`execute-action`** performs the side-effect and returns the trace but writes **no** status; the **orchestrators** own
+> bookkeeping (`act-or-decide` writes Neon `actions.status` for ACT; `act-post-decision` marks decided actions **done in
+> Jupi**, never materializing them into Neon). Where this §8 says "the worker owns `actions.status`" or "materialize the
+> chosen option as a `ready` row at settle," read [PHASE-4-PLAN.md](PHASE-4-PLAN.md) §2/§5 instead.
+
 **Clean ownership: `act-or-decide` owns `tasks.status`; `execute-actions` owns `actions.status`.** Neither writes the
 other's. Two state machines run in lockstep:
 
@@ -271,7 +277,8 @@ question invisible at the shallow stage — is missed within a run; they cluster
   the filter** (§8).
 - **Status ownership** (mirrors the split): **`act-or-decide` writes `tasks.status`** (`open → done|blocked|dropped`,
   and `blocked → open` on settle); **`execute-actions` writes `actions.status`** (`ready → executed`). Enforced by
-  convention in the skills, not the DB.
+  convention in the skills, not the DB. *(⚠️ Revised in Phase 4 — PHASE-4-PLAN §5: the worker writes **no** status;
+  `act-or-decide` writes `actions.status`, and `act-post-decision` owns the `blocked → done|open` settle transitions.)*
 - `actions.risk` **stores the *exposure* value** (P3-5); keep the column name. *(Optional rename.)*
 - `decision_id`/`option_id`, `tasks.gating_decision_ids` (array → multi-gating), `tasks.external`, `tasks.signal_url`,
   `user_id` everywhere — already present.

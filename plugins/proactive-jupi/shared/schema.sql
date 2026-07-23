@@ -64,12 +64,13 @@ create unique index if not exists tasks_user_signal_uniq on tasks (user_id, sign
 
 -- ── ACTIONS ───────────────────────────────────────────────────────────
 -- Units of execution. ONE task can fan out into several parallel actions.
--- A row exists ONLY for an action that will run (or has): either an immediate act,
--- or the chosen option of a settled decision (materialized as a `ready` row at settle).
--- Pending option-actions are NOT stored here — they live in the Jupi decision until
--- one option is picked (no Neon duplication of what Jupi already holds).
---   decision_id/option_id: provenance — which settled decision/option this row realizes
---                          (null = an immediate act).
+-- A row exists ONLY for an immediate ACT action (act-or-decide, decision_id null).
+-- DECIDED actions are NOT stored here at all — they live in the Jupi decision's
+-- option `Action:` lists and are run straight from Jupi by act-post-decision at
+-- settle (Phase 4: no Neon materialization of what Jupi already holds).
+--   decision_id/option_id: VESTIGIAL as of Phase 4 (decided actions are Jupi-only,
+--                          so these are always null on the rows now written). Retained
+--                          for back-compat; safe to drop in a later tidy-up.
 -- `user_id` is denormalized from the parent task so action queries filter by
 -- tenant directly (no join) and RLS can apply uniformly.
 create table if not exists actions (
@@ -85,8 +86,9 @@ create table if not exists actions (
   -- (no confidence column: confidence is a TASK-level, runtime judgment derived from
   --  open_questions each run — never stored on an action.)
   -- A row is queued the moment it exists: ready (to run) → executed. Nothing else —
-  -- pending option-actions live in Jupi, not here. execute-actions owns this column
-  -- (ready → executed); it never writes tasks.status.
+  -- decided actions live in Jupi, not here. act-or-decide owns this column: it inserts
+  -- `ready`, then — after the pure execute-action worker performs the side-effect and
+  -- returns a trace — writes `executed` + trace_ref. The worker writes no status.
   status        text not null default 'ready'
                   check (status in ('ready','executed')),
   trace_ref     text,                                  -- execution trace on the signal (slack msg, email id…)
@@ -176,7 +178,7 @@ end $$;
 
 -- v3 (Phase 3): widen the status CHECKs on an already-applied instance —
 --   tasks: add 'blocked' (task awaiting a decision; act-or-decide parks it there).
---   actions: add 'ready' (gated-to-ACT, queued for execute-actions).
+--   actions: add 'ready' (immediate ACT, run by the execute-action worker).
 -- A CHECK can only be widened by drop + re-add; drop-if-exists keeps it idempotent
 -- (on a fresh install the inline CHECK above is already correct — this re-adds the
 -- identical constraint, a no-op in effect). The inline name Postgres assigns to an

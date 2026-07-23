@@ -5,7 +5,7 @@
     {
       "id": 1,
       "prompt": "--dry-run act-or-decide over a window that includes a task whose reply content is known and low-exposure (draft an internal reply to a peer).",
-      "expected": "Verdict ACT: confidence high (no open question), exposure low (a draft) → the table row reads ACT, no decision. Nothing is written to Neon or Jupi; execute-actions is NOT invoked."
+      "expected": "Verdict ACT: confidence high (no open question), exposure low (a draft) → the table row reads ACT, no decision. Nothing is written to Neon or Jupi; execute-action is NOT invoked."
     },
     {
       "id": 2,
@@ -25,7 +25,7 @@
     {
       "id": 5,
       "prompt": "REAL DRAFT-MODE run (mode=draft) over eval-prefixed fixture tasks: one low-exposure act task and one task with a genuine open question. Eval-isolated (signal_ref 'eval:%').",
-      "expected": "The act task gets one 'ready' action row and execute-actions turns it into a real Gmail/Linear DRAFT (trace recorded); its task → 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi — NO actions rows are written for pending options), gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward."
+      "expected": "The act task gets one 'ready' action row; act-or-decide hands it to execute-action, which creates the real Gmail/Linear DRAFT and RETURNS a trace; act-or-decide then writes that row 'executed' + trace_ref (the worker writes no status itself); its task → 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi — NO actions rows are written for pending options), gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward."
     }
   ]
 }
