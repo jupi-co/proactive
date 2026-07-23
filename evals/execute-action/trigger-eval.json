@@ -4,7 +4,7 @@
   {"query": "flush the drafts that are queued in Neon", "should_trigger": true},
   {"query": "send what act-or-decide prepared for me", "should_trigger": true},
   {"query": "there are ready action rows — go run them against Gmail and Linear", "should_trigger": true},
-  {"query": "drain the action queue and mark them executed", "should_trigger": true},
+  {"query": "drain the ready action queue and run each one against its tool", "should_trigger": true},
   {"query": "actually create the Gmail drafts that are sitting ready", "should_trigger": true},
   {"query": "work my backlog and decide what to do with the top items", "should_trigger": false},
   {"query": "what should Jupi do now?", "should_trigger": false},

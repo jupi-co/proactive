@@ -1,0 +1,22 @@
+[
+  {"query": "run the post-decision loop", "should_trigger": true},
+  {"query": "close out the decisions I finalized in Jupi", "should_trigger": true},
+  {"query": "any decisions ready to run now that I've settled them?", "should_trigger": true},
+  {"query": "carry out the settled decisions and complete their tasks", "should_trigger": true},
+  {"query": "I picked options on a few Jupi decisions — go execute them", "should_trigger": true},
+  {"query": "reconcile the blocked tasks against their finalized decisions", "should_trigger": true},
+  {"query": "I approved the pricing decision, make it happen", "should_trigger": true},
+  {"query": "work my backlog and decide what to do with the top items", "should_trigger": false},
+  {"query": "what should Jupi do now?", "should_trigger": false},
+  {"query": "execute the ready action rows act-or-decide queued", "should_trigger": false},
+  {"query": "flush the drafts sitting ready in Neon", "should_trigger": false},
+  {"query": "triage the top of my backlog and either act or raise a decision", "should_trigger": false},
+  {"query": "refresh the backlog and parse my inbox into tasks", "should_trigger": false},
+  {"query": "update the brain from the last month of Gmail and Linear", "should_trigger": false},
+  {"query": "have we already decided which e-signature tool to use?", "should_trigger": false},
+  {"query": "log that we're going with Yousign for signatures", "should_trigger": false},
+  {"query": "raise a decision to the CRO about the discount", "should_trigger": false},
+  {"query": "set up my workspace — connect my tools and apply the schema", "should_trigger": false},
+  {"query": "who is Hassan at EcoVadis and what's our history with him?", "should_trigger": false},
+  {"query": "what's on my plate right now?", "should_trigger": false}
+]

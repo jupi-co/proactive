@@ -25,7 +25,7 @@ chaining contract for the runner. The producer is `SKILL.md`; the validator is `
 nothing over a dubious deliverable. `validation.md` keeps the trace of persistent flags for debugging.
 
 ## Also gated: a real send (perform mode)
-Before `execute-actions` fires a **real (non-draft) verb**, the same validator vets that action — a real
+Before `execute-action` fires a **real (non-draft) verb**, the same validator vets that action — a real
 external send is at least as consequential as a posted decision. Draft-mode ACTs and `--dry-run` need no
 gate (no external effect), keeping the default path fast. *(This branch is exercised only when `mode:perform`
 is enabled; the closing-loop execution of settled decisions lands in Phase 4.)*
