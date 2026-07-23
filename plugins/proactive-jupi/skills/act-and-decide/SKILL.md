@@ -1,19 +1,15 @@
 ---
 name: act-and-decide
 description: >-
-  Proactive-Jupi's planner — the downstream half of the pipeline. Over the scored Neon backlog it
-  clusters tasks by a shared open question (the coordination node — one decision can gate work across
-  many tasks), researches each kept cluster once, then per candidate action runs the confidence ×
-  exposure gate: queue it to ACT (a `ready` action row) or raise a structured Jupi DECISION whose
-  options each carry the exact action to run. It writes ONLY Neon (action rows + task status) and Jupi
-  (decisions) — it NEVER touches the user's tools; the separate `execute-actions` worker does that.
-  Use whenever Proactive-Jupi should proactively work the backlog — decide what to do and do the safe
-  parts: "run act-and-decide", "work my backlog", "what should Jupi do now", "triage and act on my tasks",
-  "draft what you can and raise decisions for the rest". Also launched by the daily routine; runs in
-  --dry-run (classify only, write nothing) under default-safe draft mode. Not for: building or re-scoring
-  the backlog itself (refresh-backlog), running already-queued actions or sending the drafts
-  (execute-actions), building Facts / entity lookups (update-brain), or looking up past decisions
-  (search-decisions).
+  Proactive-Jupi's planner — the downstream half of the pipeline. Over the scored Neon backlog it clusters
+  tasks by a shared open question (one decision can gate many — the coordination node), researches each
+  cluster once, then per action runs the confidence × exposure gate: queue it to ACT (a `ready` row) or
+  raise a structured Jupi DECISION. It writes ONLY Neon + Jupi — it never touches the user's tools (the
+  `execute-actions` worker does that). Use whenever Proactive-Jupi should work the backlog — decide, and do
+  the safe parts: "run act-and-decide", "work my backlog", "what should Jupi do now", "triage and act",
+  "draft what you can and decide the rest". Also the daily routine; runs --dry-run under default-safe draft
+  mode. Not for: building/scoring the backlog (refresh-backlog), running queued actions or sending drafts
+  (execute-actions), Facts / entity lookups (update-brain), or past decisions (search-decisions).
 disable-model-invocation: false
 ---
 
