@@ -9,7 +9,7 @@
 
 ## Container-tag scheme
 - **One company = one Supermemory org** (the connected account).
-- **v1:** a single **user-level tag** = `user_<jupiUserId>`. **Jupi is the reference for the userId** — the `jupiUserId` setup cached in `.claude/proactive-jupi.local.json`, the same tenant key Neon rows carry, so the brain and the backlog share one identity. The tag *scheme* (`user_<…>`) is hard-coded here (update-brain's concern); the id is read from config, never asked, never derived from Supermemory's `whoAmI`.
+- **v1:** a single **user-level tag** = `user_<jupiUserId>`. **Jupi is the reference for the userId** — the `jupiUserId` setup cached in `.proactive-jupi/config.local.json`, the same tenant key Neon rows carry, so the brain and the backlog share one identity. The tag *scheme* (`user_<…>`) is hard-coded here (update-brain's concern); the id is read from config, never asked, never derived from Supermemory's `whoAmI`.
 - **Later (privacy — Nick's public-vs-private split):** hierarchical `org_<id>` / `org_<id>_team_<id>` / `org_<id>_team_<id>_user_<id>`. Shared facts get the higher-level tag, private facts the user tag; Supermemory isolates by tag (a user can't read another's).
 
 ## What the connector does NOT give us — and how we compensate
@@ -33,4 +33,4 @@
 - **`save` is async-rewritten/retitled** and extracted into *multiple* memories (tests: 4 saved docs → 11 memories; 5 → 19). The stored form differs from what you sent — which is also why `forget`-by-content fails (see the tool note).
 
 ## Upgrade trigger
-Noisy recall (duplicate/contradictory facts) or a need for structured filtering/enumeration → add the **HTTP API**: `POST /v3/documents` (raw content, `customId`, `metadata`) and `POST /v4/memories` (entity-centric, `isStatic`), authenticated with the Supermemory API key. Re-introduce the key in `proactive-jupi.local.json` only when this trigger fires.
+Noisy recall (duplicate/contradictory facts) or a need for structured filtering/enumeration → add the **HTTP API**: `POST /v3/documents` (raw content, `customId`, `metadata`) and `POST /v4/memories` (entity-centric, `isStatic`), authenticated with the Supermemory API key. Re-introduce the key in `config.local.json` only when this trigger fires.

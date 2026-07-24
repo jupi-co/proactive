@@ -11,7 +11,7 @@
 -- ── TENANCY ───────────────────────────────────────────────────────────
 -- Every row carries `user_id` — the tenant key. **Jupi is the reference for
 -- identity:** `user_id` is the authenticated caller's Jupi user id, resolved
--- once at setup and cached as `jupiUserId` in `.claude/proactive-jupi.local.json`. The
+-- once at setup and cached as `jupiUserId` in `.proactive-jupi/config.local.json`. The
 -- SAME id keys the brain's Supermemory container tag (`user_<jupiUserId>`), so
 -- Jupi, Neon, and Supermemory share one identity with nothing to reconcile.
 -- Each workspace also gets its own project-scoped connection string (a
