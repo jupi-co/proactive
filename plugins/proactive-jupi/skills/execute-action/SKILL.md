@@ -32,7 +32,9 @@ status.
 
 ## Contract (hard — never transgress)
 - ✅ **Perform each action's `description` via its `tool`** — create the draft, send, comment, label, book —
-  and **return the trace ref**. Nothing more.
+  and **return the trace ref**. Nothing more. *(A `tool: jupi` action is one legit case: adding option(s)/
+  insight to an existing STARTED decision via `add-decision-options-tool`. That's a content write you
+  perform like any other — it is **not** a decision-status/lifecycle write, which stays forbidden below.)*
 - ✅ **Purely functional:** write **no status** — not `set-action-status`, not `set-task-status`, not
   `mark-option-action-done`, not the Jupi `EXECUTED` write. Those belong to the orchestrator. If you catch
   yourself opening `db.mjs` or a Jupi decision-status tool, stop — that is not your job.
@@ -45,7 +47,7 @@ status.
   real-send branch) before you fire them. Draft creations need no gate.
 
 ## Boot
-1. `.claude/proactive-jupi.local.json` → `guardrails.mode` (`draft`/`perform`) — context only. The action's
+1. `.proactive-jupi/config.local.json` → `guardrails.mode` (`draft`/`perform`) — context only. The action's
    `description` the caller handed you is authoritative on the verb; the caller already resolved draft-vs-real.
 2. Load the tool MCP schemas you need (Gmail, Linear, …) via ToolSearch as you encounter them.
 3. You normally do **not** touch the DB or install shared deps — that is the orchestrator's concern.
@@ -66,8 +68,9 @@ For each action you **return** one result `{ ref, ok, trace, error? }`:
 ```
 for each action the caller handed you:
    if the verb is a real (non-draft) send → run it past the validator; if RETURN → {ref, ok:false, error:"validator"}; continue
-   perform `description` via `tool`   (create_draft | send_email | label | comment | book | …)
-   trace = the resulting artifact ref (draft id, sent message id, Linear comment url, …)
+   perform `description` via `tool`   (create_draft | send_email | label | comment | book |
+                                       add-decision-options for a tool:jupi contribution | …)
+   trace = the resulting artifact ref (draft id, sent message id, Linear comment url, new option ref, …)
    → {ref, ok:true, trace}
 return all results
 ```

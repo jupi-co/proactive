@@ -5,7 +5,7 @@ Two eval layers, both isolated so they never pollute real Facts.
 ## Isolation — never touch real state
 - **Scratch container tag `user_eval_scratch`** — all eval writes go here, never the real `user_<userId>`. The skills never read this tag.
 - **`full`-mode runs also isolate the Neon cursor:** pass the eval flag so writes land in `crawl_state` rows with `is_eval=true` (`db.mjs … get-cursor brain <source> eval` / `advance-cursor brain <source> <cursor> eval`), leaving real cursors untouched. (`targeted`-mode runs don't touch cursors.)
-- **Teardown — one command:** `bash evals/update-brain/purge-scratch.sh [tag]` (default `user_eval_scratch`). Bulk-deletes the container via the Supermemory HTTP API, reading the key from the gitignored `.claude/proactive-jupi.local.json`. **Run it after every behavioral eval.**
+- **Teardown — one command:** `bash evals/update-brain/purge-scratch.sh [tag]` (default `user_eval_scratch`). Bulk-deletes the container via the Supermemory HTTP API, reading the key from the gitignored `.proactive-jupi/config.local.json`. **Run it after every behavioral eval.**
 
 ## 1. Triggering eval — does the skill fire on the right prompts?
 - Set: [`trigger-eval.json`](trigger-eval.json) — 10 should-trigger + 10 should-not (near-misses vs setup / act-or-decide / search-decisions).

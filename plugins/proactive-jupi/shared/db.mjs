@@ -34,9 +34,10 @@
 //     consumer = 'brain' | 'backlog'; pass a truthy 4th/3rd arg ('eval'|'true'|'1') for eval runs.
 //
 // Config resolution — connection string + tenant id (first hit wins):
-//   1. $NEON_CONN_STRING / $DATABASE_URL  and  $JUPI_USER_ID
-//   2. <cwd>/.claude/proactive-jupi.local.json  → "neonConnString" / "jupiUserId"
-//   3. walk up from cwd looking for .claude/proactive-jupi.local.json
+//   1. $NEON_CONN_STRING / $DATABASE_URL  and  $JUPI_USER_ID  (the sanctioned path
+//      for scheduled / cloud runs, where the repo isn't on the container's fs)
+//   2. walk up from cwd looking for .proactive-jupi/config.local.json
+//      → "neonConnString" / "jupiUserId"
 // EVERY verb is scoped by user_id = jupiUserId — the Jupi-resolved tenant key
 // (setup step 2). Isolation is enforced in the queries, not by the DB grant.
 //
@@ -83,7 +84,7 @@ function loadConfig() {
   let userId = process.env.JUPI_USER_ID || null;
   let dir = process.cwd();
   for (let i = 0; i < 8 && (!connString || !userId); i++) {
-    const p = join(dir, ".claude", "proactive-jupi.local.json");
+    const p = join(dir, ".proactive-jupi", "config.local.json");
     if (existsSync(p)) {
       const cfg = JSON.parse(readFileSync(p, "utf8"));
       connString = connString || clean(cfg.neonConnString);
@@ -94,9 +95,9 @@ function loadConfig() {
     dir = up;
   }
   if (!connString)
-    throw new Error("no Neon connection string: set $NEON_CONN_STRING or add neonConnString to .claude/proactive-jupi.local.json");
+    throw new Error("no Neon connection string: set $NEON_CONN_STRING or add neonConnString to .proactive-jupi/config.local.json");
   if (!userId)
-    throw new Error("no tenant id: set $JUPI_USER_ID or add jupiUserId to .claude/proactive-jupi.local.json (setup step 2 resolves it)");
+    throw new Error("no tenant id: set $JUPI_USER_ID or add jupiUserId to .proactive-jupi/config.local.json (setup step 2 resolves it)");
   return { connString, userId };
 }
 
@@ -324,6 +325,21 @@ const VERBS = {
   },
 
   async "advance-cursor"(sql, [consumer, source, cursor, isEval], userId) {
+    // Guard against advancing to a FUTURE marker. A cursor is a high-water mark of
+    // *observed* content ("only read newer than this"), never a lookahead-window
+    // bound — setting it ahead of now would blind the next crawl until real time
+    // catches up (the calendar bug: cursor = window-end swallowed all near-term
+    // activity). Only ISO-timestamp cursors are checkable; ids/page tokens pass through.
+    const SKEW_MS = 5 * 60 * 1000; // tolerate small clock skew
+    let effective = cursor;
+    let warning = null;
+    if (cursor != null) {
+      const t = Date.parse(cursor);
+      if (!Number.isNaN(t) && t > Date.now() + SKEW_MS) {
+        effective = new Date().toISOString();
+        warning = `cursor '${cursor}' is in the future — clamped to '${effective}'. A cursor marks observed content, not a lookahead bound (see shared/signal-sources.md).`;
+      }
+    }
     const rows = await sql.query(
       `insert into crawl_state (user_id, consumer, source, is_eval, last_cursor, last_run_at, updated_at)
        values ($1, $2, $3, $4, $5, now(), now())
@@ -332,9 +348,9 @@ const VERBS = {
              last_run_at = now(),
              updated_at  = now()
        returning consumer, source, is_eval, last_cursor`,
-      [userId, consumer, source, truthy(isEval), cursor],
+      [userId, consumer, source, truthy(isEval), effective],
     );
-    return rows[0];
+    return warning ? { ...rows[0], warning } : rows[0];
   },
 };
 
