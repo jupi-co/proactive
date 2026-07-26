@@ -8,6 +8,13 @@
   "seedTools": ["gmail", "calendar", "linear"],
   "crawlWindowDays": 30,
   "backlogWindowSize": 30,
+  "businessRuleStore": {
+    "_comment": "Where business rules live (Phase 5). Setup asks the user; default is a local markdown rulebook. Context searches READ this; a settled [BR] decision's business-rule-update action WRITES it (via execute-action), indexed in .proactive-jupi/assets.md.",
+    "location": ".proactive-jupi/business-rules.md",
+    "tool": "file",
+    "readable": true
+  },
+  "ruleThreshold": 2,
   "guardrails": {
     "_comment": "act-or-decide policy (Phase 3). Default conservative; loosen as trust builds.",
     "mode": "draft",

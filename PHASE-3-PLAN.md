@@ -349,8 +349,10 @@ question invisible at the shallow stage — is missed within a run; they cluster
   task (`→ open`)** → write the **trace** on the signal → one optional **EXECUTED ping** (`executedPing`) → set Jupi
   **`EXECUTED`**. This is what makes settled decisions — hence every high-exposure/external action (§5) — actually fire.
   *(Perform mode itself is just config on the Phase-3 executor, §4; enabling it is a trust decision, not a Phase-4 build.)*
-- **Phase 5 — rule loop (how business rules come to exist).** Rules aren't authored; they **precipitate** from the
-  running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
+- **Phase 5 — rule loop (how business rules come to exist).** *(Superseded by the detailed **[PHASE-5-PLAN.md](PHASE-5-PLAN.md)**,
+  which promotes rules to a **hybrid store** — Jupi approves, a `businessRuleStore` holds the durable text — and adds the
+  `[BR]` decision kind + read-side pre-emption. The sketch below is the original seam it grew from.)* Rules aren't authored;
+  they **precipitate** from the running loop (parent §2: reactive, grounded in past decisions + habits, no proactive pass):
   1. Phases 3–4 raise + settle decisions → a Jupi log of *"when X, the owner chose Y."*
   2. Phase 5: before re-raising, `act-or-decide` spots the recurrence (`search-decisions`) and posts a **rule-decision**
      — *"When X, always Y?"* (V1 types 2/4) — bundled with the live instance.

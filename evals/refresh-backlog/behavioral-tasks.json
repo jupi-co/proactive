@@ -1,6 +1,6 @@
 {
   "skill_name": "refresh-backlog",
-  "note": "Eval isolation: isolate cursors with is_eval=true (db.mjs advance-cursor backlog <source> <cursor> eval) so real cursors never advance, and give every fixture task a signal_ref prefixed 'eval:' so purge-scratch.sh can remove them. Run purge-scratch.sh after every behavioral run.",
+  "note": "Eval isolation: isolate cursors with is_eval=true (db.mjs advance-cursor backlog <source> <cursor> eval) so real cursors never advance, and give every fixture task a signal_ref prefixed 'eval:' so purge-scratch.sh can remove them. Run purge-scratch.sh after every behavioral run. Case 6 (Phase 5) additionally needs one fixture rule line in the assets.md 'Business rules — index'.",
   "evals": [
     {
       "id": 1,
@@ -26,6 +26,11 @@
       "id": 5,
       "prompt": "refresh-backlog when the Linear MCP is unreachable but Gmail and Calendar respond.",
       "expected": "Does not fail the whole run: scans Gmail + Calendar, notes Linear unreachable in the summary (⚠️), and does NOT advance the backlog/linear eval cursor."
+    },
+    {
+      "id": 6,
+      "prompt": "SHALLOW RULES-INDEX TAG (Phase 5): parse a fresh fixture signal whose implicit open-question matches a business rule already listed in the assets.md 'Business rules — index' (seed one fixture rule line first). Eval-isolated.",
+      "expected": "The created task's open_question carries a candidate rule_ref HINT ({uncertainty_pct, description, rule_ref}) pointing at the matching index entry. refresh-backlog stays SHALLOW: it does NOT open the businessRuleStore, does NOT touch Jupi, and does NOT resolve or act on the question — it only surfaces that a rule MIGHT cover it (the deep confirm + pre-emption is act-or-decide's job). Still read-only."
     }
   ]
 }
