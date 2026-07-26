@@ -48,7 +48,8 @@ is what lets it scan the whole backlog every run.
 `${CLAUDE_PLUGIN_ROOT}/shared/node_modules` is absent, run
 `npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared" --no-save`. If npm/Neon egress is blocked
 by the sandbox, retry with the sandbox network disabled (same fallback setup uses for the
-schema apply) — it's already pre-authorized, so this stays promptless in routines.
+schema apply) — it's already pre-authorized, so this stays promptless in routines. **Run on Node ≥18** —
+the Neon driver uses the global `fetch` (absent on Node 16).
 
 > **Cloud / scheduled boot.** If the repo isn't on the run's filesystem (a cloud session) or there's no
 > attended shell (a scheduled routine), the CWD walk won't find config. Provide it via **env** —
@@ -96,6 +97,13 @@ For each connected source in `seedTools` (recipes in `signal-sources.md`):
      `update-brain targeted` and **do not** deep-dig the thread — that's act-or-decide's job.
    - `open_questions` — surface-level uncertainties only: `[{uncertainty_pct, description}]`.
      Not resolved decisions.
+     - **Rules-index tag (shallow, off Jupi).** Scan the `assets.md` **"Business rules — index"**
+       you already loaded at boot (step 3 — small, read in full). If an index entry plainly
+       matches a candidate open question (its *when-X* fits this signal), attach the candidate
+       `rule_ref` to that `open_question` (`{uncertainty_pct, description, rule_ref}`) — a **hint**,
+       not a resolution. **Do not** open the rule store, **do not** touch Jupi, **do not** judge
+       whether it truly applies — that confirmation is act-or-decide's deep dig (which pre-empts
+       the question → confidence high → act). You only surface that a rule *might* cover it.
    - **Upsert:** `upsert-task '<json>'` (fields: `short_label, summary, signal_type, signal_ref,
      signal_url, signal_at, external, deadline, relevant_facts, open_questions`). Keys on
      `(signal_type, signal_ref)`; returns `{ id, prior_status }`.

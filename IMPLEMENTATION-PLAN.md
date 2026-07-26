@@ -94,7 +94,7 @@ LAYER          └── read by every automation stage; written by update-brain
 | **Task backlog** + **actions** (each action carries its `decision_id`/`option_id` + the executable instruction) | **Neon Postgres** (serverless) — `tasks` + `actions` tables (no separate registry). **Flat-file fallback** for data-wall accounts. | mutable, ordered, exactly-enumerated, recomputed each run — a DB does `ORDER BY score` / `WHERE status='open'` / transactional updates natively; an LLM rewriting a markdown table each run is brittle |
 | **Asset Map** (tools + action surfaces, agents-for-reuse, rules index) | **`.proactive-jupi/assets.md`** — flat markdown, read in full, hand-edited. **No Supermemory mirror.** | config you enumerate in full and edit by hand; markdown is the right size |
 | **Decisions + full lifecycle** (incl. EXECUTED) | **Jupi** | Jupi is the decision log (§8) |
-| **Business rules** (*when X, always Y*) | Jupi (resolved rule-decisions) → indexed in `.proactive-jupi/assets.md` | empty today; accretes reactively via task→decision→rule |
+| **Business rules** (*when X, always Y*) | Jupi **approves** (the `[BR]` rule-decision) + the **`businessRuleStore`** holds the durable rule text → indexed in `.proactive-jupi/assets.md` | empty today; accretes reactively via task→recurring decision→rule (Phase 5) |
 
 **`.proactive-jupi/assets.md` is plain markdown, no Supermemory mirror.** You read an asset map *in full* and edit it by hand — never top-K semantic retrieval — so markdown is the right size; act-or-decide just reads the whole (small) file. *Upgrade trigger:* revisit only if the map grows large, needs programmatic filtering, or goes multi-user.
 
@@ -227,8 +227,10 @@ Stands up a workspace from cold — the formalized "cold-start" the review deman
 - Scheduled **poll-detect** of FINALIZED decisions (`act-post-decision`) → **run the chosen option's actions straight from Jupi** via the pure worker → trace on the signal → **mark each action done in Jupi** → **mark the `blocked` task `done` directly once *all* its `gating_decision_ids` are FINALIZED** (a multi-gated task keeps waiting; §8 step 3) — no planner round-trip, since the option already carried the concrete action; `act-or-decide` is re-invoked **only** if executing a settled action surfaces a fresh fork → optional EXECUTED ping → set Jupi `EXECUTED`. Decided actions are **never materialized into Neon** — Jupi is their home. This is what makes settled decisions — hence every high-exposure/external action — fire.
 - *(`perform` mode is config on the Phase-3 executor, not a Phase-4 build; validator-gated sends run whenever it's enabled.)*
 
-**Phase 5 — Rule loop**
-- Reactive rule-decisions during execution; owner-approval path → Business rules store.
+**Phase 5 — Business rules (the rule loop)** *(detailed plan: [PHASE-5-PLAN.md](PHASE-5-PLAN.md))*
+- **Hybrid store:** Jupi **approves** each rule (the `[BR]` rule-decision — owner sign-off + the "why" trace); a **`businessRuleStore`** named at setup holds the durable, updatable rule text; `.proactive-jupi/assets.md` **indexes** it.
+- **(a) Setup** asks — precisely — where rules live and how to update them (`businessRuleStore` config + `ruleThreshold`). **(b) Context searches read it:** shallow (`refresh-backlog`) tags a candidate `rule_ref` off the index; deep (`act-or-decide`) opens the store entry → **pre-empts the open question → confidence high → act** (a task graduates from decide to act). **(c) A second decision kind:** on a recurring trade-off (≥ `ruleThreshold`), `act-or-decide` raises a **`[BR]` rule-decision** whose "codify" option bundles a **business-rule-update** write + the operational action — so approving the rule writes it **and** unblocks the instance; `act-post-decision` runs both (via `execute-action`) and appends the rule to the index.
+- **Read-side ships now; write-side rides Phase 4's post-decision loop** — no new execution path, only a new option-action kind; **shares Phase 4's one open blocker** (`get-decision` surfacing tool-authored option-actions).
 
 **Phase 6 — Partner-readiness**
 - Delivery surface per-account; data-location qualification; concierge-capacity check.

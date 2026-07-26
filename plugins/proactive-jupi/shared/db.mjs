@@ -102,6 +102,16 @@ function loadConfig() {
 }
 
 async function getDb() {
+  // The Neon serverless driver talks HTTP via the global `fetch`, which only
+  // exists on Node ≥18. On older Node it fails deep in the driver with a cryptic
+  // "fetch is not defined" — catch it here with an actionable message instead.
+  // (package.json also declares "engines": { "node": ">=18" }.)
+  if (typeof fetch === "undefined") {
+    throw new Error(
+      `Neon's serverless driver needs a global fetch, absent on Node ${process.version}. ` +
+        `Use Node ≥18 (e.g. \`nvm use 20\`) before running the routines.`,
+    );
+  }
   let neon;
   try {
     ({ neon } = await import("@neondatabase/serverless"));
@@ -286,7 +296,7 @@ const VERBS = {
   // queries actions by decision_id. Kept for back-compat; safe to delete.
   async "list-actions"(sql, [kind, value], userId) {
     const cols =
-      "id, task_id, decision_id, option_id, tool, description, risk, status, trace_ref, created_at";
+      "id, task_id, decision_id, option_id, tool, description, rule_ref, risk, status, trace_ref, created_at";
     if (kind === "status")
       return sql.query(
         `select ${cols} from actions where user_id = $1 and status = $2 order by created_at`,

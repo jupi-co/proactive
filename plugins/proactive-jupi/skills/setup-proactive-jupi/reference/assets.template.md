@@ -33,6 +33,8 @@ _Empty until setup runs._
 _None discovered yet._
 
 ## Business rules — index
-Rules accrete reactively via task → decision → rule. Each entry: **rule id (Jupi)** · *when-X-always-Y* · owner · task types it unblocks.
+**Store:** `<businessRuleStore.location>` — the durable, updatable rule text lives here (set at setup; default `.proactive-jupi/business-rules.md`). This section is the **index** read in full by the context searches (shallow tags a candidate `rule_ref`; the deep dig opens the store entry to confirm and pre-empt the open question → confidence high → act).
+
+Rules accrete reactively via task → recurring decision → rule: `act-or-decide` posts a `[BR]` rule-decision, the owner approves it in Jupi, `act-post-decision` runs its business-rule-update action (writes the store) and appends the entry here. Each entry: **rule id (Jupi decision)** · *when-X-always-Y* · owner · task types it unblocks · store ref (anchor / block id).
 
 _Empty. No business rules yet._

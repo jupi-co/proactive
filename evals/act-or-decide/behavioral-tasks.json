@@ -1,6 +1,6 @@
 {
   "skill_name": "act-or-decide",
-  "note": "Isolation: cases 1–4 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Case 5 is a real draft-mode run against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Never run write cases in perform mode.",
+  "note": "Isolation: cases 1–4 and 6–7 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Cases 5 and 8 are real draft-mode runs against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Phase-5 rule fixtures: case 6 needs a business rule seeded in the assets.md 'Business rules — index' + its businessRuleStore entry; cases 7–8 need >= ruleThreshold (2) prior FINALIZED decisions that settled the SAME trade-off the SAME way (in the scratch Jupi workspace). Case 8 posts a [BR] decision that lives in Jupi (not Neon) — archive stray eval decisions in Jupi by hand. Never run write cases in perform mode.",
   "evals": [
     {
       "id": 1,
@@ -26,6 +26,21 @@
       "id": 5,
       "prompt": "REAL DRAFT-MODE run (mode=draft) over eval-prefixed fixture tasks: one low-exposure act task and one task with a genuine open question. Eval-isolated (signal_ref 'eval:%').",
       "expected": "The act task gets one 'ready' action row; act-or-decide hands it to execute-action, which creates the real Gmail/Linear DRAFT and RETURNS a trace; act-or-decide then writes that row 'executed' + trace_ref (the worker writes no status itself); its task → 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi — NO actions rows are written for pending options), gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward."
+    },
+    {
+      "id": 6,
+      "prompt": "READ-SIDE PRE-EMPTION (--dry-run): a window with a task whose open_question ('approve a <15% discount for a strategic client?') is already answered by a business rule seeded in the assets.md 'Business rules — index' (and its businessRuleStore entry). A fixture rule_ref hint may already be tagged on the open_question by refresh-backlog.",
+      "expected": "Stage 3.3 opens the matching rule in businessRuleStore, confirms it fits → the open question is PRE-EMPTED → confidence high → the table row reads ACT (not DECIDE), and the acted row cites rule_ref = the rule's id. No Jupi decision is raised for that task (it graduated from decide to act). Nothing is written (dry-run). A rule that only ALMOST fits (a wrinkle it doesn't cover) would instead show a [BR] amendment decision, not a silent act."
+    },
+    {
+      "id": 7,
+      "prompt": "RECURRENCE → [BR] (--dry-run): a window with (a) a task on a trade-off that search-decisions shows was settled the SAME way >= ruleThreshold (2) times (e.g. 'discount approval for strategic clients'), and (b) a sibling task on a one-off trade-off settled only once before.",
+      "expected": "(a) is raised as a [BR] rule-decision: the table's decision cell reads '[BR] When … always …', and its 'codify' option lists TWO option-actions — a business-rule-update write AND the operational action — plus a 'just this once' option carrying ONLY the operational action. (b) is a plain OPERATIONAL decision — no [BR] prefix, no business-rule-update action (below threshold → not yet a rule). Nothing is written (dry-run)."
+    },
+    {
+      "id": 8,
+      "prompt": "REAL DRAFT-MODE [BR] POSTING (mode=draft) over an eval-prefixed fixture task on a recurring trade-off (>= ruleThreshold prior FINALIZED consistent decisions). Eval-isolated (signal_ref 'eval:%').",
+      "expected": "act-or-decide posts a private STARTED Jupi decision titled '[BR] When … always …'. Its 'codify' option carries TWO STRUCTURED option-actions via add-option-actions-tool: (1) a business-rule-update {tool: <businessRuleStore.tool>, instruction: write 'when X → Y' to <businessRuleStore.location>}, and (2) the operational action for the instance; a 'don't codify' option carries only the operational action. NO rule text is written yet (that is act-post-decision's job at settle) and NO business-rule-update Neon row is created (pending options live in Jupi). Task → 'blocked', gating_decision_ids set. Purge tasks afterward; archive the eval [BR] decision in Jupi by hand."
     }
   ]
 }

@@ -14,3 +14,6 @@ package-lock.json
 
 # macOS
 .DS_Store
+
+# Legacy config path (pre-#13 rename) — never commit.
+.claude/proactive-jupi.local.json

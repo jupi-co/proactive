@@ -6,6 +6,8 @@
   {"query": "there are ready action rows — go run them against Gmail and Linear", "should_trigger": true},
   {"query": "drain the ready action queue and run each one against its tool", "should_trigger": true},
   {"query": "actually create the Gmail drafts that are sitting ready", "should_trigger": true},
+  {"query": "add a rule to my business-rules.md that we always approve discounts under 15%", "should_trigger": false},
+  {"query": "codify this into a business rule for next time", "should_trigger": false},
   {"query": "work my backlog and decide what to do with the top items", "should_trigger": false},
   {"query": "what should Jupi do now?", "should_trigger": false},
   {"query": "draft a reply to Hassan about the pilot timeline", "should_trigger": false},

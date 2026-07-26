@@ -69,11 +69,18 @@ For each action you **return** one result `{ ref, ok, trace, error? }`:
 for each action the caller handed you:
    if the verb is a real (non-draft) send → run it past the validator; if RETURN → {ref, ok:false, error:"validator"}; continue
    perform `description` via `tool`   (create_draft | send_email | label | comment | book |
-                                       add-decision-options for a tool:jupi contribution | …)
-   trace = the resulting artifact ref (draft id, sent message id, Linear comment url, new option ref, …)
+                                       add-decision-options for a tool:jupi contribution | write-rule | …)
+   trace = the resulting artifact ref (draft id, sent message id, Linear comment url, new option ref, rule store anchor, …)
    → {ref, ok:true, trace}
 return all results
 ```
+- **Business-rule-update actions (a settled `[BR]` decision, from `act-post-decision`).** The `tool` is a
+  `businessRuleStore` surface — `file` (write/append the rule to the local markdown rulebook, e.g.
+  `.proactive-jupi/business-rules.md`), or `drive`/`notion` (the connector's create/append). Do exactly what
+  the `description` says — write the *"when X → Y"* rule text — and **return the store anchor as `trace`** (the
+  markdown section/heading, the Notion block id). No approval gate: a FINALIZED `[BR]` decision *is* the
+  authorization. **You write only the rule text into the store** — you do **not** touch the `assets.md`
+  index; that's the orchestrator's bookkeeping (`act-post-decision` appends it from your `trace`).
 - **Trace on the signal.** The proof lives where the work happened — the created draft, the sent reply
   in-thread, the Linear comment. That trace **is** the natural notification; nothing extra is pushed for it.
   You capture and return the ref; the orchestrator stores it.
@@ -90,9 +97,11 @@ return all results
 A concrete action is a concrete action — you run both identically.
 
 ## Where you write
-- **The user's tools** (drafts / sends / comments / bookings) — you are the only skill that does.
-- **Nothing else.** No Neon, no Jupi status, no Supermemory, no `context`. You return traces; the caller
-  records them.
+- **The user's tools** (drafts / sends / comments / bookings) — you are the only skill that does — **plus the
+  `businessRuleStore`** (the rule *text* of a settled `[BR]` action). Both are action surfaces; both are
+  side-effects you perform and return a trace for.
+- **Nothing else.** No Neon, no Jupi status, no Supermemory, no `context`, and **not** the `assets.md` rules
+  index (the orchestrator writes that). You return traces; the caller records them.
 
 ## Narrate + return
 Narrate per action (✅ executed → trace / ⚠️ failed → why). Return the structured result list (`ref`, `ok`,

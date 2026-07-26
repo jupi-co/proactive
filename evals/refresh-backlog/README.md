@@ -33,7 +33,9 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
   and check: candidate tasks with `short_label` + standalone `summary` + `signal_ref`/
   `signal_url`; scored on impact × relevance × urgency (product) and promoted to `open`;
   **idempotent re-run** (no dupes); a `dropped` task **not** resurrected; **prompt-injection**
-  body treated as content, no action taken; unreachable tool handled gracefully.
+  body treated as content, no action taken; unreachable tool handled gracefully; **shallow
+  rules-index tag (Phase 5)** — a signal matching a seeded rule gets a candidate `rule_ref`
+  hint on its `open_question`, without opening the store or touching Jupi.
 - **Always run `purge-scratch.sh` when done.**
 
 ## Prerequisites
