@@ -25,7 +25,7 @@ Setup runs **inside the user's existing repo**, so **everything Proactive-Jupi o
 > **Writing `.claude/settings.json` — use the device shell, not the file tools.** Some environments (e.g. the Cowork bridge) **refuse direct Write/Edit-tool writes into `.claude/`.** So write `settings.json` via **Bash** from the start (a `jq`/node merge into the file), rather than trying the Write/Edit tool and having it error then rerouting. Everything under `.proactive-jupi/` — **config included** — is a normal Write. *(Relocating config here, out of `.claude/`, is exactly what removes the bridge-refusal problem for the config file; only `settings.json` still lands in `.claude/`.)*
 
 ## Config — the workspace's `.proactive-jupi/config.local.json` (gitignored)
-Read it; if missing, copy from the bundled `reference/config.local.json.template` into the workspace `.proactive-jupi/config.local.json`, then ask the user for any empty key and offer to save.
+Read it; if missing, copy from the bundled `reference/config.template.json` into the workspace `.proactive-jupi/config.local.json`, then ask the user for any empty key and offer to save.
 
 > **Config holds two things only: (1) ids + secrets that let us *reach* a store, and (2) settings/thresholds. It never names which tool does what — that is `assets.md`'s job** (the roles table, step 2b). If you find yourself writing a tool list or a store location into config, it belongs in the assets map instead.
 

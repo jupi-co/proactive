@@ -237,7 +237,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
 
 - `plugins/proactive-jupi/skills/setup-proactive-jupi/SKILL.md` — step 2b prelude question; step 3 store-inventory;
   guardrails note.
-- `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/config.local.json.template` — `businessRuleStore`
+- `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/config.template.json` — `businessRuleStore`
   default + `ruleThreshold`.
 - `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/assets.template.md` — rules-index header points at the
   store; entry format documented.

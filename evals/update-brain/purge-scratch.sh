@@ -12,7 +12,7 @@ TAG="${1:-user_eval_scratch}"
 ROOT="$(git rev-parse --show-toplevel)"
 [ -f "$ROOT/.proactive-jupi/.env" ] && { set -a; . "$ROOT/.proactive-jupi/.env"; set +a; }
 KEY="${SUPERMEMORY_API_KEY:-}"
-[ -n "$KEY" ] || { echo "ERROR: no SUPERMEMORY_API_KEY in $ROOT/.proactive-jupi/.env — run 'cp .proactive-jupi/.env.example .proactive-jupi/.env' and fill it in (key from app.supermemory.ai)" >&2; exit 1; }
+[ -n "$KEY" ] || { echo "ERROR: no SUPERMEMORY_API_KEY in $ROOT/.proactive-jupi/.env — run 'cp .proactive-jupi/.env.template .proactive-jupi/.env' and fill it in (key from app.supermemory.ai)" >&2; exit 1; }
 
 echo "Purging Supermemory container tag: $TAG"
 curl -sS -X DELETE "https://api.supermemory.ai/v3/documents/bulk" \
