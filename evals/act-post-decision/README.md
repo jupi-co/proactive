@@ -1,5 +1,7 @@
 # act-post-decision evals
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two layers, matching `evals/act-or-decide/`.
 
 - **`trigger-eval.json`** — should-fire prompts ("run the post-decision loop", "close out settled

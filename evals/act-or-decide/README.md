@@ -1,5 +1,7 @@
 # act-or-decide evals
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two layers, matching `evals/refresh-backlog/`.
 
 - **`trigger-eval.json`** — should-fire prompts ("run act-or-decide", "what should Jupi do now",

@@ -1,5 +1,7 @@
 # refresh-backlog — eval workflow (repeatable)
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two eval layers, both isolated so they never pollute the real backlog. Mirrors
 `evals/update-brain/`.
 

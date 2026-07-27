@@ -1,5 +1,7 @@
 # setup-proactive-jupi evals
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 One layer only — **behavioral**. There is deliberately no `trigger-eval.json`: the skill carries
 `disable-model-invocation: true`, so it never fires from a user's phrasing and there is nothing to tune.
 It is invoked explicitly (`/proactive-jupi:setup-proactive-jupi`), which is also how every case starts.
@@ -20,8 +22,11 @@ tools into Supermemory, and schedules routines. So:
 - **Cases 1–9 run the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
   Every behavior under test lives in steps 1–3, and stopping there keeps the eval cheap and side-effect-free
   — no 30-day crawl, no backlog rows, no live routines.
-- **Case 10 is the only full run.** It's opt-in and expensive (real crawl → real Supermemory facts, real Neon
-  rows, real scheduled routines). Run `purge-scratch.sh` after it, every time.
+- **Case 10 is the only full run.** It's opt-in and expensive — it crawls, writes rows, and schedules
+  routines for real. It therefore runs under the standard three isolations from
+  [`evals/README.md`](../README.md): the **`user_eval_scratch`** container tag for Facts, the
+  **`JUPI_EVAL_WORKSPACE`** test workspace for decisions, and `eval:`-prefixed Neon rows. Run
+  `purge-scratch.sh` after it, every time.
 - **Never `perform` mode.** Setup takes no external actions by design; a case that produces one is a finding,
   not a config to fix.
 
@@ -52,17 +57,14 @@ calendar. **If you had to tell the agent something the persona never said, the c
 
 The prelude probes real services, so a run needs the same access a real setup does:
 
-- **Jupi reachable** — it is the blocking gate; the prelude is *supposed* to stop until it answers. Verify
-  with a cheap `search-decisions-tool` call (it needs `groupId` **or** `groupSlug` — a call with neither
-  fails validation and is not an auth failure).
+- **Jupi reachable** — it is the blocking gate; the prelude is *supposed* to stop until it answers. Point it
+  at `JUPI_EVAL_WORKSPACE` and verify with a cheap `search-decisions-tool` call (it needs `groupId` **or**
+  `groupSlug` — a call with neither fails validation and is not an auth failure).
 - **Supermemory + the tool MCPs** (Gmail/Calendar/Linear/…) for the inventory probes.
-- **A Neon connection string** for case 9's credential + egress probe. Use a **scratch project**, not the
-  real one, if you don't want an eval applying a schema to it.
-- **In a fresh git worktree, `config.local.json` does not exist** — it's gitignored, so it never comes along
-  with a new worktree, and `db.mjs` will fail to resolve credentials until you copy one in (or export
-  `NEON_CONN_STRING` + `JUPI_USER_ID`). Same for `plugins/proactive-jupi/shared/node_modules`:
-  `npm install --prefix plugins/proactive-jupi/shared`. Neither is an authorization problem — worth knowing
-  before you conclude a service is down.
+- **A Neon connection string** for case 9's credential + egress probe. Prefer a **scratch project**: case 9
+  hands the string to a real `SELECT 1` and case 10 applies the schema over it.
+- Plus the shared fresh-worktree prerequisites in [`evals/README.md`](../README.md) — a new worktree has
+  neither `config.local.json` nor `shared/node_modules`, and neither absence is an auth failure.
 
 ## Teardown
 
@@ -70,6 +72,6 @@ The prelude probes real services, so a run needs the same access a real setup do
 bash evals/setup-proactive-jupi/purge-scratch.sh <scratch-workspace-path>
 ```
 
-Removes the scratch workspace and deletes the two eval-run scheduled routines. It **cannot** un-write
-Supermemory facts a case-10 crawl created — see `evals/update-brain/README.md` for that scratch convention,
-and prefer a scratch container tag if you run case 10 often.
+Removes the scratch workspace and reminds you of the state a case-10 run left outside it. Facts and decisions
+are recoverable **only because** they were written to the test container and test workspace in the first
+place — that's why those two isolations are set before the run, not cleaned up after it.
