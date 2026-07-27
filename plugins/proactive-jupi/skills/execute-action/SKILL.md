@@ -79,10 +79,14 @@ return all results
   this work (the `assets.md` *Agents / skills* table), so the action is *"run `<skill>` with `<inputs>`"*. Invoke
   it and let it do the work; **return whatever artifact ref it produces as `trace`** (the draft id, doc url,
   issue key it created) — or the skill's own completion ref if it produces nothing else. The same rules bind
-  as anywhere: **a real send inside a skill run is still a real send**, so the verb in `description` governs
-  (draft stays draft), and you still write no status anywhere. If the skill doesn't exist or errors, that's a
-  plain `ok:false` + `error` — never fall back to improvising the work yourself, since the caller chose the
-  skill deliberately.
+  as anywhere, with one asymmetry to respect: **you cannot draft-ify someone else's skill.** The planner is
+  the one that judged whether this skill is safe to run unattended (Stage 4 scores a possibly-sending skill
+  as non-draftable → it comes to you only via a settled decision). So **run it as instructed and don't
+  improvise around it** — don't "make it a draft" by rewriting its inputs, and if mid-run it turns out to
+  send where the `description` said prepare, **stop and return `ok:false` with what happened** rather than
+  letting it complete. You still write no status anywhere. A missing or erroring skill is a plain
+  `ok:false` + `error` — never fall back to doing the work yourself, since the caller chose the skill
+  deliberately.
 - **Business-rule-update actions (a settled `[BR]` decision, from `act-post-decision`).** The `tool` is a
   `rules`-tagged surface (from `assets.md`, opened via `rulesStoreRef`) — `file` (write/append the rule to the local markdown rulebook, e.g.
   `.proactive-jupi/business-rules.md`), or `drive`/`notion` (the connector's create/append). Do exactly what

@@ -168,9 +168,17 @@ Expand each task into **one or several concrete parallel actions**, each with it
 the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is written yet** — Stage 5 emits.
 - **Reuse existing capability before improvising one.** Check the `assets.md` **Agents / skills** table
   (*When to reach for it*): if a workspace skill or agent already covers this work, the action is to
-  **invoke it** — `description` names the skill and the inputs it needs — rather than recomposing the task
-  by hand. A skill someone built and trusts beats your ad-hoc version, and it's the same reason you check
-  the rule store in Stage 3.3: known competence first, reasoning only for the remainder.
+  **invoke it** (`tool: skill`) — `description` names the skill and the inputs it needs — rather than
+  recomposing the task by hand. A skill someone built and trusts beats your ad-hoc version, and it's the
+  same reason you check the rule store in Stage 3.3: known competence first, reasoning only for the remainder.
+  - **Score a skill's exposure by what the skill itself does, not by the verb you wrote.** The draft-mode
+    transform rewrites *your* verb; it cannot reach inside someone else's skill. A skill that only produces
+    or prepares content (builds a report, assembles a summary, opens a draft) is `low`. **A skill that may
+    send, post, publish, or book as part of its run is non-draftable → `exposure: high` → DECIDE**, even in
+    draft mode — exactly like booking a venue or merging a PR. Never let "it's draft mode" stand in for a
+    guarantee about a skill you don't control; if the table's *what it does* doesn't tell you, treat it as
+    high. This is what keeps §Draft mode's promise (no external side-effect before a decision is settled)
+    true for borrowed capability.
 - For an **ACT** action, prepare its `insert-action` payload (`decision_id` null, `exposure` tagged; **`rule_ref`
   set** if a business rule pre-empted the question, Stage 3.3). Apply the **draft-mode transform** (§Draft mode)
   — in `draft` the verb is the draft form (`create draft email…`).
@@ -210,8 +218,12 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
 ```
 - **Exposure — draft-first, then destination.** A **draft** exposes nothing → `low`. **But only actions
   with a draft form collapse this way.** A **non-draftable** action (book a venue, raise a budget, submit
-  a payment, merge a PR) is scored by destination directly — read `external`, recipient sensitivity
-  (peer < manager < CEO < external), irreversibility → `high` when any bites.
+  a payment, merge a PR, or a skill that may send — Stage 4) is scored by destination directly — read
+  `external`, recipient sensitivity (peer < manager < CEO < external), irreversibility → `high` when any
+  bites. **That ladder is relative to the user, so read it off `assets.md`'s `Who this is`** (role ·
+  accountable for · works with): a VP is a peer to a VP and a skip-level to an IC, and someone inside
+  their stated accountabilities is routine where the same name outside them is not. Absent that section,
+  fall back to the literal ladder and lean conservative.
 - The `high × high` cell → **DECIDE** (an *authorize* decision, "do exactly this?"). It fires in draft mode
   for non-draftable actions; in perform mode also for draftable sends. Same decision mechanism either way.
 - A **business rule** that covers the situation makes confidence `high` (the open question is pre-empted) →

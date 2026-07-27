@@ -43,9 +43,12 @@ is what lets it scan the whole backlog every run.
    `backlogWindowSize` (default `30`). *(Config holds ids/secrets + settings only — **which tools to
    scan comes from `assets.md`**, step 3.)*
 2. `${CLAUDE_PLUGIN_ROOT}/shared/signal-sources.md` — the per-tool scan recipes (shared with update-brain).
-3. `.proactive-jupi/assets.md` — **your source list is every `Connected` tool tagged `inbox`.** That role
-   means "parse tasks from it". Ignore the other roles here: `context` is what `update-brain` crawls,
+3. `.proactive-jupi/assets.md` — two things. **Your source list is every `Connected` tool tagged `inbox`.**
+   That role means "parse tasks from it". Ignore the other *roles*: `context` is what `update-brain` crawls,
    `work` is where `execute-action` writes, and `decision`/`rules`/`brain` are stores, not signal sources.
+   **Also read the `Who this is` section** (role · accountable for · works with) — that's what you score
+   `relevance` against in Stage 2. If the section is missing (an `assets.md` predating it), score relevance
+   on the signal alone and say so in the return; don't stall.
 
 **Ensure the DB helper's deps once** (first run / fresh install): if
 `${CLAUDE_PLUGIN_ROOT}/shared/node_modules` is absent, run
