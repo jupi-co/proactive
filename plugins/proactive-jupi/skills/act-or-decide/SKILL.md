@@ -50,7 +50,9 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
 2. **`.proactive-jupi/assets.md`** — the Asset Map, read in full. It is the **routing map**: which tool holds
    which role. You need `rules` (the one rule store — open it with `rulesStoreRef`), `decision` (the one
    decision store — where you post), `brain` (the one Facts store — where you `recall`), and `context` (what
-   you may research in, Stage 3). Config never names a tool; this table does.
+   you may research in, Stage 3). Config never names a tool; this table does. It also carries two things you
+   plan against: **Who this is** (role + accountabilities — what makes something worth doing for *them*) and
+   **Agents / skills** (workspace capability to invoke instead of improvising, Stage 4).
 3. **Run args:** `--dry-run` (classify only, write nothing) · `--perform` (override `mode` to perform for
    this run).
 
@@ -164,6 +166,11 @@ Then, per cluster:
 Expand each task into **one or several concrete parallel actions**, each with its `tool`, a precise
 `description` (recipient, content, location — see §Actions), and its own **`exposure`** (§The gate). Run
 the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is written yet** — Stage 5 emits.
+- **Reuse existing capability before improvising one.** Check the `assets.md` **Agents / skills** table
+  (*When to reach for it*): if a workspace skill or agent already covers this work, the action is to
+  **invoke it** — `description` names the skill and the inputs it needs — rather than recomposing the task
+  by hand. A skill someone built and trusts beats your ad-hoc version, and it's the same reason you check
+  the rule store in Stage 3.3: known competence first, reasoning only for the remainder.
 - For an **ACT** action, prepare its `insert-action` payload (`decision_id` null, `exposure` tagged; **`rule_ref`
   set** if a business rule pre-empted the question, Stage 3.3). Apply the **draft-mode transform** (§Draft mode)
   — in `draft` the verb is the draft form (`create draft email…`).

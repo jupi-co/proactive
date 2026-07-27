@@ -134,7 +134,10 @@ facts the Parser recorded:
 
 - **impact** — the **intrinsic value of the outcome** itself.
 - **relevance** — how sure this is a *real, worth-surfacing* task vs noise (the noise gate). *(NOT
-  the act-gate confidence; that lives on actions, in Phase 3.)*
+  the act-gate confidence; that lives on actions, in Phase 3.)* **Judge it against the user's role
+  and accountabilities** — the *Who this is* section at the top of `.proactive-jupi/assets.md`
+  (role · accountable for · works with). Something squarely inside what they own is relevant;
+  the same thread addressed to someone else's remit is not.
 - **bottleneck** — **leverage: who/what is blocked until you do this.** `low` = nothing waiting;
   `medium` = someone is waiting on your reply/decision/review; `high` = several people, an external
   party, or a deadline for *others* is blocked on you. **Keep this distinct from impact:** impact is
