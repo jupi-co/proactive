@@ -70,7 +70,7 @@ Explore **what the task asks**, with filters — not exhaustive dumps. Tool name
 - **Calendar** — events in the window: recurring meetings → Process + who-works-with-whom; external participants → Person/Org; big future events → Project/Goal.
 - **Linear** — teams, projects (→ Project), cycles/rituals (→ Process), members (→ Person), issues updated since cursor.
 - **Drive / GitHub / Slack** (if tagged `context`) — docs where the user is author/key contributor; repos touched; threads.
-- If a tool is **unreachable**, note it in the summary and do the most with what's reachable — never fail silently.
+- If a tool is **unreachable** — or is tagged `context` but has **no scan recipe** and none can be honestly derived (`signal-sources.md` §A tool with no recipe) — note it in the summary and do the most with what's reachable; never fail silently, and never advance a cursor you couldn't read.
 
 ## Contract (non-negotiable)
 - **ONLY writer of Facts** (Supermemory). `act-or-decide` reads, never writes.

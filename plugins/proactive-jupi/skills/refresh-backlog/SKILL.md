@@ -120,8 +120,9 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
 6. **Advance the cursor** — `advance-cursor backlog <source> <marker>` (the cursor marker from
    `signal-sources.md`), so the next run doesn't re-scan this window.
 
-**Robustness:** if a source is unreachable, note it in the run summary and scan the rest —
-never fail the whole run, never advance a cursor you couldn't read.
+**Robustness:** if a source is unreachable — or is tagged `inbox` but has **no scan recipe** and none
+can be honestly derived (`signal-sources.md` §A tool with no recipe) — note it in the run summary and
+scan the rest; never fail the whole run, never advance a cursor you couldn't read.
 
 ---
 
