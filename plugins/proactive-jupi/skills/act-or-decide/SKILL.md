@@ -98,7 +98,10 @@ filter on `gating_decision_ids` or execution — the status carries it.
 ## The flow
 
 ### Stage 0 — Refresh (+ sweep orphaned `ready` rows)
-Invoke **`refresh-backlog`** so you reason over a current window. Processed tasks are already out of `open`
+Invoke **`refresh-backlog`** so you reason over a current window. **Except in `--dry-run`: skip the refresh
+and reason over the window as it stands.** `refresh-backlog` writes `tasks` rows and advances `crawl_state`
+cursors, so invoking it would break dry-run's "writes nothing" guarantee before the gate ever runs — and the
+guarantee is the whole point of the mode. Say in the report that the window is as-of the last real refresh. Processed tasks are already out of `open`
 (they're `done`/`blocked`/`dropped`), so there is no task pile to re-read. Detecting settled decisions and
 completing `blocked` tasks is **`act-post-decision`** (it runs before you in the routine), not this stage.
 **Orphan-sweep:** `list-actions status ready` — any `ready` row is one a prior run queued but whose worker
@@ -217,8 +220,13 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   "low":  { "low": "decide", "high": "decide" } }  // open question → decide (approach), whatever the exposure
 ```
 - **Exposure — draft-first, then destination.** A **draft** exposes nothing → `low`. **But only actions
-  with a draft form collapse this way.** A **non-draftable** action (book a venue, raise a budget, submit
-  a payment, merge a PR, or a skill that may send — Stage 4) is scored by destination directly — read
+  with a draft form collapse this way — and "has a draft form" means the *side-effect itself* can be staged
+  for review, not that you can describe it in an email.** Wrapping a commitment in a message about the
+  commitment doesn't stage it: "draft an email confirming the booking" is still the booking if sending that
+  mail is what confirms it, and scoring it `low` would launder a high-exposure act through the draft
+  transform. Ask what is irreversible once the action completes, not what the verb is called. A
+  **non-draftable** action (book a venue, raise a budget, submit a payment, merge a PR, or a skill that may
+  send — Stage 4) is scored by destination directly — read
   `external`, recipient sensitivity (peer < manager < CEO < external), irreversibility → `high` when any
   bites. **That ladder is relative to the user, so read it off `assets.md`'s `Who this is`** (role ·
   accountable for · works with): a VP is a peer to a VP and a skip-level to an IC, and someone inside
@@ -316,6 +324,14 @@ Whenever an action (a Case-ACT draft or an option's Action) is a message to a pe
 of the **≥10 recent messages you sent them in that channel** (greeting, sign-off, tone, FR/EN, length) —
 never a generic template. Be **minimal**: the shortest message that does the job.
 
+**First contact — no history to mirror.** A new counterparty has no sent thread, and "never a generic
+template" still holds, so fall back in this order: (1) the register of **the thread you're replying into** —
+they set a tone, match it; (2) how the user writes to **comparable people** in that channel (same seniority,
+same internal/external side); (3) the user's own baseline register from any recent sent mail. Say in the
+action which fallback you used, so a reviewer knows the voice is inferred rather than observed. Never let
+absent history become an excuse for boilerplate — it is the case where a template is most tempting and most
+obviously wrong to the person receiving it.
+
 ## Actions — maximally advanced
 Before writing each action, **dig the real tools** to make it concrete and far-along: the exact thread to
 reply to, the exact doc + location, the drafted substance (the ask, angle, cc). Resolve unknowns instead of
@@ -326,11 +342,19 @@ decision to settle XXX."
 ---
 
 ## Dry-run — the classification table
-`--dry-run` runs the full flow through the gate but **writes nothing** (no rows, no decisions, no status
-changes) and **does not invoke `execute-action`**. Emit one row per candidate action, grouped by task:
+`--dry-run` runs the full flow through the gate but **writes nothing** — no rows, no decisions, no status
+changes, **no Stage 0 refresh** (§Stage 0), and it **does not invoke `execute-action`**. Emit one row per
+candidate action, grouped by task:
 
 | Task | conf (task) | Action | exposure | Verdict | Decision (kind → title) |
 |---|---|---|---|---|---|
+
+**Precede it with the cluster table**, or the coordination node is invisible — three rows carrying the same
+decision title read identically whether one decision gates three tasks or three duplicate decisions were
+raised, and that difference is the whole point of Stage 2:
+
+| Cluster | Tasks | Shared open question | conf |
+|---|---|---|---|
 
 Footer: the active `mode` + `policy`. Write it to `act-or-decide/runs/run-<id>/report.md` and return it.
 

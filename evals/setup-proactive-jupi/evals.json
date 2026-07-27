@@ -133,6 +133,21 @@
         "Routine cadences are anchored to real rituals found by the crawl, with the why stated in the report",
         "No external side-effect occurs in either run"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "WORKSPACE ROOT RESOLUTION (prelude, step 1a). Run the prelude three times, in three environments: (a) invoked inside a git repo; (b) invoked in a directory that is NOT a repo and has no connected folder, with an ephemeral-looking container $HOME as CWD; (c) same as (b) but with two connected device folders available. Stop each at the '✋ needs-you done' boundary.",
+      "persona": "A user who answers whatever is asked but never volunteers a path. In (b), if asked where Jupi should keep its workspace, replies 'what happens if I just leave it here?' once before choosing a durable folder.",
+      "expected_output": "(a) `git rev-parse --show-toplevel` resolves <root> with no question asked. (b) The agent does NOT silently write into the container home: it STOPS and asks where the workspace should live, in the user's terms (durability of the config the routines read each morning), offering a connected folder / requesting access / staying cloud-only with the consequence stated. When the persona asks 'what if I leave it here?', it answers plainly that the routines will report-and-stop until setup is re-run somewhere durable. (c) With two candidate folders it asks WHICH, listing them, rather than picking one. In every case the resolved <root> is recorded as a header line in assets.md and NOT written into config.local.json (config lives at the root, so it cannot name it).",
+      "files": [],
+      "expectations": [
+        "In a git repo, <root> resolves silently to the repo top level with no question asked",
+        "With nothing durable, the agent asks before writing any file rather than defaulting to the CWD",
+        "The ask is phrased around durability of the routines' config, not as 'where is your workspace root'",
+        "Cloud-only is offered as a legitimate choice with its consequence stated plainly",
+        "With two connected folders the agent asks which one, listing them",
+        "The resolved root appears as a header line in assets.md and does NOT appear in config.local.json"
+      ]
     }
   ]
 }

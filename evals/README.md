@@ -57,7 +57,7 @@ can't be undone in all three isn't isolated — it's a production write with goo
 |---|---|---|
 | **Neon** (tasks, actions, cursors) | Same project, but every fixture row carries a **`signal_ref` prefixed `eval:`**, and cursor writes go to **`crawl_state` rows with `is_eval=true`** | **Delete after.** `bash evals/<skill>/purge-scratch.sh` — deletes `eval:%` tasks (their `actions` cascade) and `is_eval` cursors. Run it after every behavioral eval, not at the end of the day |
 | **Supermemory** (Facts) | A **dedicated test container tag — `user_eval_scratch`** — never the real `user_<jupiUserId>`. The skills never read this tag, so a stray eval Fact can't leak into a real run | `bash evals/update-brain/purge-scratch.sh` bulk-deletes the container via the HTTP API (the connector's `forget` is unreliable — see that README) |
-| **Jupi** (decisions) | A **dedicated test workspace**, addressed by `groupSlug` from **`JUPI_EVAL_WORKSPACE`** — never the real workspace in `config.jupiWorkspace` | Decisions are archived **in the test workspace**, where a leftover is harmless. Nothing needs deleting from the real one because nothing was written there |
+| **Jupi** (decisions) | A **dedicated test workspace** — set `jupiWorkspace` to the eval slug **in the scratch workspace's own `config.local.json`**, because that is the only thing the skills read | Decisions are archived **in the test workspace**, where a leftover is harmless. Nothing needs deleting from the real one because nothing was written there |
 
 **Why the asymmetry** — Neon rows are cheap to delete precisely, so evals share the project and clean up by
 tag. Supermemory can't reliably delete an individual memory, so isolation has to happen at the container
@@ -66,19 +66,22 @@ at all, even briefly, even archived.
 
 ## Set these before a live run
 
-Both live in **`.proactive-jupi/.env`** (gitignored; copy from `.env.template` in a fresh worktree):
+**The eval Jupi workspace slug is `test`.** Point runs at it by writing it into the **scratch workspace's**
+`config.local.json` — `"jupiWorkspace": "test"` — *not* by exporting a variable. **No skill reads
+`JUPI_EVAL_WORKSPACE`**; every one of them resolves the workspace from `config.jupiWorkspace`, so a scratch
+config that copies the real value verbatim will post eval decisions **into the real workspace**. A dry-run
+hides this, because it posts nothing at all; the first write-mode case is where it bites. `.env.template`
+keeps `JUPI_EVAL_WORKSPACE` as the place the slug is *recorded* for humans and scripts — it is not a
+mechanism the skills honour.
 
-```
-JUPI_EVAL_WORKSPACE=test        # the eval Jupi workspace — never config.jupiWorkspace
-SUPERMEMORY_API_KEY=sm_...      # admin key the container purge needs
-```
+Sanity-check the slug before a run: pass it as `groupSlug` to `search-decisions-tool`. A real-but-empty
+workspace returns `{"items":[]}` while a wrong slug errors `Group <slug> not found`, so an empty result is
+confirmation, not a silent miss.
 
-At Jupi today the eval workspace slug is **`test`**. Sanity-check it before a run — pass it as `groupSlug`
-to `search-decisions-tool`; a real-but-empty workspace returns `{"items":[]}` while a wrong slug errors with
-`Group <slug> not found`, so an empty result is confirmation, not a silent miss.
-
-Eval-only settings stay in the environment — **never in `config.local.json`**, which is the product's config,
-gets mirrored into unattended/cloud run CWDs, and must not grow eval keys.
+`SUPERMEMORY_API_KEY` (the container purge needs it) stays in **`.proactive-jupi/.env`**, gitignored — copy
+from `.env.template` in a fresh worktree. **Note the connector writes on read:** a plain `recall` was observed
+persisting a memory of the query itself, so run every case against `user_eval_scratch` even when the skill
+under test only reads.
 
 ## Rules that hold for every set
 
