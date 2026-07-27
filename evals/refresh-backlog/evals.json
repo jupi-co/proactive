@@ -70,14 +70,15 @@
     },
     {
       "id": 7,
-      "prompt": "RELEVANCE vs ROLE: with an assets.md whose 'Who this is' section names a specific role and accountabilities (e.g. Head of Revenue Ops — pipeline hygiene, forecast accuracy), parse two near-identical fixture threads: (a) a forecast-accuracy escalation squarely inside those accountabilities, and (b) the same shape of thread about a topic owned by someone else (a frontend release regression), with the user only cc'd. Then re-run with the 'Who this is' section removed. Eval-isolated.",
-      "expected_output": "(a) scores relevance HIGH, (b) LOW — the two threads are otherwise comparable, so any run that scores them the same is ignoring the role. With the section removed, the run does NOT stall or invent a role: it scores relevance on the signal alone and says so in its return. Read-only; still no drafting, deciding, or Facts.",
+      "prompt": "RELEVANCE vs ROLE: with a fixture `assets.md` whose *Who this is* names a role and accountabilities (Head of Revenue Ops — pipeline hygiene, forecast accuracy), parse FOUR fixture threads holding impact, bottleneck, signal_at, external and deadline FIXED so relevance is the only free variable. Pair A (the discriminating one, user addressed DIRECTLY on To: in both): (c) in-remit — a forecast-accuracy escalation; (d) out-of-remit — a frontend release regression. Pair B (weaker, kept for realism): (a) in-remit on To:, (b) out-of-remit with the user only Cc'd. Then re-run with the *Who this is* section removed. Eval-isolated.",
+      "expected_output": "Pair A is the test: (c) scores relevance HIGH and (d) LOW **with** the role, and (d) rises to HIGH **without** it — that swing is the only clean proof the section changed the outcome. Pair B must also split (a) HIGH / (b) LOW, but note it proves less: 'user only Cc'd' is independently sufficient, so a completely role-blind run scores that pair correctly. With the section removed, the run scores relevance on the signal alone and SAYS SO in its return — it does not stall and does not invent a role. Read-only throughout.",
       "files": [],
       "expectations": [
-        "The thread inside the user's stated accountabilities scores relevance high",
-        "The comparable thread outside their remit scores relevance low",
-        "With the Who this is section removed, relevance is scored on the signal alone and the run says so",
-        "The missing section does not stall the run or cause an invented role"
+        "With the role present, the directly-addressed out-of-remit thread (d) scores relevance LOW",
+        "With the role removed, that same thread (d) scores relevance HIGH — the swing that proves the section is load-bearing",
+        "The directly-addressed in-remit thread (c) scores HIGH in both runs",
+        "Impact, bottleneck and urgency inputs are held fixed across the pair so relevance is the only variable",
+        "With the section missing, the run scores on the signal alone and says so, rather than stalling or inventing a role"
       ]
     }
   ]

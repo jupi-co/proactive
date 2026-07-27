@@ -97,6 +97,12 @@ under test only reads.
 - **Grade the transcript, not just the artifact.** Most regressions this plugin has actually had were
   behavioral — a hardcoded tool menu, a redundant OAuth push, a rule store recommended that shouldn't be.
   None of those appear in a diff of what was written.
+- **Never stage the real connection string into a fixture file.** A case that needs a credential gets it by
+  shell copy straight into the scratch `config.local.json`, or from a scratch Neon project — not written to
+  something like `from-user/neon-conn.txt` for the run to pick up. Observed in a real run: a scratch
+  workspace ended up holding the live database password in plaintext, outside any `.gitignore`. It was
+  throwaway, so nothing leaked — but the same improvisation one directory over is a committed secret, and
+  the skill under test is the one that preaches this hygiene.
 
 ## Fresh-worktree prerequisites (this bites every time)
 

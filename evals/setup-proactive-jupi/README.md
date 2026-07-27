@@ -38,6 +38,16 @@ they weren't asked. Several cases hinge on this — case 1's persona mentions th
 proposes something like it, which is exactly how you detect an interview that never got past mail and
 calendar. **If you had to tell the agent something the persona never said, the case failed.**
 
+**Keep the persona sheet OUT of the scratch workspace.** Step 3 scans the working tree for assets, so a
+`persona.md` sitting at the workspace root is an answer key the agent under test can simply read — it would
+turn the eval into an open-book exam and you might never notice, because the transcript looks the same
+either way. Write it somewhere the run can't reach.
+
+**Spawn the setup agent blind if you can.** The strongest version of this eval, run in practice: a separate
+agent gets only the workspace path, `SKILL.md`, and "stop at ✋" — no persona, no grading criteria — while
+the runner plays the user and grades. Single-context role-play is the fallback, and its results should be
+read as "a careful run *can* do this", not "any run *will*".
+
 ## What the cases cover
 
 | # | Covers |

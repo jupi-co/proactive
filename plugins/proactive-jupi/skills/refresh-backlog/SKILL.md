@@ -44,6 +44,15 @@ is what lets it scan the whole backlog every run.
    scan comes from `assets.md`**, step 3.)*
 2. `${CLAUDE_PLUGIN_ROOT}/shared/signal-sources.md` — the per-tool scan recipes (shared with update-brain).
 3. `.proactive-jupi/assets.md` — two things. **Your source list is every `Connected` tool tagged `inbox`.**
+   - **If that set comes back empty, do not return an empty backlog — work out why first.** An
+     `assets.md` written before the roles refactor has no `Roles` column at all, so *nothing* is tagged
+     `inbox` even though every tool is connected and healthy. Silently scanning nothing looks exactly
+     like a quiet morning, which is the worst possible failure for this skill. When the table has no
+     `Roles` column, fall back to the tools marked `Connected` whose action surface is plainly an inbox
+     (mail, calendar, chat, an issue tracker with assigned work), **say in the return that you inferred
+     the sources from a pre-roles `assets.md`**, and recommend a `setup-proactive-jupi` re-run to
+     reconcile the file. If the column exists and is genuinely empty of `inbox` tags, that's a
+     configuration answer, not a schema gap — report it and scan nothing.
    That role means "parse tasks from it". Ignore the other *roles*: `context` is what `update-brain` crawls,
    `work` is where `execute-action` writes, and `decision`/`rules`/`brain` are stores, not signal sources.
    **Also read the `Who this is` section** (role · accountable for · works with) — that's what you score
@@ -120,6 +129,11 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
      activity after the task's last update (a real new reply, not our own). Only then treat it
      as fresh and let it reopen. This preserves the original's ruled-out memory: a signal judged
      "nothing to do" stays out of the backlog.
+     - **Compare against the timestamp from step 3's `list-open-refs`, NOT the row you just
+       upserted.** The upsert in step 4 sets `updated_at = now()`, so a post-upsert read makes
+       "the task's last update" always *now* — no inbound can ever be newer, and a genuinely
+       revived thread stays suppressed forever. Capture the pre-upsert `updated_at` in step 3 and
+       test against that. (Cheapest correct order: decide with the pre-check, then upsert.)
 6. **Advance the cursor** — `advance-cursor backlog <source> <marker>` (the cursor marker from
    `signal-sources.md`), so the next run doesn't re-scan this window.
 
@@ -131,9 +145,17 @@ scan the rest; never fail the whole run, never advance a cursor you couldn't rea
 
 ## Stage 2 — Score (order the backlog + promote)
 
-For each `candidate` task, judge **three axes** (each `low|medium|high`) — cheap, no reasoning
-about decisions or actions. You do **not** compute urgency or the score — `db.mjs` does, from the
-facts the Parser recorded:
+Score **every `candidate` task, and re-score the `open` ones you re-saw this run** — judge **three
+axes** (each `low|medium|high`) — cheap, no reasoning about decisions or actions. You do **not**
+compute urgency or the score — `db.mjs` does, from the facts the Parser recorded:
+
+> **Why the re-score matters more than it looks.** `upsert-task` does not reset `status`, so a signal
+> seen on an earlier run comes back `open`, not `candidate`. Score only the candidates and those tasks
+> keep the urgency they were first given — permanently. Urgency is *supposed* to climb with staleness
+> and an approaching deadline (`1 + 2·max(staleness, deadline)`, computed **relative to now**), so
+> freezing it means the aging tasks that should be floating to the top are the exact ones that never
+> move. Re-issue `score-task` for any `open` task whose signal appeared in this window; its axes rarely
+> change, but the recomputed urgency is the point.
 
 - **impact** — the **intrinsic value of the outcome** itself.
 - **relevance** — how sure this is a *real, worth-surfacing* task vs noise (the noise gate). *(NOT
