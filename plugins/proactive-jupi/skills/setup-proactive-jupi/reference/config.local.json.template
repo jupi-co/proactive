@@ -1,22 +1,19 @@
 {
-  "_comment": "Copy to the workspace .proactive-jupi/config.local.json (gitignored) and fill in. Instance-specific; never commit.",
+  "_comment": "Copy to the workspace .proactive-jupi/config.local.json (gitignored) and fill in. Instance-specific; never commit. THIS FILE HOLDS ONLY (1) ids + secrets needed to reach a store, and (2) settings/thresholds. WHICH tool plays which role lives in .proactive-jupi/assets.md, never here.",
+
+  "_ids_and_secrets": "— access only —",
   "jupiWorkspace": "<jupi-workspace-slug>",
-  "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + Supermemory; leave blank>",
+  "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + the brain's container tag; leave blank>",
   "neonProjectId": "<optional, informational — the Neon project id for reference; nothing in the pipeline reads it. Leave blank if unknown.>",
   "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
-  "_supermemoryApiKey_note": "NOT here. The runtime uses the Supermemory MCP connector and needs no key. The dev-tooling key (HTTP-API ops + eval purge) lives in the gitignored .env at the repo root as SUPERMEMORY_API_KEY — this file gets mirrored into unattended/cloud run CWDs, so an admin key must not travel in it.",
-  "seedTools": ["gmail", "calendar", "linear"],
+  "rulesStoreRef": "<optional — the id/path needed to OPEN the tool tagged `rules` in assets.md: a Notion page id, a Drive file id, or a repo-relative path. Default '.proactive-jupi/business-rules.md'. Which TOOL it is comes from the assets.md role, not from here.>",
+
+  "_settings": "— thresholds + windows —",
   "crawlWindowDays": 30,
   "backlogWindowSize": 30,
-  "businessRuleStore": {
-    "_comment": "Where business rules live (Phase 5). Setup asks the user; default is a local markdown rulebook. Context searches READ this; a settled [BR] decision's business-rule-update action WRITES it (via execute-action), indexed in .proactive-jupi/assets.md.",
-    "location": ".proactive-jupi/business-rules.md",
-    "tool": "file",
-    "readable": true
-  },
   "ruleThreshold": 2,
   "guardrails": {
-    "_comment": "act-or-decide policy (Phase 3). Default conservative; loosen as trust builds.",
+    "_comment": "act-or-decide policy. Default conservative; loosen as trust builds.",
     "mode": "draft",
     "actBudget": 5,
     "policy": {

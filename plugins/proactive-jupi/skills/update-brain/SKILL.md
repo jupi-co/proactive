@@ -53,7 +53,7 @@ Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours
 Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budget.
 1. Read `jupiUserId` from config → container tag `user_<jupiUserId>`. Read your cursors via `db.mjs get-cursor brain <source>` (user-scoped automatically).
 2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once).
-3. For each tool in `seedTools` (from config; default **Gmail + Calendar + Linear**): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
+3. For each `Connected` tool tagged **`context`** in `.proactive-jupi/assets.md` (that role means "read it to feed the brain"): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag.
 4. **Advance each cursor** — `db.mjs advance-cursor brain <source> <cursor>` (user-scoped automatically).
 5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
@@ -69,7 +69,7 @@ Explore **what the task asks**, with filters — not exhaustive dumps. Tool name
 - **Gmail** — `search_threads` with `newer_than:` (window) since cursor; `from:/to:/subject:` when targeted. Deep-read only threads worth it. Rich for people, style, topics.
 - **Calendar** — events in the window: recurring meetings → Process + who-works-with-whom; external participants → Person/Org; big future events → Project/Goal.
 - **Linear** — teams, projects (→ Project), cycles/rituals (→ Process), members (→ Person), issues updated since cursor.
-- **Drive / GitHub / Slack** (if in `seedTools`) — docs where the user is author/key contributor; repos touched; threads.
+- **Drive / GitHub / Slack** (if tagged `context`) — docs where the user is author/key contributor; repos touched; threads.
 - If a tool is **unreachable**, note it in the summary and do the most with what's reachable — never fail silently.
 
 ## Contract (non-negotiable)

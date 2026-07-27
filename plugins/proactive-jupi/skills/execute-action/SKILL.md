@@ -75,7 +75,7 @@ for each action the caller handed you:
 return all results
 ```
 - **Business-rule-update actions (a settled `[BR]` decision, from `act-post-decision`).** The `tool` is a
-  `businessRuleStore` surface — `file` (write/append the rule to the local markdown rulebook, e.g.
+  `rules`-tagged surface (from `assets.md`, opened via `rulesStoreRef`) — `file` (write/append the rule to the local markdown rulebook, e.g.
   `.proactive-jupi/business-rules.md`), or `drive`/`notion` (the connector's create/append). Do exactly what
   the `description` says — write the *"when X → Y"* rule text — and **return the store anchor as `trace`** (the
   markdown section/heading, the Notion block id). No approval gate: a FINALIZED `[BR]` decision *is* the
@@ -98,7 +98,7 @@ A concrete action is a concrete action — you run both identically.
 
 ## Where you write
 - **The user's tools** (drafts / sends / comments / bookings) — you are the only skill that does — **plus the
-  `businessRuleStore`** (the rule *text* of a settled `[BR]` action). These are the **work**-role surfaces in
+  `rules` store** (the rule *text* of a settled `[BR]` action). Your targets are the **`work`**-role tools in
   `.proactive-jupi/assets.md` (Gmail, Linear, Drive/Notion, …); a well-formed action always targets one. Both
   are action surfaces; both are side-effects you perform and return a trace for.
 - **Nothing else.** No Neon, no Jupi status, no Supermemory, no `context`, and **not** the `assets.md` rules
