@@ -84,8 +84,18 @@ PY
     # install is worse than a missing one: `command -v` finds the shim, every
     # `claude -p` dies with EACCES, and run_eval faithfully reports trigger_rate
     # 0.0 for every query — output indistinguishable from a catastrophic
-    # regression. Observed here: @anthropic-ai/claude-code 2.1.181 installed with
-    # bin -> bin/claude.exe (a non-executable Windows artifact) under a stale node.
+    # regression.
+    #
+    # The failure mode seen here is worth recognising, because it is silent and
+    # not rare: when claude-code's postinstall does not run (`--ignore-scripts`,
+    # some pnpm configs, `--omit=optional`), the package leaves a ~500-byte shell
+    # placeholder at bin/claude.exe in place of the real native binary. The
+    # placeholder exists to print a helpful error — but it ships without the
+    # execute bit, so it dies with EACCES before it can. `which claude` finds
+    # nothing (nvm keeps each version's bin separate), `command -v` finds it, and
+    # anything that shells out gets a permission error it will probably swallow.
+    # Fix is a reinstall under the CURRENT node; `file bin/claude.exe` should say
+    # Mach-O executable, not ASCII text.
     CLAUDE_BIN="$(command -v claude 2>/dev/null || true)"
     if [[ -z "$CLAUDE_BIN" ]]; then
       echo "this shells out to 'claude -p' and the CLI is not on PATH." >&2
