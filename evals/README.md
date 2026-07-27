@@ -20,13 +20,19 @@ at all, even briefly, even archived.
 
 ## Set these before a live run
 
-```bash
-export JUPI_EVAL_WORKSPACE=<your-eval-workspace-slug>   # never config.jupiWorkspace
+Both live in **`.proactive-jupi/.env`** (gitignored; copy from `.env.template` in a fresh worktree):
+
+```
+JUPI_EVAL_WORKSPACE=test        # the eval Jupi workspace — never config.jupiWorkspace
+SUPERMEMORY_API_KEY=sm_...      # admin key the container purge needs
 ```
 
-Eval-only settings live in the environment (or `.proactive-jupi/.env`, gitignored, which is also where
-`SUPERMEMORY_API_KEY` lives for the purge script) — **never in `config.local.json`**, which is the product's
-config and must not grow eval keys.
+At Jupi today the eval workspace slug is **`test`**. Sanity-check it before a run — pass it as `groupSlug`
+to `search-decisions-tool`; a real-but-empty workspace returns `{"items":[]}` while a wrong slug errors with
+`Group <slug> not found`, so an empty result is confirmation, not a silent miss.
+
+Eval-only settings stay in the environment — **never in `config.local.json`**, which is the product's config,
+gets mirrored into unattended/cloud run CWDs, and must not grow eval keys.
 
 ## Rules that hold for every set
 
