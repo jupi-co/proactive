@@ -2,7 +2,7 @@
 # All plugin-owned instance state lives under .proactive-jupi/.
 .proactive-jupi/config.local.json
 .proactive-jupi/*.local.json
-# Dev secrets (the .env.example template beside it IS committed)
+# Dev secrets (the .env.template beside it IS committed)
 .proactive-jupi/.env
 # Harness-owned local settings override (standard Claude Code convention).
 .claude/settings.local.json

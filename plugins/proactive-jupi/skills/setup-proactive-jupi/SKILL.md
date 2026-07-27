@@ -88,6 +88,7 @@ The three carve the user's world along exactly what Proactive-Jupi needs to lear
 | `brain` | it's the Facts store | Supermemory |
 
 - **`decision`, `rules` and `brain` take exactly one tool each.** If a second candidate appears, **stop and resolve it with the user** — never tag two. A split `brain` is how Facts end up under two container tags, and a split `rules`/`decision` makes every downstream target ambiguous.
+  - **Then verify it, don't just intend it.** Before you leave this step, **re-read the finished table and count the rows carrying each singular role.** Any of the three appearing zero or twice is a **hard stop** — fix it with the user now; noticing a clash only if it happens to come up mid-conversation is not enough, since the duplicate is usually introduced by a *later* row than the one that raised the question. Close the step by stating the resolved trio explicitly: *"decision → Jupi · rules → <tool> · brain → Supermemory."*
 - **`inbox`, `context` and `work` are free to span many tools** — and usually overlap heavily. Gmail is normally all three (mail lands, threads carry context, replies get drafted).
 - Config gets **no tool list** — `refresh-backlog` derives its sources from `inbox`, `update-brain` from `context`, `execute-action` from `work`. The map is the single source of truth, so nothing can drift out of sync.
 

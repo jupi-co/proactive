@@ -21,7 +21,7 @@ The system's own capability inventory. **Read in full** by act-or-decide; **hand
 | Tool | Connected | Roles | When to use it |
 |---|---|---|---|
 | Gmail | ☐ | inbox, context, work | Triage what lands; read threads for context; draft/send replies |
-| Google Calendar | ☐ | inbox, context | Meetings that need prep; who-met-whom for the brain |
+| Google Calendar | ☐ | inbox, context, work | Meetings that need prep; who-met-whom for the brain; create/move events, book slots |
 | Google Drive | ☐ | context, work | Read the doc behind a decision; comment / create docs |
 | Linear | ☐ | inbox, context, work | Assigned issues; project/owner context; comment + create issues |
 | GitHub | ☐ | inbox, context, work | Review requests; code/PR context; comment, open PRs |

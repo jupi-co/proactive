@@ -104,9 +104,17 @@ if [ "$TAG" = "$SCRATCH_TAG" ] || [ "$CONFIRM" -eq 1 ]; then
     -H "Content-Type: application/json" \
     -d "{\"containerTags\": [\"$TAG\"]}"
   echo
-  LEFT="$(list_docs "$TAG" titles | grep -c '^TITLE' || true)"
-  [ "$LEFT" -eq 0 ] && echo "done — tag is now empty." \
-                    || echo "done, but $LEFT document(s) still present — re-run to retry."
+  # Verify — but never let a FAILED re-list masquerade as "empty". Capture status separately:
+  # if the list call itself errors, say so rather than printing a reassuring zero.
+  if VERIFY="$(list_docs "$TAG" titles)"; then
+    LEFT="$(printf '%s\n' "$VERIFY" | grep -c '^TITLE' || true)"
+    if [ "$LEFT" -eq 0 ]; then echo "done — tag is now empty."
+    else echo "done, but $LEFT document(s) still present — re-run to retry."; fi
+  else
+    echo "delete was sent, but the verification re-list FAILED — cannot confirm the tag is empty." >&2
+    echo "Re-run '--list' once the API is reachable to check." >&2
+    exit 1
+  fi
   exit 0
 fi
 

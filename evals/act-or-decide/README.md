@@ -30,5 +30,5 @@ rare and archive stray eval decisions in Jupi by hand.
 
 Seed fixtures via `refresh-backlog` (eval mode) or `db.mjs upsert-task` with `signal_ref` prefixed `eval:`.
 **Phase-5 rule fixtures:** case 6 needs a rule in the assets.md "Business rules — index" + its
-`businessRuleStore` entry; cases 7–8 need ≥ `ruleThreshold` (2) prior FINALIZED decisions on the *same*
+entry in the `rules` store (`rulesStoreRef`); cases 7–8 need ≥ `ruleThreshold` (2) prior FINALIZED decisions on the *same*
 trade-off, settled the *same* way, in the scratch Jupi workspace.
