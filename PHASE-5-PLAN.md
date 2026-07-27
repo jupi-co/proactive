@@ -24,7 +24,7 @@
 
 The **rule loop** — how undocumented know-how becomes a standing rule, so over time more tasks act without asking
 (the parent §1 promise, the §9 kill-criterion). Three moving parts. **(a) Setup** asks — precisely — **where business
-rules live and how to update them**, recording a `businessRuleStore` (location + write tool) in config and pointing the
+rules live and how to update them**, tagging that tool **`rules`** in `assets.md` and recording the id/path that opens it as `rulesStoreRef` in config, pointing the
 `assets.md` rules index at it. **(b) Context searches read it:** both the shallow recall (`refresh-backlog` Stage 3)
 and the deep dig (`act-or-decide` Stage 3) consult the store, so an open question a rule already answers is **pre-empted
 → confidence `high` → act** (a task *graduates from decide to act*, parent §9). **(c) `act-or-decide` gains a second
@@ -44,7 +44,7 @@ pass (locked decision, parent §2 "Rule bootstrap").
 | P5-1 | **Where rules live** | **Hybrid.** Jupi *approves* (the `[BR]` decision — owner sign-off + the "why" trace); the **business-rule store** (named at setup) holds the durable, updatable rule text; `assets.md` **indexes** it. Reconciles "find *and* update rules" + a write-action with §14's owner-approval step. |
 | P5-2 | **Recurrence → what's raised** | **One `[BR]` decision** ("when X, always Y?"). Its chosen option bundles **two option-actions** — the BR-update write **and** the operational action — so approving it **writes the rule AND unblocks the current instance** (Phase-4 completion gate: `blocked → done` directly once both ran). No double-ask. Operational decisions stay the default for one-off, non-recurring trade-offs. |
 | P5-3 | **BR-update is decision-gated only** | A business-rule-update action is **always** a Jupi option-action on a settled `[BR]` decision, run by `act-post-decision` → **never** an immediate Neon act. Structural under Phase 4: decided actions never touch Neon, so a BR-update can't appear as an immediate-act row. Writing a standing rule only fires post-approval. |
-| P5-4 | **Default store** | `.proactive-jupi/business-rules.md` — a local, in-full-readable, hand-editable **markdown rulebook** (same philosophy as `assets.md`). The user may point `businessRuleStore` at an external repo instead (Drive folder / Notion / a docs dir); partners crawl their existing SOPs. |
+| P5-4 | **Default store** | `.proactive-jupi/business-rules.md` — a local, in-full-readable, hand-editable **markdown rulebook** (same philosophy as `assets.md`). The user may tag an external store `rules` instead (Drive folder / Notion / a docs dir); partners crawl their existing SOPs. |
 | P5-5 | **Recurrence detector** | **`search-decisions` over the Jupi log** — the same trade-off settled the same way ≥ `ruleThreshold` times (config, default 2). Rides `act-or-decide`'s **existing** Stage-3 `search-decisions-tool` read (SKILL.md:116) — no new read. Grounded in past decisions + habits; no proactive scan. |
 | P5-6 | **Title convention** | The rule-decision's Jupi title is **prefixed `[BR]`** — a cheap, human- and machine-legible marker distinguishing it from operational decisions in the log and the poll. |
 | P5-7 | **Index bookkeeping owner** | `act-post-decision` owns the `assets.md` **rules-index** line (it already reads `assets.md` and owns DECIDE-path bookkeeping). `execute-action` performs only the store write (the domain side-effect) and returns a trace; the index entry is orchestrator bookkeeping, keeping the worker pure. *(Minor flip — §10.)* |
@@ -80,13 +80,9 @@ belongs in the **attended prelude** (step 2b, with the stack-discovery questions
 > *"Where do your business rules / playbooks / SOPs live today — and where should Jupi write a new one when you approve
 > it? (e.g. a Notion page, a Drive folder, or I can keep a simple `business-rules.md` in this workspace.)"*
 
-- **New config key `businessRuleStore`** in `.proactive-jupi/config.local.json`:
+- **The store is named by the `rules` role in `assets.md`**; config carries only the id/path that opens it, `rulesStoreRef` in `.proactive-jupi/config.local.json`. *(Superseded shape — the original draft put `location`/`tool`/`readable` in config; config no longer names a tool.)*
   ```jsonc
-  "businessRuleStore": {
-    "location": ".proactive-jupi/business-rules.md",  // default; or a Drive/Notion/dir ref
-    "tool": "file",                                    // file | drive | notion | … — how the BR-update action writes
-    "readable": true                                   // can context searches read it in-full cheaply?
-  },
+  "rulesStoreRef": ".proactive-jupi/business-rules.md",
   "ruleThreshold": 2                                    // recurrence count that triggers a [BR] decision (P5-5)
   ```
   Default (no external repo named) → the local markdown rulebook (P5-4). Template ships this default so setup needn't
@@ -113,7 +109,7 @@ and, critically, **keeps the shallow stage off Jupi** (refresh-backlog's contrac
   index entry plainly matches a candidate `open_question`, **tag the open-question with the candidate `rule_ref`** rather
   than resolving it — the authoritative pre-emption stays downstream.
 - **Deep — `act-or-decide` Stage 3** (research each cluster once). Add a research step **alongside** `recall` Facts and
-  `search-decisions`: **open the matching rule in the store** (via `businessRuleStore.tool`) and confirm it applies to
+  `search-decisions`: **open the matching rule in the store** (via the `rules`-tagged tool) and confirm it applies to
   *this* instance. If it does → the open question is **pre-empted → confidence `high` → ACT**, and the emitted `ready`
   row carries `rule_ref` = the rule (schema.sql:84). This is the §14 read-side, now reading the real store. If the rule
   *almost* applies but the instance has a wrinkle the rule doesn't cover → it stays a trade-off (decide), possibly a
@@ -142,8 +138,8 @@ SKILL.md:201):
   sees the concrete case they're generalizing from).
 - **The "codify" option carries two structured option-actions** (Fork P5-2), each an `add-option-actions-tool`
   `{title, instruction, tool}`:
-  1. a **business-rule-update action** — `tool` = `businessRuleStore.tool`; instruction *"write rule 'when X → Y' to
-     `<businessRuleStore.location>`"*.
+  1. a **business-rule-update action** — `tool` = the `rules`-tagged tool; instruction *"write rule 'when X → Y' to
+     `<rulesStoreRef>`"*.
   2. the **operational action** that satisfies the current instance (the discount draft/send, etc.) — so approving the
      rule **also unblocks this task**.
 - **A "don't-codify" option** carries only the operational action, leaving the store untouched. Options thus read as
@@ -171,7 +167,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
 `act-post-decision` already reads, runs, and marks them. The Phase-5 specifics:
 
 - **`execute-action` (pure worker) performs the store write.** Handed the BR-update action, it writes the rule into
-  `businessRuleStore` via its `tool` (`file` → the markdown rulebook; `drive`/`notion` → the connector) and **returns the
+  the `rules` store via its tool (`file` → the markdown rulebook; `drive`/`notion` → the connector) and **returns the
   trace** (the rulebook section anchor, the Notion block id). Symmetric with any other content side-effect; it writes
   **no** status (Phase-4 purity).
 - **`act-post-decision` owns the bookkeeping** (P5-7): after the worker returns `ok`, it (i) `mark-option-action-done` in
@@ -191,7 +187,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
 
 1. **Read-side first — ships now, no blocker.** Value the moment a rule exists (even a hand-written one in the default
    rulebook):
-   - Setup: the `businessRuleStore` prelude question + config key + template default + step-3 inventory (§4).
+   - Setup: the rule-store prelude question + the `rules` role + `rulesStoreRef` + template default + step-3 inventory (§4).
    - `refresh-backlog` Stage 3: shallow index tag (§5).
    - `act-or-decide` Stage 3: deep store read → pre-emption → `rule_ref` on acted rows (§5).
    - *Testable now* by seeding one rule into `.proactive-jupi/business-rules.md` and watching a matching task ACT
@@ -200,7 +196,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
    - `act-or-decide`: recurrence detection + the `[BR]` decision (title prefix, two option-actions) (§6).
    - `act-post-decision`: recognise a completed BR-update action → append the `assets.md` rules index (§7); the
      execute-run + mark-done + task-complete are already Phase-4 behaviour.
-   - `execute-action`: handle a `businessRuleStore` write verb (`file`/`drive`/`notion`) → return the store trace (§7).
+   - `execute-action`: handle a `rules`-store write verb (`file`/`drive`/`notion`) → return the store trace (§7).
 
 ---
 
@@ -237,7 +233,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
 
 - `plugins/proactive-jupi/skills/setup-proactive-jupi/SKILL.md` — step 2b prelude question; step 3 store-inventory;
   guardrails note.
-- `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/config.local.json.template` — `businessRuleStore`
+- `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/config.template.json` — `rulesStoreRef`
   default + `ruleThreshold`.
 - `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/assets.template.md` — rules-index header points at the
   store; entry format documented.
@@ -247,7 +243,7 @@ Under the Phase-4 ownership model this is almost free — a `[BR]` option's acti
   made concrete.
 - `plugins/proactive-jupi/skills/act-post-decision/SKILL.md` — recognise a completed BR-update option-action → append the
   `assets.md` rules index; the decision-gated invariant (§7).
-- `plugins/proactive-jupi/skills/execute-action/SKILL.md` — handle a `businessRuleStore` write verb → return the store
+- `plugins/proactive-jupi/skills/execute-action/SKILL.md` — handle a `rules`-store write verb → return the store
   trace (§7).
 - `IMPLEMENTATION-PLAN.md` §4a (store row) + §11 Phase-5 line; `PHASE-3-PLAN.md` §14 (mark superseded-by-this-doc).
 - New default store file created lazily at first rule (or an empty `.proactive-jupi/business-rules.md` seeded by setup).

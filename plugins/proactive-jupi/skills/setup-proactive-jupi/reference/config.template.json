@@ -1,0 +1,25 @@
+{
+  "_comment": "Copy to the workspace .proactive-jupi/config.local.json (gitignored) and fill in. Instance-specific; never commit. THIS FILE HOLDS ONLY (1) ids + secrets needed to reach a store, and (2) settings/thresholds. WHICH tool plays which role lives in .proactive-jupi/assets.md, never here.",
+
+  "_ids_and_secrets": "— access only —",
+  "jupiWorkspace": "<jupi-workspace-slug>",
+  "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + the brain's container tag; leave blank>",
+  "neonProjectId": "<optional, informational — the Neon project id for reference; nothing in the pipeline reads it. Leave blank if unknown.>",
+  "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
+  "rulesStoreRef": "<optional — the id/path needed to OPEN the tool tagged `rules` in assets.md: a Notion page id, a Drive file id, or a repo-relative path. Default '.proactive-jupi/business-rules.md'. Which TOOL it is comes from the assets.md role, not from here.>",
+
+  "_settings": "— thresholds + windows —",
+  "crawlWindowDays": 30,
+  "backlogWindowSize": 30,
+  "ruleThreshold": 2,
+  "guardrails": {
+    "_comment": "act-or-decide policy. Default conservative; loosen as trust builds.",
+    "mode": "draft",
+    "actBudget": 5,
+    "policy": {
+      "high": { "low": "act",    "high": "decide" },
+      "low":  { "low": "decide", "high": "decide" }
+    },
+    "executedPing": "none"
+  }
+}

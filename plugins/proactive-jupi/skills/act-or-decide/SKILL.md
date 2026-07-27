@@ -44,11 +44,13 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
 
 ## Boot — read these, then go (no tree exploration)
 1. **`.proactive-jupi/config.local.json`** → `guardrails` (`mode`, `actBudget`, `policy`, `executedPing`),
-   `jupiWorkspace`, `backlogWindowSize`, `businessRuleStore` (`location`, `tool`, `readable` — where rules
-   live, §Business rules), `ruleThreshold` (default `2` — recurrences before you propose a rule). *(If
+   `jupiWorkspace`, `backlogWindowSize`, `rulesStoreRef` (the id/path that *opens* the rule store),
+   `ruleThreshold` (default `2` — recurrences before you propose a rule). *(If
    `guardrails` is absent, default `mode:"draft"`, `actBudget:5`, and the conservative policy in §The gate.)*
-2. **`.proactive-jupi/assets.md`** — the Asset Map (tools + action surfaces, agents-for-reuse, the **Business
-   rules — index** pointing at `businessRuleStore.location`), read in full.
+2. **`.proactive-jupi/assets.md`** — the Asset Map, read in full. It is the **routing map**: which tool holds
+   which role. You need `rules` (the one rule store — open it with `rulesStoreRef`), `decision` (the one
+   decision store — where you post), `brain` (the one Facts store — where you `recall`), and `context` (what
+   you may research in, Stage 3). Config never names a tool; this table does.
 3. **Run args:** `--dry-run` (classify only, write nothing) · `--perform` (override `mode` to perform for
    this run).
 
@@ -127,7 +129,7 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
    inconsistent → keep it a one-off operational decision.
 3. **Consult the business-rule store** (§Business rules). Read the `assets.md` **Business rules — index**
    in full; if an entry (or a `rule_ref` hint the parser tagged on an `open_question`) looks like it covers
-   the cluster's trade-off, **open that rule in `businessRuleStore`** (via its `tool`) and confirm it applies
+   the cluster's trade-off, **open that rule in the `rules`-tagged store** (the tool from `assets.md`, opened via `rulesStoreRef`) and confirm it applies
    to *this* instance. A rule that genuinely fits **pre-empts the open question → confidence `high`** and its
    id becomes the acted row's `rule_ref`. A rule that *almost* fits (a wrinkle it doesn't cover) does **not**
    act silently → it's a `[BR]` **amendment** decision (apply-as-is / add-exception / supersede).
@@ -207,7 +209,7 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   for non-draftable actions; in perform mode also for draftable sends. Same decision mechanism either way.
 - A **business rule** that covers the situation makes confidence `high` (the open question is pre-empted) →
   **ACT**, tagging the acted row's `rule_ref` with the rule's id. You find it via the `assets.md` rules index
-  → the `businessRuleStore` entry (Stage 3.3). This is how a task *graduates from decide to act*.
+  → the `rules`-store entry (Stage 3.3). This is how a task *graduates from decide to act*.
 
 ## Draft mode
 `mode` is config, read here. **`draft` (default):** actions with a draft form get their draft verb →
@@ -262,7 +264,7 @@ for that item and move on.
 absolute.
 
 ## Business rules — read to pre-empt, `[BR]` to codify
-A **business rule** is a resolved *"when X, always Y"* the owner approved. Rules live in the **`businessRuleStore`**
+A **business rule** is a resolved *"when X, always Y"* the owner approved. Rules live in the **tool tagged `rules`** in `assets.md`
 (config: `location` + `tool`; default the local `.proactive-jupi/business-rules.md`), **indexed** in the
 `assets.md` "Business rules — index". You touch rules two ways:
 
@@ -275,8 +277,8 @@ settled the same way **≥ `ruleThreshold`** times, propose to codify it instead
 - Title **`[BR] When X, always Y`**; frame it as the standing rule bundled with the live instance that
   triggered it (so the owner sees the concrete case they're generalizing from).
 - The **"codify" option carries two structured option-actions** (`add-option-actions-tool`):
-  1. **business-rule-update** — `{ title, instruction: "write rule 'when X → Y' to <businessRuleStore.location>",
-     tool: <businessRuleStore.tool> }`. This is the durable rule write.
+  1. **business-rule-update** — `{ title, instruction: "write rule 'when X → Y' to <rulesStoreRef>",
+     tool: <the `rules`-tagged tool> }`. This is the durable rule write.
   2. **the operational action** for the current instance (the draft/send/etc.) — so approving the rule also
      **unblocks this task**.
 - Add a **"don't codify — just handle this once"** option carrying only the operational action (leaves the

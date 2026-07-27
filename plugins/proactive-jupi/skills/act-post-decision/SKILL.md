@@ -42,7 +42,7 @@ task. You are the DECIDE-path counterpart to `act-or-decide` (which handles the 
 
 ## Boot — read these, then go (no tree exploration)
 1. **`.proactive-jupi/config.local.json`** → `guardrails` (`mode`), `jupiWorkspace` (the Jupi group slug),
-   `businessRuleStore` (`location`, `tool` — for indexing a settled `[BR]` rule, §Business rules).
+   `rulesStoreRef` (the id/path that opens the rule store; the *tool* is whichever `assets.md` tags `rules` — for indexing a settled `[BR]` rule, §Business rules).
 2. **`.proactive-jupi/assets.md`** — the Asset Map (which tools are `Connected`; the **Business rules — index**
    you maintain when a `[BR]` decision settles), read in full.
 
@@ -110,7 +110,7 @@ actions run for real even in `draft` mode). For each result the worker returns:
   `trace` it returned already sits on the signal (the sent reply, the comment) — that is the notification;
   nothing else is pushed.
   - **If this action was a business-rule-update** (a `[BR]` decision's rule write — its `tool` is the
-    `businessRuleStore.tool` and `execute-action` returned the store anchor as its `trace`), **index it**:
+    the `rules`-tagged tool and `execute-action` returned the store anchor as its `trace`), **index it**:
     append one line to the `assets.md` "Business rules — index" (rule id = the decision id · *when-X-always-Y*
     · owner · task types it unblocks · the `trace` store ref). This index write is **yours** (config
     bookkeeping, like your Neon/Jupi writes) — `execute-action` only wrote the rule *text* into the store and
@@ -120,7 +120,7 @@ actions run for real even in `draft` mode). For each result the worker returns:
   gone, send bounced needing a fresh approach), note it for the Stage 3 fork.
 
 *(These option-actions never become Neon rows — Jupi is their home, the `done` flag is their ledger. The
-business-rule *text* is the exception's exception: it lands in the `businessRuleStore`, indexed in `assets.md`
+business-rule *text* is the exception's exception: it lands in the `rules` store, indexed in `assets.md`
 — never in Neon either.)*
 
 ### Stage 3 — Complete the task (or, on a fork, reopen it)
@@ -147,7 +147,7 @@ A **`[BR]`-titled** decision (posted by `act-or-decide` on a recurring trade-off
 *"when X, always Y"* rule. Its chosen "codify" option carries **two** option-actions: a **business-rule-update**
 write and the **operational** action for the instance. You run both like any others (Stage 2) — the split of
 labor:
-- **`execute-action`** performs the rule write into `businessRuleStore` (the `tool` routes it — `file` →
+- **`execute-action`** performs the rule write into the `rules` store (its tool routes it — `file` →
   the markdown rulebook, `drive`/`notion` → the connector) and returns the store anchor as `trace`. It stays
   pure — no status, no index.
 - **You** own the **`assets.md` rules-index** append (Stage 2, `ok:true` branch) — the same category as your
@@ -169,7 +169,7 @@ immediate act — it is always a settled `[BR]` option-action (it carries a Jupi
 - **Neon `tasks.status`** (via `db.mjs`) — `blocked → done` (complete) / `blocked → open` (fork only).
 - **Jupi** — `mark-option-action-done-tool` on the executed option-actions. **Never** posts or finalizes decisions.
 - **`.proactive-jupi/assets.md` — the Business rules index** — one appended line when a `[BR]` decision's
-  business-rule-update action runs `ok` (§Business rules). The rule *text* itself goes to `businessRuleStore`
+  business-rule-update action runs `ok` (§Business rules). The rule *text* itself goes to the `rules` store
   via `execute-action`, not here.
 - `act-post-decision/runs/run-<id>/log.md` — decisions polled, which were FINALIZED, actions run (with
   traces), tasks completed vs reopened vs still-waiting, any unreachable source.

@@ -6,11 +6,22 @@ Workspace + skills for the Proactive-Jupi proactive engine (dogfood build). Full
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
 The human is bothered **only for genuine trade-offs** (the confidence × risk gate). Everything confident-and-safe just happens.
 
+## Config — two files, two jobs
+
+Both are gitignored; each has a committed template. **Neither ever names a tool** — which tool plays which role lives in `.proactive-jupi/assets.md` (the roles table: `inbox`, `context`, `work`, `decision`, `rules`, `brain`).
+
+| File | Holds | Template | Who reads it |
+|---|---|---|---|
+| `.proactive-jupi/config.local.json` | Per-workspace **ids/secrets** to reach a store (`jupiUserId`, `neonConnString`, `rulesStoreRef`, …) + **settings/thresholds** (`crawlWindowDays`, `ruleThreshold`, `guardrails`, …) | [`…/reference/config.template.json`](plugins/proactive-jupi/skills/setup-proactive-jupi/reference/config.template.json) — setup copies it in and collects missing keys | The skills, at runtime |
+| `.proactive-jupi/.env` | **Dev-tooling secrets for this repo only** (`SUPERMEMORY_API_KEY`) | [`.proactive-jupi/.env.template`](.proactive-jupi/.env.template) — `cp .proactive-jupi/.env.template .proactive-jupi/.env` | Repo scripts you run by hand (`evals/*/purge-scratch.sh`, ad-hoc HTTP-API ops) |
+
+The Supermemory key is deliberately **not** in `config.local.json`: that file is mirrored into unattended/cloud run CWDs, so an admin-scoped key would travel with every scheduled routine. The runtime never needs it — the skills reach Supermemory through the installed MCP connector.
+
 ## Where state lives
 | Store | Home |
 |---|---|
 | Facts & relationships | **Supermemory** |
-| Asset Map (capability inventory) | **`.proactive-jupi/assets.md`** |
+| Asset Map (roles: which tool to use, when) | **`.proactive-jupi/assets.md`** |
 | Task backlog + actions | **Neon Postgres** (schema: `plugins/proactive-jupi/skills/setup-proactive-jupi/reference/schema.sql`) — every row keyed by `user_id` = the **Jupi user id** (same identity as the brain's container tag) |
 | Decisions + lifecycle (incl. EXECUTED) | **Jupi** |
 
