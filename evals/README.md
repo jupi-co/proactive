@@ -1,8 +1,54 @@
 # Evals — the standing rules
 
 Read this before running any eval in this directory. The per-skill READMEs cover *what* each set checks;
-this covers *how every run isolates itself*, which is the same everywhere and must not be reinvented per
-skill.
+this covers *how a run works* and *how it isolates itself* — the same everywhere, and not to be reinvented
+per skill.
+
+## Layout + tooling — standard `skill-creator`
+
+Each set follows `skill-creator`'s conventions so its scripts work unmodified:
+
+```
+evals/<skill>/
+├── evals.json          # the cases: {id, prompt, expected_output, files, expectations[]}
+├── trigger-eval.json   # [{query, should_trigger}] for the description loop
+├── README.md           # what this set covers
+├── purge-scratch.sh    # teardown
+└── workspace/          # run artifacts (gitignored, regenerable)
+    └── iteration-N/
+        ├── eval-<id>/
+        │   ├── eval_metadata.json
+        │   ├── with_skill/{outputs/, grading.json, timing.json}
+        │   └── without_skill/{outputs/, grading.json, timing.json}
+        ├── benchmark.json + benchmark.md
+        └── review.html
+```
+
+`expectations[]` is what the grader checks — one objectively verifiable statement each. `expected_output` is
+the human-readable description of success. Sets live at the repo root rather than inside the skill
+directories on purpose: `plugins/` is packaged into the shipped `.plugin`, and eval fixtures have no business
+travelling to users.
+
+**`evals/run-eval.sh` does the path bookkeeping** (skill-creator's scripts must run as modules from its own
+session-scoped directory; set `SKILL_CREATOR_DIR` to override autodiscovery):
+
+```bash
+./evals/run-eval.sh layout    <skill> [iteration]   # scaffold the workspace + eval_metadata.json
+./evals/run-eval.sh benchmark <skill> [iteration]   # grading.json -> benchmark.json + .md
+./evals/run-eval.sh view      <skill> [iteration]   # static review.html (adds --previous-workspace if it exists)
+./evals/run-eval.sh trigger   <skill>               # description-triggering loop (needs the `claude` CLI)
+```
+
+**The run itself is agent work, not a script.** Per iteration: `layout`, then spawn **one executor subagent
+per case per configuration — `with_skill` and the baseline, in the same turn** so they finish together. The
+baseline is what makes a pass rate mean anything: a case Claude passes unaided measures nothing about the
+skill. Capture each subagent's `total_tokens`/`duration_ms` into `timing.json` **as its notification
+arrives** — that data isn't persisted anywhere else. Then grade each run into `grading.json`
+(`expectations[]` entries with `text`/`passed`/`evidence` — the viewer depends on those exact field names),
+`benchmark`, and `view`.
+
+For interactive skills (`setup-proactive-jupi`) the executor also plays the scripted persona; see that set's
+README for the protocol that keeps it honest.
 
 Proactive-Jupi's evals touch three live stores, and each has its own isolation mechanism. **A run that
 can't be undone in all three isn't isolated — it's a production write with good intentions.**

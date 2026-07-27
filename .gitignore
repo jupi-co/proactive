@@ -19,3 +19,6 @@ package-lock.json
 
 # Legacy config path (pre-#13 rename) — never commit.
 .claude/proactive-jupi.local.json
+
+# Eval run artifacts — regenerable, often large, sometimes carry real signal content
+evals/*/workspace/

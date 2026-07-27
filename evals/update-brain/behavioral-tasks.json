@@ -1,7 +1,8 @@
 {
+  "_deprecated": true,
   "skill_name": "update-brain",
   "container_tag": "user_eval_scratch",
-  "note": "Every run writes ONLY to container_tag. full-mode tasks must also isolate the Neon cursor with is_eval=true (db.mjs advance-cursor brain <source> <cursor> eval). Run purge-scratch.sh after.",
+  "note": "DEPRECATED — superseded by evals.json in this directory, which uses the standard skill-creator schema ({id, prompt, expected_output, files, expectations[]}) that the grader and benchmark scripts read. This file is kept only because eval runs launched before the migration are still reading it; delete it once they finish. Do not add cases here. ORIGINAL NOTE FOLLOWS: Every run writes ONLY to container_tag. full-mode tasks must also isolate the Neon cursor with is_eval=true (db.mjs advance-cursor brain <source> <cursor> eval). Run purge-scratch.sh after.",
   "evals": [
     {
       "id": 1,

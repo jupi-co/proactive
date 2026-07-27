@@ -30,7 +30,7 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
   ```
 
 ## 2. Behavioral eval — does the skill produce a good backlog?
-- Set: [`behavioral-tasks.json`](behavioral-tasks.json).
+- Set: [`evals.json`](evals.json).
 - Per task, run the skill **eval-isolated** (eval cursor keys + `eval:` signal_ref prefix)
   and check: candidate tasks with `short_label` + standalone `summary` + `signal_ref`/
   `signal_url`; scored on impact × relevance × urgency (product) and promoted to `open`;

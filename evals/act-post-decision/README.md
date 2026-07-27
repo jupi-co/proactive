@@ -8,7 +8,7 @@ Two layers, matching `evals/act-or-decide/`.
   decisions", "any decisions ready to run?") vs near-misses that belong to `act-or-decide` (decide / work
   the backlog), `execute-action` (run the ready queue), `refresh-backlog` (parse/score), `update-brain`
   (who-is / build the brain), `setup-proactive-jupi`, or the decision skills (search / log / submit).
-- **`behavioral-tasks.json`** — the settle → execute → complete loop:
+- **`evals.json`** — the settle → execute → complete loop:
   1. **single-gate settle → direct done** — one `blocked` task, its one decision FINALIZED → the chosen
      option's actions run (via `execute-action`), each marked **done in Jupi**, task → `done` **directly**
      (no `act-or-decide` re-invoke; **no** Neon `actions` row created for the decision).

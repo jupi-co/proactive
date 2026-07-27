@@ -32,7 +32,7 @@ tools into Supermemory, and schedules routines. So:
 
 ## The persona field
 
-`behavioral-tasks.json` cases carry a `persona` alongside `prompt`/`expected` (the other skills' cases don't
+`evals.json` cases carry a `persona` alongside `prompt`/`expected` (the other skills' cases don't
 need one). Role-play it **strictly**: answer only what that person would answer, and never volunteer what
 they weren't asked. Several cases hinge on this — case 1's persona mentions their ATS *only* if the agent
 proposes something like it, which is exactly how you detect an interview that never got past mail and

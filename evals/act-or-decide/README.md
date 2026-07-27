@@ -8,7 +8,7 @@ Two layers, matching `evals/refresh-backlog/`.
   "dry-run and show the table") vs near-misses that belong to `refresh-backlog` (parse/score),
   `update-brain` (who-is / build the brain), `execute-action` (run the queue / send the drafts),
   `setup-proactive-jupi`, or the decision skills (search / log / submit-decision).
-- **`behavioral-tasks.json`** — the gate + coordination node + the Phase-5 rule loop:
+- **`evals.json`** — the gate + coordination node + the Phase-5 rule loop:
   1. ACT classification (high confidence + low exposure).
   2. Coordination node — 2+ tasks sharing a question → **one** decision.
   3. Non-draftable high-exposure → DECIDE even in draft mode; draftable → ACT.

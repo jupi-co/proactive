@@ -21,7 +21,7 @@ Two eval layers, both isolated so they never pollute real Facts.
   ```
 
 ## 2. Behavioral eval — does the skill produce good Facts?
-- Set: [`behavioral-tasks.json`](behavioral-tasks.json).
+- Set: [`evals.json`](evals.json).
 - Per task, run the skill against the **scratch tag** and check: entity-centric Facts, **provenance inline**, retrievable via `recall`, and a good summary.
 - **Blind version** (skill-creator): spawn with-skill vs baseline subagents per task, grade, then `generate_review.py` for the viewer. Point every write at `user_eval_scratch`.
 - **Always run `purge-scratch.sh` when done.**
