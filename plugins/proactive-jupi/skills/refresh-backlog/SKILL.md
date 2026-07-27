@@ -42,7 +42,7 @@ is what lets it scan the whole backlog every run.
 1. `.proactive-jupi/config.local.json` → `neonConnString`, `seedTools` (default `["gmail","calendar","linear"]`),
    `crawlWindowDays` (default `30`), `backlogWindowSize` (default `30`).
 2. `${CLAUDE_PLUGIN_ROOT}/shared/signal-sources.md` — the per-tool scan recipes (shared with update-brain).
-3. `.proactive-jupi/assets.md` — which tools are `Connected` (only scan those).
+3. `.proactive-jupi/assets.md` — the **inbox**-role tools that are `Connected` (scan those; setup keeps them in sync with `seedTools`). A tool tagged **work** only is an action surface, not a signal source — skip it here; `execute-action` writes to those.
 
 **Ensure the DB helper's deps once** (first run / fresh install): if
 `${CLAUDE_PLUGIN_ROOT}/shared/node_modules` is absent, run

@@ -98,8 +98,9 @@ A concrete action is a concrete action — you run both identically.
 
 ## Where you write
 - **The user's tools** (drafts / sends / comments / bookings) — you are the only skill that does — **plus the
-  `businessRuleStore`** (the rule *text* of a settled `[BR]` action). Both are action surfaces; both are
-  side-effects you perform and return a trace for.
+  `businessRuleStore`** (the rule *text* of a settled `[BR]` action). These are the **work**-role surfaces in
+  `.proactive-jupi/assets.md` (Gmail, Linear, Drive/Notion, …); a well-formed action always targets one. Both
+  are action surfaces; both are side-effects you perform and return a trace for.
 - **Nothing else.** No Neon, no Jupi status, no Supermemory, no `context`, and **not** the `assets.md` rules
   index (the orchestrator writes that). You return traces; the caller records them.
 

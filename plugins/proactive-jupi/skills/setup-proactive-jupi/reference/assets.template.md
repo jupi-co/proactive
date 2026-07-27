@@ -2,20 +2,27 @@
 
 The system's own capability inventory. **Read in full** by act-or-decide; **hand-editable**. Written/updated by the `setup` skill (steps 2–3). Not in Supermemory.
 
-## Tools — connected MCPs + action surface
+## Tools — connected MCPs + role + action surface
 **Setup regenerates this table from what it actually probes** (step 2b — no hardcoded menu): one row per tool the user names and that resolves in the session, `Connected` ticked after a successful probe. The rows below are **illustrative examples**, not a fixed list — drop any the user doesn't use, add whatever they do.
 
-| Tool | Connected | Action surface (what Proactive-Jupi may do) |
-|---|---|---|
-| Gmail | ☐ | read; draft · send (external) |
-| Google Calendar | ☐ | read; create/update events |
-| Google Drive | ☐ | read; comment; create docs |
-| Linear | ☐ | read; comment/create/update issues (internal) |
-| GitHub | ☐ | read; comment; open PRs (internal) |
-| Slack | ☐ | read; reply in thread (internal) · DM |
-| Jupi | ☐ | search / create / finalize decisions |
-| Supermemory | ☐ | add / search Facts (via MCP) |
-| Neon | ☐ | backlog / actions tables (via project-scoped conn string) |
+The **Role** column records *why the tool matters to the user*, from step 2b's three questions — and a connector can hold **more than one**:
+- **inbox** — where things that need the user land, and what they check to know what to work on (step 2b·a). These are the signals `refresh-backlog` and `update-brain` crawl — the **inbox** set is what `config.seedTools` should list, so the two can't drift.
+- **work** — where the user actually gets things done (step 2b·b). These are the surfaces `execute-action` writes to (draft, send, comment, book, create doc).
+- **both** — most tools are both: Gmail is where mail arrives *and* where replies are drafted; Linear is a "my list" *and* where issues get worked. Tag every role a tool genuinely plays; don't force it into one.
+
+System stores (Jupi/Supermemory/Neon) are neither — they're Proactive-Jupi's own plumbing, marked `—`.
+
+| Tool | Connected | Role | Action surface (what Proactive-Jupi may do) |
+|---|---|---|---|
+| Gmail | ☐ | inbox + work | read; draft · send (external) |
+| Google Calendar | ☐ | inbox + work | read; create/update events |
+| Google Drive | ☐ | work | read; comment; create docs |
+| Linear | ☐ | inbox + work | read; comment/create/update issues (internal) |
+| GitHub | ☐ | inbox + work | read; comment; open PRs (internal) |
+| Slack | ☐ | inbox + work | read; reply in thread (internal) · DM |
+| Jupi | ☐ | — (system) | search / create / finalize decisions |
+| Supermemory | ☐ | — (system) | add / search Facts (via MCP) |
+| Neon | ☐ | — (system) | backlog / actions tables (via project-scoped conn string) |
 
 ## Routines — cadence + why
 Populated by setup step 8. Each routine is anchored to a **real ritual the crawl discovered**, so the user sees *why* it fires when it does. Each entry: **routine** · **schedule** · **anchor event** (the ritual it's timed to).
