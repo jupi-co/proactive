@@ -53,13 +53,14 @@ Populated by setup step 8. Each routine is anchored to a **real ritual the crawl
 _Empty until setup runs._
 
 ## Agents / skills — discovered, for reuse
-**Capability already in this workspace that Proactive-Jupi can call instead of improvising.** Populated by setup step 3 (scan of `.claude/skills/`, `.claude/agents/`, installed plugins) and hand-extendable. `act-or-decide` reads this when planning an action: if an entry covers the work, its action **invokes that skill** rather than reasoning the task out from scratch — so the *When to reach for it* column is the load-bearing one. **Reuse only — never a lifecycle registry:** nothing here is created, edited, or scheduled by Proactive-Jupi.
+**Capability already in this workspace that Proactive-Jupi can call instead of improvising.** Populated by setup step 3 (scan of `.claude/skills/`, `.claude/agents/`, installed plugins) and hand-extendable. `act-or-decide` reads this when planning an action: if an entry covers the work, its action **invokes that skill** rather than reasoning the task out from scratch — so *When to reach for it* is what makes an entry usable, and **`Sends?` is what makes it safe**. Draft mode rewrites act-or-decide's own verb; it cannot reach inside a skill you invoke. So a skill that sends, posts, publishes or books is **non-draftable** — it must be gated as a decision even in draft mode — and `unknown` counts as sending. An entry that says only "compiles the digest" while the skill quietly mails it is how an unauthorised external send gets through. **Reuse only — never a lifecycle registry:** nothing here is created, edited, or scheduled by Proactive-Jupi.
 
 Proactive-Jupi's own skills (`update-brain`, `refresh-backlog`, `act-or-decide`, `execute-action`, `act-post-decision`) are the pipeline itself and are deliberately **not** listed.
 
-| Name | Kind | Invoked as | What it does | When to reach for it |
-|---|---|---|---|---|
-| _e.g. weekly-board-report_ | skill | `/weekly-board-report` | _Builds the investor update from Linear + the metrics sheet_ | _Any "board update / investor report" task — don't recompose it by hand_ |
+| Name | Kind | Invoked as | Sends? | What it does | When to reach for it |
+|---|---|---|---|---|---|
+| _e.g. weekly-board-report_ | skill | `/weekly-board-report` | no — drafts only | _Builds the investor update from Linear + the metrics sheet_ | _Any "board update / investor report" task — don't recompose it by hand_ |
+| _e.g. partner-digest_ | skill | `/partner-digest` | **yes — emails the partners list** | _Compiles the monthly digest and mails it_ | _Monthly partner comms — but it sends, so it can never be a silent ACT_ |
 
 _Empty until setup runs. If a scan finds nothing, setup writes "none discovered" here — an empty table is ambiguous, an explicit "none" is not._
 
