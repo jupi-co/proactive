@@ -50,7 +50,9 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
 2. **`.proactive-jupi/assets.md`** — the Asset Map, read in full. It is the **routing map**: which tool holds
    which role. You need `rules` (the one rule store — open it with `rulesStoreRef`), `decision` (the one
    decision store — where you post), `brain` (the one Facts store — where you `recall`), and `context` (what
-   you may research in, Stage 3). Config never names a tool; this table does.
+   you may research in, Stage 3). Config never names a tool; this table does. It also carries two things you
+   plan against: **Who this is** (role + accountabilities — what makes something worth doing for *them*) and
+   **Agents / skills** (workspace capability to invoke instead of improvising, Stage 4).
 3. **Run args:** `--dry-run` (classify only, write nothing) · `--perform` (override `mode` to perform for
    this run).
 
@@ -96,7 +98,10 @@ filter on `gating_decision_ids` or execution — the status carries it.
 ## The flow
 
 ### Stage 0 — Refresh (+ sweep orphaned `ready` rows)
-Invoke **`refresh-backlog`** so you reason over a current window. Processed tasks are already out of `open`
+Invoke **`refresh-backlog`** so you reason over a current window. **Except in `--dry-run`: skip the refresh
+and reason over the window as it stands.** `refresh-backlog` writes `tasks` rows and advances `crawl_state`
+cursors, so invoking it would break dry-run's "writes nothing" guarantee before the gate ever runs — and the
+guarantee is the whole point of the mode. Say in the report that the window is as-of the last real refresh. Processed tasks are already out of `open`
 (they're `done`/`blocked`/`dropped`), so there is no task pile to re-read. Detecting settled decisions and
 completing `blocked` tasks is **`act-post-decision`** (it runs before you in the routine), not this stage.
 **Orphan-sweep:** `list-actions status ready` — any `ready` row is one a prior run queued but whose worker
@@ -164,6 +169,19 @@ Then, per cluster:
 Expand each task into **one or several concrete parallel actions**, each with its `tool`, a precise
 `description` (recipient, content, location — see §Actions), and its own **`exposure`** (§The gate). Run
 the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is written yet** — Stage 5 emits.
+- **Reuse existing capability before improvising one.** Check the `assets.md` **Agents / skills** table
+  (*When to reach for it*): if a workspace skill or agent already covers this work, the action is to
+  **invoke it** (`tool: skill`) — `description` names the skill and the inputs it needs — rather than
+  recomposing the task by hand. A skill someone built and trusts beats your ad-hoc version, and it's the
+  same reason you check the rule store in Stage 3.3: known competence first, reasoning only for the remainder.
+  - **Score a skill's exposure by what the skill itself does, not by the verb you wrote.** The draft-mode
+    transform rewrites *your* verb; it cannot reach inside someone else's skill. A skill that only produces
+    or prepares content (builds a report, assembles a summary, opens a draft) is `low`. **A skill that may
+    send, post, publish, or book as part of its run is non-draftable → `exposure: high` → DECIDE**, even in
+    draft mode — exactly like booking a venue or merging a PR. Never let "it's draft mode" stand in for a
+    guarantee about a skill you don't control; if the table's *what it does* doesn't tell you, treat it as
+    high. This is what keeps §Draft mode's promise (no external side-effect before a decision is settled)
+    true for borrowed capability.
 - For an **ACT** action, prepare its `insert-action` payload (`decision_id` null, `exposure` tagged; **`rule_ref`
   set** if a business rule pre-empted the question, Stage 3.3). Apply the **draft-mode transform** (§Draft mode)
   — in `draft` the verb is the draft form (`create draft email…`).
@@ -202,9 +220,18 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   "low":  { "low": "decide", "high": "decide" } }  // open question → decide (approach), whatever the exposure
 ```
 - **Exposure — draft-first, then destination.** A **draft** exposes nothing → `low`. **But only actions
-  with a draft form collapse this way.** A **non-draftable** action (book a venue, raise a budget, submit
-  a payment, merge a PR) is scored by destination directly — read `external`, recipient sensitivity
-  (peer < manager < CEO < external), irreversibility → `high` when any bites.
+  with a draft form collapse this way — and "has a draft form" means the *side-effect itself* can be staged
+  for review, not that you can describe it in an email.** Wrapping a commitment in a message about the
+  commitment doesn't stage it: "draft an email confirming the booking" is still the booking if sending that
+  mail is what confirms it, and scoring it `low` would launder a high-exposure act through the draft
+  transform. Ask what is irreversible once the action completes, not what the verb is called. A
+  **non-draftable** action (book a venue, raise a budget, submit a payment, merge a PR, or a skill that may
+  send — Stage 4) is scored by destination directly — read
+  `external`, recipient sensitivity (peer < manager < CEO < external), irreversibility → `high` when any
+  bites. **That ladder is relative to the user, so read it off `assets.md`'s `Who this is`** (role ·
+  accountable for · works with): a VP is a peer to a VP and a skip-level to an IC, and someone inside
+  their stated accountabilities is routine where the same name outside them is not. Absent that section,
+  fall back to the literal ladder and lean conservative.
 - The `high × high` cell → **DECIDE** (an *authorize* decision, "do exactly this?"). It fires in draft mode
   for non-draftable actions; in perform mode also for draftable sends. Same decision mechanism either way.
 - A **business rule** that covers the situation makes confidence `high` (the open question is pre-empted) →
@@ -297,6 +324,14 @@ Whenever an action (a Case-ACT draft or an option's Action) is a message to a pe
 of the **≥10 recent messages you sent them in that channel** (greeting, sign-off, tone, FR/EN, length) —
 never a generic template. Be **minimal**: the shortest message that does the job.
 
+**First contact — no history to mirror.** A new counterparty has no sent thread, and "never a generic
+template" still holds, so fall back in this order: (1) the register of **the thread you're replying into** —
+they set a tone, match it; (2) how the user writes to **comparable people** in that channel (same seniority,
+same internal/external side); (3) the user's own baseline register from any recent sent mail. Say in the
+action which fallback you used, so a reviewer knows the voice is inferred rather than observed. Never let
+absent history become an excuse for boilerplate — it is the case where a template is most tempting and most
+obviously wrong to the person receiving it.
+
 ## Actions — maximally advanced
 Before writing each action, **dig the real tools** to make it concrete and far-along: the exact thread to
 reply to, the exact doc + location, the drafted substance (the ask, angle, cc). Resolve unknowns instead of
@@ -307,11 +342,19 @@ decision to settle XXX."
 ---
 
 ## Dry-run — the classification table
-`--dry-run` runs the full flow through the gate but **writes nothing** (no rows, no decisions, no status
-changes) and **does not invoke `execute-action`**. Emit one row per candidate action, grouped by task:
+`--dry-run` runs the full flow through the gate but **writes nothing** — no rows, no decisions, no status
+changes, **no Stage 0 refresh** (§Stage 0), and it **does not invoke `execute-action`**. Emit one row per
+candidate action, grouped by task:
 
 | Task | conf (task) | Action | exposure | Verdict | Decision (kind → title) |
 |---|---|---|---|---|---|
+
+**Precede it with the cluster table**, or the coordination node is invisible — three rows carrying the same
+decision title read identically whether one decision gates three tasks or three duplicate decisions were
+raised, and that difference is the whole point of Stage 2:
+
+| Cluster | Tasks | Shared open question | conf |
+|---|---|---|---|
 
 Footer: the active `mode` + `policy`. Write it to `act-or-decide/runs/run-<id>/report.md` and return it.
 

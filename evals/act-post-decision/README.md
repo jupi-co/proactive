@@ -1,12 +1,14 @@
 # act-post-decision evals
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two layers, matching `evals/act-or-decide/`.
 
 - **`trigger-eval.json`** — should-fire prompts ("run the post-decision loop", "close out settled
   decisions", "any decisions ready to run?") vs near-misses that belong to `act-or-decide` (decide / work
   the backlog), `execute-action` (run the ready queue), `refresh-backlog` (parse/score), `update-brain`
   (who-is / build the brain), `setup-proactive-jupi`, or the decision skills (search / log / submit).
-- **`behavioral-tasks.json`** — the settle → execute → complete loop:
+- **`evals.json`** — the settle → execute → complete loop:
   1. **single-gate settle → direct done** — one `blocked` task, its one decision FINALIZED → the chosen
      option's actions run (via `execute-action`), each marked **done in Jupi**, task → `done` **directly**
      (no `act-or-decide` re-invoke; **no** Neon `actions` row created for the decision).

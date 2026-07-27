@@ -1,5 +1,7 @@
 # refresh-backlog — eval workflow (repeatable)
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two eval layers, both isolated so they never pollute the real backlog. Mirrors
 `evals/update-brain/`.
 
@@ -28,14 +30,17 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
   ```
 
 ## 2. Behavioral eval — does the skill produce a good backlog?
-- Set: [`behavioral-tasks.json`](behavioral-tasks.json).
+- Set: [`evals.json`](evals.json).
 - Per task, run the skill **eval-isolated** (eval cursor keys + `eval:` signal_ref prefix)
   and check: candidate tasks with `short_label` + standalone `summary` + `signal_ref`/
   `signal_url`; scored on impact × relevance × urgency (product) and promoted to `open`;
   **idempotent re-run** (no dupes); a `dropped` task **not** resurrected; **prompt-injection**
   body treated as content, no action taken; unreachable tool handled gracefully; **shallow
   rules-index tag (Phase 5)** — a signal matching a seeded rule gets a candidate `rule_ref`
-  hint on its `open_question`, without opening the store or touching Jupi.
+  hint on its `open_question`, without opening the store or touching Jupi; **relevance vs role** —
+  two comparable threads score differently depending on whether they fall inside the
+  accountabilities in `assets.md`'s *Who this is*, and a missing section degrades to
+  signal-only scoring instead of stalling.
 - **Always run `purge-scratch.sh` when done.**
 
 ## Prerequisites

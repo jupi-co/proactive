@@ -6,7 +6,7 @@
   "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + the brain's container tag; leave blank>",
   "neonProjectId": "<optional, informational — the Neon project id for reference; nothing in the pipeline reads it. Leave blank if unknown.>",
   "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
-  "rulesStoreRef": "<optional — the id/path needed to OPEN the tool tagged `rules` in assets.md: a Notion page id, a Drive file id, or a repo-relative path. Default '.proactive-jupi/business-rules.md'. Which TOOL it is comes from the assets.md role, not from here.>",
+  "rulesStoreRef": "<the id/path needed to OPEN the tool tagged `rules` in assets.md: a Notion page id, a Drive file id, a Confluence space key. Normally the shared space where the team's SOPs already live; '.proactive-jupi/business-rules.md' is a last-resort fallback for someone with no external home, never the recommended answer. Which TOOL it is comes from the assets.md role, not from here.>",
 
   "_settings": "— thresholds + windows —",
   "crawlWindowDays": 30,

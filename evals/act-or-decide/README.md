@@ -1,12 +1,14 @@
 # act-or-decide evals
 
+> **Isolation + teardown rules are shared — read [`evals/README.md`](../README.md) first.** Neon: `eval:`-prefixed rows, deleted after. Supermemory: the `user_eval_scratch` test container. Jupi: the test workspace in `JUPI_EVAL_WORKSPACE`, never the real one.
+
 Two layers, matching `evals/refresh-backlog/`.
 
 - **`trigger-eval.json`** — should-fire prompts ("run act-or-decide", "what should Jupi do now",
   "dry-run and show the table") vs near-misses that belong to `refresh-backlog` (parse/score),
   `update-brain` (who-is / build the brain), `execute-action` (run the queue / send the drafts),
   `setup-proactive-jupi`, or the decision skills (search / log / submit-decision).
-- **`behavioral-tasks.json`** — the gate + coordination node + the Phase-5 rule loop:
+- **`evals.json`** — the gate + coordination node + the Phase-5 rule loop:
   1. ACT classification (high confidence + low exposure).
   2. Coordination node — 2+ tasks sharing a question → **one** decision.
   3. Non-draftable high-exposure → DECIDE even in draft mode; draftable → ACT.
@@ -21,6 +23,12 @@ Two layers, matching `evals/refresh-backlog/`.
   8. **Real `[BR]` posting (Phase 5)** — a STARTED `[BR]` Jupi decision with **structured** option-actions
      (BR-update `{tool, instruction}` + operational) via `add-option-actions-tool`; no rule text written yet
      (that's settle-time in `act-post-decision`), no Neon row for pending options; task → `blocked`.
+  9. **Skill reuse** — a task an `assets.md` *Agents / skills* entry covers is planned as one `tool: skill`
+     invoke, not recomposed by hand; an uncovered sibling still gets normal tool actions.
+  10. **Skill exposure in draft mode** — a content-producing skill is `low` → ACT, but one that **may send**
+     is non-draftable → DECIDE *even in draft mode* (the draft transform rewrites our verb, not someone
+     else's skill), and a vaguely-described skill counts as may-send. This is the external-send hole the
+     `tool: skill` action kind would otherwise open.
 
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`

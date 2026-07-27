@@ -1,0 +1,42 @@
+{
+  "skill_name": "update-brain",
+  "_isolation": "Every run writes ONLY to container_tag. full-mode tasks must also isolate the Neon cursor with is_eval=true (db.mjs advance-cursor brain <source> <cursor> eval). Run purge-scratch.sh after.",
+  "_container_tag": "user_eval_scratch",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "targeted: who is our contact at Batch and where does the pilot stand?",
+      "expected_output": "Entity-centric Facts on Batch (org), Simon Dawlat and Antoine Guénard (people), and the pilot (project), each with inline provenance; a 4-6 line synthesized summary returned.",
+      "files": [],
+      "expectations": [
+        "Entity-centric Facts exist for Batch (org), the people, and the pilot (project)",
+        "Each Fact carries inline provenance",
+        "A 4-6 line synthesized summary is returned",
+        "All writes went to the user_eval_scratch container tag"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "targeted: what do we know about the lemlist account and the people there?",
+      "expected_output": "Facts on lemlist (people, deal state) with provenance — or an honest 'thin coverage' note if little is found. No invention.",
+      "files": [],
+      "expectations": [
+        "Facts on lemlist carry provenance, or an honest thin-coverage note is returned",
+        "Nothing is invented to fill gaps",
+        "All writes went to the user_eval_scratch container tag"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "full: refresh context from the last 14 days across Gmail + Calendar + Linear. Eval-isolated: write to container user_eval_scratch and isolate cursors with is_eval=true.",
+      "expected_output": "A budget announced up front; several Facts across types (Person/Org/Project/Process); is_eval=true cursors advanced (real ones untouched); a summary of what was drained + pushed.",
+      "files": [],
+      "expectations": [
+        "A budget is announced up front",
+        "Facts span several types (Person/Org/Project/Process)",
+        "is_eval=true cursors advanced and real brain cursors were untouched",
+        "The summary reports what was drained and pushed, with a warning rather than blind success if a tool was unreachable"
+      ]
+    }
+  ]
+}

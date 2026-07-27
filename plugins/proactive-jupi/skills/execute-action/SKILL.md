@@ -56,7 +56,7 @@ status.
 The caller hands you a **list of concrete actions**. Each item carries:
 - `ref` — an opaque id the caller uses to map your result back to its own record (a Neon `actions.id` for
   ACT, a Jupi option-action id for DECIDE). **Treat it as opaque** — echo it back, never interpret it.
-- `tool` — where the action runs (`gmail`, `linear`, …).
+- `tool` — where the action runs (`gmail`, `linear`, …; `skill` = invoke a workspace skill/agent, below).
 - `description` — the exact executable instruction (recipient, content, location).
 
 For each action you **return** one result `{ ref, ok, trace, error? }`:
@@ -69,11 +69,24 @@ For each action you **return** one result `{ ref, ok, trace, error? }`:
 for each action the caller handed you:
    if the verb is a real (non-draft) send → run it past the validator; if RETURN → {ref, ok:false, error:"validator"}; continue
    perform `description` via `tool`   (create_draft | send_email | label | comment | book |
+                                       invoke-skill for a tool:skill action |
                                        add-decision-options for a tool:jupi contribution | write-rule | …)
    trace = the resulting artifact ref (draft id, sent message id, Linear comment url, new option ref, rule store anchor, …)
    → {ref, ok:true, trace}
 return all results
 ```
+- **Skill-invocation actions (`tool: skill`).** The planner found a workspace skill or agent that already does
+  this work (the `assets.md` *Agents / skills* table), so the action is *"run `<skill>` with `<inputs>`"*. Invoke
+  it and let it do the work; **return whatever artifact ref it produces as `trace`** (the draft id, doc url,
+  issue key it created) — or the skill's own completion ref if it produces nothing else. The same rules bind
+  as anywhere, with one asymmetry to respect: **you cannot draft-ify someone else's skill.** The planner is
+  the one that judged whether this skill is safe to run unattended (Stage 4 scores a possibly-sending skill
+  as non-draftable → it comes to you only via a settled decision). So **run it as instructed and don't
+  improvise around it** — don't "make it a draft" by rewriting its inputs, and if mid-run it turns out to
+  send where the `description` said prepare, **stop and return `ok:false` with what happened** rather than
+  letting it complete. You still write no status anywhere. A missing or erroring skill is a plain
+  `ok:false` + `error` — never fall back to doing the work yourself, since the caller chose the skill
+  deliberately.
 - **Business-rule-update actions (a settled `[BR]` decision, from `act-post-decision`).** The `tool` is a
   `rules`-tagged surface (from `assets.md`, opened via `rulesStoreRef`) — `file` (write/append the rule to the local markdown rulebook, e.g.
   `.proactive-jupi/business-rules.md`), or `drive`/`notion` (the connector's create/append). Do exactly what
