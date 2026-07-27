@@ -29,6 +29,11 @@ tools into Supermemory, and schedules routines. So:
   `purge-scratch.sh` after it, every time.
 - **Never `perform` mode.** Setup takes no external actions by design; a case that produces one is a finding,
   not a config to fix.
+- **Step 4's permission write is out of scope.** No case asserts on `.claude/settings.json`
+  (`defaultMode: dontAsk` + the allowlist). It lives past the ✋ boundary, so a prelude-only case has no
+  business testing it, and a sandbox that refuses the write is behaving correctly rather than failing. If a
+  run reaches for it anyway: record what happened, carry on, **never work around the denial**, and never let
+  it decide a verdict. Revisit if the consent flow itself becomes worth testing.
 
 ## The persona field
 
