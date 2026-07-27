@@ -9,7 +9,8 @@
 #   ./evals/run-eval.sh layout   <skill> [iteration]  # create the workspace tree
 #   ./evals/run-eval.sh benchmark <skill> [iteration] # aggregate grading.json -> benchmark.json
 #   ./evals/run-eval.sh view      <skill> [iteration] # build the static review HTML
-#   ./evals/run-eval.sh trigger   <skill>             # description-triggering loop (needs `claude` CLI)
+#   ./evals/run-eval.sh measure   <skill>             # score the CURRENT description (needs `claude` CLI)
+#   ./evals/run-eval.sh trigger   <skill>             # optimization loop — REWRITES the description
 #
 # SKILL_CREATOR_DIR overrides autodiscovery.
 set -euo pipefail
@@ -73,15 +74,46 @@ PY
     ( cd "$SC" && python3 eval-viewer/generate_review.py "${args[@]}" )
     echo "open $OUT"
     ;;
-  trigger)
-    command -v claude >/dev/null || {
-      echo "the trigger loop shells out to 'claude -p' and the CLI is not on PATH." >&2
-      echo "install: npm i -g @anthropic-ai/claude-code" >&2; exit 3; }
+  measure|trigger)
+    # `measure` scores the CURRENT description and stops. `trigger` runs the full
+    # optimization loop, which REWRITES the description across up to 5 iterations
+    # and picks the winner on a held-out split. Reach for `measure` first: you
+    # usually want to know whether triggering regressed before letting a loop
+    # rewrite prose you tuned by hand.
+    # Check the CLI actually RUNS, not merely that the name resolves. A broken
+    # install is worse than a missing one: `command -v` finds the shim, every
+    # `claude -p` dies with EACCES, and run_eval faithfully reports trigger_rate
+    # 0.0 for every query — output indistinguishable from a catastrophic
+    # regression. Observed here: @anthropic-ai/claude-code 2.1.181 installed with
+    # bin -> bin/claude.exe (a non-executable Windows artifact) under a stale node.
+    CLAUDE_BIN="$(command -v claude 2>/dev/null || true)"
+    if [[ -z "$CLAUDE_BIN" ]]; then
+      echo "this shells out to 'claude -p' and the CLI is not on PATH." >&2
+      echo "install: npm i -g @anthropic-ai/claude-code" >&2; exit 3
+    fi
+    if ! "$CLAUDE_BIN" --version >/dev/null 2>&1; then
+      echo "'claude' resolves to $CLAUDE_BIN but will not execute." >&2
+      ls -l "$CLAUDE_BIN" >&2 || true
+      echo "A broken install silently yields trigger_rate 0.0 on every query, which reads" >&2
+      echo "like a regression but means nothing. Reinstall under your CURRENT node:" >&2
+      echo "  npm i -g @anthropic-ai/claude-code && claude --version" >&2
+      exit 3
+    fi
+    [[ -f "$EVAL_DIR/trigger-eval.json" ]] || {
+      echo "$SKILL has no trigger-eval.json — expected for a disable-model-invocation skill," >&2
+      echo "which never fires from phrasing and has nothing to tune." >&2; exit 2; }
     SC="$(find_skill_creator)"
-    ( cd "$SC" && python3 -m scripts.run_loop \
-        --eval-set "$EVAL_DIR/trigger-eval.json" \
-        --skill-path "$ROOT/plugins/proactive-jupi/skills/$SKILL" \
-        --model "${EVAL_MODEL:-claude-opus-5}" --max-iterations 5 --verbose )
+    if [[ "$CMD" == measure ]]; then
+      ( cd "$SC" && python3 -m scripts.run_eval \
+          --eval-set "$EVAL_DIR/trigger-eval.json" \
+          --skill-path "$ROOT/plugins/proactive-jupi/skills/$SKILL" \
+          --model "${EVAL_MODEL:-claude-opus-5}" --runs-per-query "${RUNS:-3}" --verbose )
+    else
+      ( cd "$SC" && python3 -m scripts.run_loop \
+          --eval-set "$EVAL_DIR/trigger-eval.json" \
+          --skill-path "$ROOT/plugins/proactive-jupi/skills/$SKILL" \
+          --model "${EVAL_MODEL:-claude-opus-5}" --max-iterations 5 --verbose )
+    fi
     ;;
   *) usage ;;
 esac
