@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Purge every Supermemory memory in a container tag — eval teardown.
-# Reads SUPERMEMORY_API_KEY from the gitignored .env at the repo root (never committed).
+# Reads SUPERMEMORY_API_KEY from the gitignored .proactive-jupi/.env (never committed).
 # This is a dev-tooling key: the runtime pipeline uses the Supermemory MCP connector and
 # never needs it, so it stays OUT of .proactive-jupi/config.local.json — that file gets
 # mirrored into unattended/cloud run CWDs, and shipping an admin key there is needless
@@ -10,9 +10,9 @@ set -euo pipefail
 
 TAG="${1:-user_eval_scratch}"
 ROOT="$(git rev-parse --show-toplevel)"
-[ -f "$ROOT/.env" ] && { set -a; . "$ROOT/.env"; set +a; }
+[ -f "$ROOT/.proactive-jupi/.env" ] && { set -a; . "$ROOT/.proactive-jupi/.env"; set +a; }
 KEY="${SUPERMEMORY_API_KEY:-}"
-[ -n "$KEY" ] || { echo "ERROR: no SUPERMEMORY_API_KEY in $ROOT/.env — run 'cp .env.example .env' and fill it in (key from app.supermemory.ai)" >&2; exit 1; }
+[ -n "$KEY" ] || { echo "ERROR: no SUPERMEMORY_API_KEY in $ROOT/.proactive-jupi/.env — run 'cp .proactive-jupi/.env.example .proactive-jupi/.env' and fill it in (key from app.supermemory.ai)" >&2; exit 1; }
 
 echo "Purging Supermemory container tag: $TAG"
 curl -sS -X DELETE "https://api.supermemory.ai/v3/documents/bulk" \
