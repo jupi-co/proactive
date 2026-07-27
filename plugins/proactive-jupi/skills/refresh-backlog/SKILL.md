@@ -92,7 +92,8 @@ For each connected source in `seedTools` (recipes in `signal-sources.md`):
        domain ≠ your org's). Internal tickets/PRs → `false`.
      - `deadline` — ISO hard due date if the signal has one (meeting start, explicit due date);
        else omit.
-   - `relevant_facts` — a **light** `recall` (containerTag `user_<whoAmI.userId>`) for the
+   - `relevant_facts` — a **light** `recall` (containerTag `user_<jupiUserId>`, read from config —
+     **never** Supermemory's `whoAmI`, which is a different id and points at a different store) for the
      people/orgs/projects named: `[{summary, source}]`. Read-only, shallow. **Do not** launch
      `update-brain targeted` and **do not** deep-dig the thread — that's act-or-decide's job.
    - `open_questions` — surface-level uncertainties only: `[{uncertainty_pct, description}]`.
