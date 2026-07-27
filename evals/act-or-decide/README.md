@@ -21,6 +21,12 @@ Two layers, matching `evals/refresh-backlog/`.
   8. **Real `[BR]` posting (Phase 5)** — a STARTED `[BR]` Jupi decision with **structured** option-actions
      (BR-update `{tool, instruction}` + operational) via `add-option-actions-tool`; no rule text written yet
      (that's settle-time in `act-post-decision`), no Neon row for pending options; task → `blocked`.
+  9. **Skill reuse** — a task an `assets.md` *Agents / skills* entry covers is planned as one `tool: skill`
+     invoke, not recomposed by hand; an uncovered sibling still gets normal tool actions.
+  10. **Skill exposure in draft mode** — a content-producing skill is `low` → ACT, but one that **may send**
+     is non-draftable → DECIDE *even in draft mode* (the draft transform rewrites our verb, not someone
+     else's skill), and a vaguely-described skill counts as may-send. This is the external-send hole the
+     `tool: skill` action kind would otherwise open.
 
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`

@@ -31,6 +31,11 @@
       "id": 6,
       "prompt": "SHALLOW RULES-INDEX TAG (Phase 5): parse a fresh fixture signal whose implicit open-question matches a business rule already listed in the assets.md 'Business rules — index' (seed one fixture rule line first). Eval-isolated.",
       "expected": "The created task's open_question carries a candidate rule_ref HINT ({uncertainty_pct, description, rule_ref}) pointing at the matching index entry. refresh-backlog stays SHALLOW: it does NOT open the 'rules' store, does NOT touch Jupi, and does NOT resolve or act on the question — it only surfaces that a rule MIGHT cover it (the deep confirm + pre-emption is act-or-decide's job). Still read-only."
+    },
+    {
+      "id": 7,
+      "prompt": "RELEVANCE vs ROLE: with an assets.md whose 'Who this is' section names a specific role and accountabilities (e.g. Head of Revenue Ops — pipeline hygiene, forecast accuracy), parse two near-identical fixture threads: (a) a forecast-accuracy escalation squarely inside those accountabilities, and (b) the same shape of thread about a topic owned by someone else (a frontend release regression), with the user only cc'd. Then re-run with the 'Who this is' section removed. Eval-isolated.",
+      "expected": "(a) scores relevance HIGH, (b) LOW — the two threads are otherwise comparable, so any run that scores them the same is ignoring the role. With the section removed, the run does NOT stall or invent a role: it scores relevance on the signal alone and says so in its return. Read-only; still no drafting, deciding, or Facts."
     }
   ]
 }

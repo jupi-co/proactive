@@ -35,7 +35,10 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
   **idempotent re-run** (no dupes); a `dropped` task **not** resurrected; **prompt-injection**
   body treated as content, no action taken; unreachable tool handled gracefully; **shallow
   rules-index tag (Phase 5)** — a signal matching a seeded rule gets a candidate `rule_ref`
-  hint on its `open_question`, without opening the store or touching Jupi.
+  hint on its `open_question`, without opening the store or touching Jupi; **relevance vs role** —
+  two comparable threads score differently depending on whether they fall inside the
+  accountabilities in `assets.md`'s *Who this is*, and a missing section degrades to
+  signal-only scoring instead of stalling.
 - **Always run `purge-scratch.sh` when done.**
 
 ## Prerequisites
