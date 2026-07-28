@@ -18,8 +18,8 @@ evals/<skill>/
     └── iteration-N/
         ├── eval-<id>/
         │   ├── eval_metadata.json
-        │   ├── with_skill/{outputs/, grading.json, timing.json}
-        │   └── without_skill/{outputs/, grading.json, timing.json}
+        │   ├── with_skill/run-1/{outputs/, grading.json, timing.json}
+        │   └── without_skill/run-1/{outputs/, grading.json, timing.json}
         ├── benchmark.json + benchmark.md
         └── review.html
 ```
@@ -42,7 +42,16 @@ session-scoped directory; set `SKILL_CREATOR_DIR` to override autodiscovery):
 **The run itself is agent work, not a script.** Per iteration: `layout`, then spawn **one executor subagent
 per case per configuration — `with_skill` and the baseline, in the same turn** so they finish together. The
 baseline is what makes a pass rate mean anything: a case Claude passes unaided measures nothing about the
-skill. Capture each subagent's `total_tokens`/`duration_ms` into `timing.json` **as its notification
+skill. **Pick the baseline that answers the question you're asking.** For a *new* skill it's `without_skill`
+— no skill at all. For an *edit* to a skill that already works, no-skill measures the wrong gap: snapshot the
+pre-change `SKILL.md` (`git show <base>:… > workspace/iteration-N/skill-snapshot/SKILL.md`) and run the
+baseline against that, in a config dir named `old_skill/`. The aggregator discovers config names
+dynamically, so nothing needs renaming — but note it sorts them alphabetically, which puts `old_skill`
+first and therefore reports the delta as *baseline − new*. Read the two pass rates, not the sign.
+
+**Keep the `run-N` level even with a single run.** `aggregate_benchmark` only recognises a config directory
+that has a `run-*` child; a flat `with_skill/grading.json` is skipped without error and the whole benchmark
+comes out `0% ± 0%`, which looks like total collapse and is really a missing directory. Capture each subagent's `total_tokens`/`duration_ms` into `timing.json` **as its notification
 arrives** — that data isn't persisted anywhere else. Then grade each run into `grading.json`
 (`expectations[]` entries with `text`/`passed`/`evidence` — the viewer depends on those exact field names),
 `benchmark`, and `view`.
