@@ -121,6 +121,13 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
        - Omit it when there genuinely isn't one. **A guessed deadline is worse than none**: it pins urgency
          to the top for a task that didn't earn it, and nothing downstream can tell an inferred date from a
          stated one.
+       - **A deadline already in the past still gets recorded.** Extracting more deadlines means finding
+         more overdue ones, and an overdue commitment is the most urgent thing in the backlog, not an error
+         to drop — `deadline_u` pins it to the maximum, which is what you want. Say in the summary that it's
+         overdue so the report doesn't read as though it were still ahead.
+       - **On a calendar event, `signal_at` is the event start** (per the field's own rule), so its
+         staleness term is zero until the event passes and the `deadline` term carries it alone. That's
+         intended: a meeting three weeks out isn't rotting, it's approaching.
      - `parse_confidence` — `low | medium | high` (default `high`): **how sure you are you read the
        signal correctly**, which is not the same question as `relevance` (is this a real task worth
        surfacing) or the act-gate confidence (do we know how to handle it). Go `low`/`medium` when the
