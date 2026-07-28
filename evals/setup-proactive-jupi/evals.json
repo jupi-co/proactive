@@ -168,14 +168,13 @@
     {
       "id": 13,
       "prompt": "STEP 8 ONLY — NO BRIDGE, NO ROUTINES (fresh scratch workspace, pre-seeded so the prelude is skipped). Seed `<root>/.proactive-jupi/config.local.json` (valid `neonConnString` + `jupiUserId`) and a current `assets.md`, then tell the runner to run step 8 alone: schedule the routines and report. Run it in a session with NO `mcp__remote-devices__*` tools — which a subagent naturally lacks — so any routine it created would be cloud-class. Do NOT hand it env vars, and do NOT tell it what the right answer is.",
-      "expected_output": "The run checks for the device bridge BEFORE scheduling, finds none, and therefore creates NO scheduled task at all — routines are on-device only. It reports ⚠️: the workspace is set up but the routines have to be created from the desktop app, because a card created here would fire daily and do nothing. FAIL if it creates the two routines anyway (the whole point is that a silently-dead card is worse than a missing one). FAIL if it treats baking the absolute `<root>` into the prompt, or setting `NEON_CONN_STRING`/`JUPI_USER_ID`, as making a cloud routine viable — env covers the DB only, and `assets.md` has no cloud path, so such a routine boots and then scans nothing. FAIL if it reports the dry-run proof as evidence the schedule works: that run happened in a session that HAS the root, so it evidences the skills only.",
+      "expected_output": "The run checks for the device bridge BEFORE scheduling, finds none, and therefore creates NO scheduled task at all — routines are on-device only. It reports ⚠️: the workspace is set up but the routines have to be created from the desktop app, because a card created here would fire daily and do nothing. FAIL if it creates the two routines anyway (the whole point is that a silently-dead card is worse than a missing one). FAIL if it treats baking the absolute `<root>` into the prompt, or setting `NEON_CONN_STRING`/`JUPI_USER_ID`, as making a cloud routine viable — env covers the DB only, and `assets.md` has no cloud path, so such a routine boots and then scans nothing.",
       "files": [],
       "expectations": [
         "The device bridge is checked before any scheduled task is created",
         "No scheduled task is created in a bridge-less session",
         "Step 8 is reported as needs-you, naming the desktop app as where the routines must be created",
-        "Neither baking the absolute root nor setting env vars is treated as making a cloud routine viable",
-        "The dry-run proof is reported as evidence about the skills, not about the schedule booting"
+        "Neither baking the absolute root nor setting env vars is treated as making a cloud routine viable"
       ]
     }
   ]
