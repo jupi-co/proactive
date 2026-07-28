@@ -30,12 +30,16 @@ _Empty until setup runs._
 **`Draft call` — what draft mode can actually promise on this tool.** `act-or-decide`'s default `draft` mode
 assumes it can prepare something and leave it for the user to look at. That came from mail, where a draft is
 a real object sitting in a folder; most tools have nothing like it, and draft mode was quietly undefined for
-them. So record, per tool, **the name of the call that only prepares** — `gmail create_draft` — or `none`, or
-`unknown`. Write what the tool could actually do when it was probed, not what the product can do in its own
-UI: Linear has drafts in-product but doesn't offer them over MCP, so its honest value today is `none`.
+them. So record, per tool, **the name of the call that leaves the last step to the user** — `gmail
+create_draft` — or `none`, or `unknown`. A call qualifies only if **both** are true: (1) after it returns
+the user still has to do something for it to count (they press send), and (2) until they do, nobody else can
+see it. `create_draft` passes both; `save_comment` fails the first — the comment is posted and people are
+notified, with nothing left to press. Write what the tool could actually do when it was probed, not what the
+product can do in its own UI: Linear has drafts in-product but doesn't offer them over MCP, so its honest
+value today is `none`.
 
-Two things that look like a draft and aren't: **hiding it isn't the same as not doing it** (an issue `state`,
-a doc's sharing setting — the thing exists and notifies people the moment it's created, and undoing it means
+Two things that look like a draft and fail that test: **hiding it isn't the same as not doing it** (an issue
+`state`, a doc's sharing setting — the issue is created, the team can see it, and taking it back means
 deleting it); and **a draft message *about* a commitment is not a draft of the commitment**.
 
 This column is **a note from last time, not the last word**. `act-or-decide` works out per action, at run

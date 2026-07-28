@@ -266,10 +266,15 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   → the `rules`-store entry (Stage 3.3). This is how a task *graduates from decide to act*.
 
 **Draft-mode resolution — the last check before any ACT.** When `mode` is `draft`, you may only ACT if the
-tool call you'd actually make **produces something that just sits there for the user to look at** — the way
-`create_draft` leaves an email in their drafts folder. If the call you'd make *does the thing* — sends,
-posts, comments, books, publishes — then there is no draft version of it, and the action becomes a
-**DECIDE**, whatever the confidence × exposure gate returned. **Carry the content you'd prepared into the
+tool call you'd actually make **leaves the last step to the user**. Two questions, and it's a draft only if
+both answers are yes:
+1. **After this call returns, is there still something the user has to do for it to count?** `create_draft`
+   leaves the email sitting in their drafts — they still have to press send. `save_comment` doesn't: the
+   comment is posted, and there is no further step.
+2. **Until they do it, is the user the only person who can see it?** Nobody is notified about a draft.
+
+If either answer is no, there is no draft version of this action, and it becomes a **DECIDE**, whatever the
+confidence × exposure gate returned. **Carry the content you'd prepared into the
 decision as the recommended option**, so the human approves text you already wrote instead of starting over.
 In `mode: "perform"` this rule doesn't apply; verbs run as written.
 
@@ -279,12 +284,12 @@ On the reference workspace four of five gate-cleared ACTs — two Linear comment
 fell in that gap, and "draft mode is on" was doing nothing for any of them.
 
 **Work it out per action, at run time — never from a label on the tool.** Whether something can be drafted
-depends on the *call*, not the product: one connector often has both a call that only prepares and a call
-that does it for real, and its call list changes when the connector is upgraded. So ask, in this order:
-1. **What can this tool actually do, here, now?** Which call would you make, and does it leave the result
-   where only the user sees it until they act on it? **If you can point at that call by name** —
-   `create_draft` — that call becomes the ACT's verb. If the best you can say is "Linear probably has
-   drafts", it doesn't count: you can't make a call you can't name.
+depends on the *call*, not the product: one connector often has both a call that stops short and a call that
+finishes the job, and its call list changes when the connector is upgraded. So ask, in this order:
+1. **What can this tool actually do, here, now?** Run the two questions above against the call you'd make.
+   **If you can point at a call by name that passes both** — `create_draft` — that call becomes the ACT's
+   verb. If the best you can say is "Linear probably has drafts", it doesn't count: you can't make a call
+   you can't name.
 2. **What setup wrote down.** `assets.md`'s tools table has a **Draft call** column, filled from the call
    list setup saw when it probed. Use it when you can't check the tool yourself. It's a note from last
    time, not the last word — a call you *can* name beats a table that says `none`.
@@ -292,13 +297,14 @@ that does it for real, and its call list changes when the connector is upgraded.
    getting it wrong towards "yes" does something in their name that can't be taken back, under the very
    mode they picked to stop that happening.
 
-Two things that look like a draft and aren't:
-- **Hiding it isn't the same as not doing it.** A Linear issue's `state`, a doc's sharing setting: the thing
-  exists and people are notified the moment it's created. Undoing that means deleting it, which is not the
-  same as throwing away a draft nobody saw.
+Two things that look like a draft and fail one of the two questions:
+- **Hiding it isn't the same as not doing it.** A Linear issue's `state`, a doc's sharing setting: the issue
+  is created and the team can see it. Nothing further is required for it to count, and taking it back means
+  deleting it, not discarding a draft nobody saw. Fails question 1.
 - **A draft email about a booking is not a draft booking.** If sending that mail is what confirms the venue,
-  the booking is what you're really doing — the draft wrapper just hides it, which is exactly the trick
-  §The gate warns about. Ask what can't be taken back once the call returns, not what the verb is called.
+  the booking is the real action — and *it* has no draft. The mail being a draft says nothing about the
+  commitment inside it, which is exactly the trick §The gate warns about. Ask what the action really is
+  before you ask whether it can be drafted.
 
 *(Known and accepted: this makes draft mode materially tighter than perform mode, and `decisionBudget`
 becomes the binding constraint. The intended way out is flipping to `perform` as trust builds, not relaxing
