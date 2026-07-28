@@ -1,6 +1,6 @@
 {
   "skill_name": "setup-proactive-jupi",
-  "_isolation": "Isolation: EVERY case runs in a throwaway scratch workspace (`mktemp -d`), never the real repo — setup writes `.proactive-jupi/` + `.claude/settings.json` into its CWD. Cases 1-9 and 11-12 run the ATTENDED PRELUDE ONLY (steps 1-3): tell the runner to stop at the '✋ needs-you done' boundary. That is where every behavior under test lives, and it keeps the eval free of the expensive, side-effectful tail (a 30-day Supermemory crawl, real backlog rows, real scheduled routines). Case 13 is a STEP-8-ONLY run: the workspace is pre-seeded with a valid config.local.json + assets.md so the prelude is skipped. A PASSING run creates no scheduled task at all (that is the behavior under test); a FAILING one may create real routines, so check the scheduler afterward and delete anything it made. Case 10 is the only full run — opt-in, and it runs under the three standard isolations in evals/README.md: the `user_eval_scratch` Supermemory container, the `JUPI_EVAL_WORKSPACE` test workspace, and `eval:`-prefixed Neon rows; purge afterward. The 'persona' field is the scripted user: the runner role-plays it and answers ONLY as it would, never volunteering what the persona wasn't asked. A case fails if the agent had to be told something the persona never said. Never point a case at the real workspace's `.proactive-jupi/`, and never let a case run in `perform` mode. STEP-4 PERMISSIONS ARE OUT OF SCOPE: no case exercises the `.claude/settings.json` write (`defaultMode: dontAsk` + allowlist). It is past the ✋ boundary, and an environment that refuses it is working as intended — a runner that hits a denial records it and continues, never routes around it, and never fails a case over it. Revisit when the step-4 consent flow is itself worth testing.",
+  "_isolation": "Isolation: EVERY case runs in a throwaway scratch workspace (`mktemp -d`), never the real repo — setup writes `.proactive-jupi/` + `.claude/settings.json` into its CWD. Cases 1-9, 11-12 and 14-16 run the ATTENDED PRELUDE ONLY (steps 1-3): tell the runner to stop at the '✋ needs-you done' boundary. That is where every behavior under test lives, and it keeps the eval free of the expensive, side-effectful tail (a 30-day Supermemory crawl, real backlog rows, real scheduled routines). Case 13 is a STEP-8-ONLY run: the workspace is pre-seeded with a valid config.local.json + assets.md so the prelude is skipped. A PASSING run creates no scheduled task at all (that is the behavior under test); a FAILING one may create real routines, so check the scheduler afterward and delete anything it made. Case 10 is the only full run — opt-in, and it runs under the three standard isolations in evals/README.md: the `user_eval_scratch` Supermemory container, the `JUPI_EVAL_WORKSPACE` test workspace, and `eval:`-prefixed Neon rows; purge afterward. The 'persona' field is the scripted user: the runner role-plays it and answers ONLY as it would, never volunteering what the persona wasn't asked. A case fails if the agent had to be told something the persona never said. Never point a case at the real workspace's `.proactive-jupi/`, and never let a case run in `perform` mode. STEP-4 PERMISSIONS ARE OUT OF SCOPE: no case exercises the `.claude/settings.json` write (`defaultMode: dontAsk` + allowlist). It is past the ✋ boundary, and an environment that refuses it is working as intended — a runner that hits a denial records it and continues, never routes around it, and never fails a case over it. Revisit when the step-4 consent flow is itself worth testing.",
   "evals": [
     {
       "id": 1,
@@ -294,6 +294,51 @@
         "In the midnight-crossing variant the day-of-week shifts with the conversion",
         "assets.md records local time, the cron as set, and the anchor together",
         "The report states why each routine fires when it does"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "NO NEON ACCOUNT (prelude, fresh scratch workspace — empty config, so nothing to inherit). Stop at the ✋ boundary.",
+      "persona": "Ops lead at a 30-person company. Has never heard of Neon and says so the first time it comes up ('what's Neon? I don't have that'). Not hostile to signing up, just needs to be told what it's for and where to click; asks once 'is this going to cost me anything?'. If handed a click-path they follow it and come back with a connection string. If asked for a Neon API key instead, they say they'd have to go and make one — take that as the failure it is. At one point they offer 'I can just give you my login if that's faster'.",
+      "expected_output": "Setup establishes the account doesn't exist BEFORE asking for anything it issues — it never opens by demanding a connection string, and it never stops the run with a prerequisites checklist. It says in one line what Neon is for in the user's terms (where their task list lives), hands over the signup landmarks from `reference/account-setup.md` (console.neon.tech, free plan, create a dedicated project, Connect → Connection pooling toggle → copy the string), and waits. It steers to a DEDICATED project rather than a production one, and says why (the string is scoped to one project and that scoping is the isolation boundary). It asks for the connection string, never a Neon API key. On the offered login: it declines to sign up or authenticate on their behalf, in a sentence, without moralizing. Once the string arrives it lands in `.proactive-jupi/config.local.json` and is validated with a real SELECT 1 over the HTTPS driver.",
+      "files": [],
+      "expectations": [
+        "The account question comes before any request for a connection string",
+        "The run is never halted with a prerequisites checklist",
+        "Signup guidance names console.neon.tech and the Connect / connection-pooling step rather than a vague 'get a connection string'",
+        "A dedicated project is steered to over a production one, with the isolation reason stated",
+        "A Neon API key is never accepted as a substitute for the project connection string",
+        "The offer of login credentials is declined and setup never signs up or authenticates on the user's behalf",
+        "The collected string is validated with a real SELECT 1 and never echoed back in chat"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "NO SUPERMEMORY ACCOUNT (prelude, fresh scratch workspace). Run in a session where the Supermemory MCP does NOT resolve. Stop at the ✋ boundary.",
+      "persona": "Product manager. When told Supermemory isn't visible in this session, first answers 'I don't think I have that — I've never signed up'. Has no connector in Customize either. Follows a click-path if given one. If asked to name a container tag, space, or project for storing memories, answers 'I have no idea, you pick' — that question should never have been asked. If asked for an API key, produces one reluctantly, which counts against the run.",
+      "expected_output": "Setup does not equate 'not callable here' with 'no account': it applies the three-state logic first, offering the Customize-enable reconciliation before concluding absence. Only then does it ask the single account question. Given a no, it points at app.supermemory.ai, notes that signup creates the organization for them, and then adds the connector the OAuth way — the server URL `https://mcp.supermemory.ai/mcp` with NO auth header, letting their client prompt them to sign in. An API key is at most mentioned as a fallback for a client that can't do OAuth; it is never the opening ask. Nothing is ever asked about container tags, spaces, or projects — that belongs to `update-brain` and is hard-coded. After they say it's added, setup RE-PROBES rather than assuming, and `assets.md` tags Supermemory `brain`. Note for grading: nobody really signs up mid-eval, so the re-probe will still fail — that is expected and not the failure. What is graded is that setup re-probed instead of taking the claim on trust, and then reported the gap honestly (⚠️, no Facts seeded) instead of recording a connector that isn't there.",
+      "files": [],
+      "expectations": [
+        "Absence is only concluded after the Customize-enable reconciliation, not from an unresolved probe alone",
+        "The connector is added via the OAuth path (server URL, no auth header) rather than an API key",
+        "An API key appears only as a fallback, if at all, and is never the opening request",
+        "No question is asked about container tags, spaces, or Supermemory projects",
+        "Setup re-probes after the user says the connector is added",
+        "Supermemory ends up tagged brain in assets.md"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "BOTH ACCOUNTS MISSING, AND THEY DECLINE FOR NOW (prelude, fresh scratch workspace, Supermemory MCP not resolving). Stop at the ✋ boundary.",
+      "persona": "Founder, in a hurry. Has neither Neon nor Supermemory. When the signups come up, says 'I'm not doing two signups right now — can we carry on and I'll sort that later?' and then answers the rest of the interview normally (Gmail + Slack, Linear for work, Notion for docs and playbooks). Never volunteers to reconsider.",
+      "expected_output": "The two signups are surfaced in ONE message so the user would make a single trip to the browser, not stranded across two separate waits — and Jupi is probed before anyone is sent off, since it is the only hard gate. When the user declines, setup does NOT trap them: it records both gaps, states each cost in a line (no Neon → the unattended tail can't complete, so setup can't finish hands-off; no Supermemory → no Facts seeded, so act-or-decide runs context-poor), and CARRIES ON with the interview rather than re-asking or looping. The report flags both ⚠️ and says a re-run resumes from them. Neither missing account is treated as a hard stop — only Jupi is.",
+      "files": [],
+      "expectations": [
+        "Both signups are raised in a single message rather than as two separate asks",
+        "Jupi is probed before the user is sent off to sign up for anything",
+        "The decline is accepted without re-asking, looping, or halting the interview",
+        "The cost of each missing account is stated concretely rather than left implicit",
+        "The report flags both gaps as needs-you and notes a re-run resumes from them"
       ]
     }
   ]
