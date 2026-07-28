@@ -84,13 +84,9 @@ Load `.proactive-jupi/config.local.json` (create from the bundled template + col
 - **Probe, don't assume.** Determine state by whether the tool's calls actually resolve — not by a `.mcp.json` entry (that only wires *local* Claude Code) and not by `list_connectors` (unreliable/empty here).
 - **Jupi is the blocking gate — probe it first.** Jupi is Proactive-Jupi's *only* interface; nothing downstream works without it. Probe with a cheap read-only call (e.g. `search-decisions-tool`, 1 result). **The gate passes if *any* Jupi surface answers.** More than one registration can be present — the plugin bundles its own Jupi MCP server alongside the user's installed connector, and the bundled one commonly shows unauthorized while the connector works fine. Probing only the unauthorized one would hard-stop setup on a workspace where Jupi is perfectly healthy, so try each surface before concluding anything, and note the unauthorized registration in the report as a warning rather than a blocker. Equally, a call that fails *validation* (`search-decisions-tool` without `groupId`/`groupSlug`) is a malformed probe, not an auth failure — fix the call before blaming the connection. If every surface genuinely fails, **STOP** — give the user the exact connect steps, then **re-probe in a loop; do not proceed to the rest of setup until Jupi answers** — bounded by the no-answer rule above: the loop exists to give a present user time to connect it, so once a couple of rounds pass with no sign of them, halt with the connect steps on screen instead of probing into the void. (Every other tool is optional and non-blocking — only Jupi hard-stops.)
 - **Resolve the tenant identity here — Jupi is the reference for the userId.** Once Jupi answers, capture the **authenticated caller's Jupi user id** (the same principal Jupi assigns as a decision's default `ownerId`) and cache it as **`jupiUserId`** in `.proactive-jupi/config.local.json`. This one id is the single identity across all three stores: it is the Neon `user_id` on every row **and** the brain's Supermemory container tag `user_<jupiUserId>` — never a second source (do not derive identity from Supermemory's `whoAmI`). Resolve once; the routines read it from config.
-  - **Try `whoami` / `get-current-user` first — it is the direct answer, and it shipped (TECH-456, 2026-07-28).** If the Jupi surface in this session exposes it, call it, cache the id, and skip the rest of this block. Don't assume it's there: it may not be deployed to the surface you're on, and an older connector registration won't have it.
-  - **If it doesn't resolve, triangulate.** Take the **cheapest source that does**, in this order, and cross-check whichever you get against a second:
-    1. **Passed in.** `jupiUserId` is a **supported invocation argument** — accept it when the caller supplies one. This is what actually worked on the reference run, and it was undocumented, so nobody could rely on it.
-    2. **The contacts map.** A name-keyed contacts/members map in config or a prior `jupi.local.json` resolves the user's id directly. Also the **documented second source** for confirming an id from anywhere else.
-    3. **A decision they authored.** `search-decisions-tool` (or `get-decision` on a recent one) → read its **`makerId`**; that principal is the caller. **Confirm it's them**, not just any maker — cross-check against the contacts map, or read the maker's name back to the user.
-  - **`{"items":[]}` from `search-decisions-tool` is a SUCCESSFUL call, not a failed gate.** An empty workspace, or one whose decisions are private to other people, returns exactly that (consistent with TECH-457), and it means "no decisions to read a `makerId` from" — nothing about Jupi's health. Reading it as "Jupi is down" would hard-stop setup on a perfectly working workspace. The blocking gate above is about whether Jupi *answers*; an empty result is an answer. (An error, an auth failure, or a validation complaint is a different thing — see the probe rules above.)
-  - **Failure mode — neither `whoami` nor any of the three resolve:** don't guess. **Ask the user to confirm their id from their Jupi profile** (the id in their profile URL), and cache that. Never proceed on an unverified id — every Neon row and the brain's container tag hang off it, and correcting it later orphans everything written under the old one.
+  Three sources, in order: **`whoami` / `get-current-user`** if this Jupi surface exposes it (shipped TECH-456, but not on every registration yet) · else **`jupiUserId` from the invocation args**, a supported way to pass it · else **ask them** for the id in their Jupi profile URL. You're in the attended prelude, so asking costs one line and gives a certain answer.
+  - **Don't reconstruct it from a decision's `makerId`.** It needs a recent decision they happen to have authored — the reference workspace returned `{"items":[]}` — and it yields *a* maker, not necessarily them. A wrong id here is silently catastrophic: every Neon row and every Fact is written under it, and correcting it later orphans all of them. One question beats an inference you'd have to verify anyway.
+  - **`{"items":[]}` is a successful call, not a failed gate** — an empty or all-private workspace returns exactly that. Reading it as "Jupi is down" would hard-stop setup on a healthy workspace.
 - **Then the rest of the required core:** **Supermemory** (the brain). Probe with a cheap read; if missing, guide the connect.
   - **Check for the orphaned brain, and say so out loud when you find it.** The signature is: Facts already exist under the tenant tag `user_<jupiUserId>` **and** there is no `.proactive-jupi/` at the `<root>` you resolved in 1a. That combination means a **previous run was cloud-only** — the remote store survived, the local config went with the container, and the scheduled routines have been dead ever since (they boot by reading a config that isn't there). Step 1a stops this happening again; nothing detects that it already did.
   - Probe it explicitly (a `recall` on the tag returns results, config absent at `<root>`) and **report it as a repair, not a fresh install**: *"⚠️ Found an existing brain from <date> but no local config — a previous setup ran cloud-only, so your routines have been reporting-and-stopping since then. Re-pointing them at `<root>` now."* Silent repair is indistinguishable from a first-time setup, which hides both the earlier mistake and the window in which nothing was running.
@@ -131,11 +127,9 @@ You cannot do any of this on a vague picture of their day. So **your job in this
 
 **For every surface named:** run a lightweight probe → if missing, pause and tell them exactly what to authorize → re-probe until it responds. Then record it in `.proactive-jupi/assets.md` (created from `reference/assets.template.md`), ticking `Connected` and filling its **Roles**, **Draft call** and **When to use it**.
 
-- **`Draft call` — write down what the tool could actually do when you probed it, not what the product can do.** You have its call list in front of you, which is the only moment anyone does. Note **the name of the call that leaves the last step to the user** (`gmail create_draft`), or `none`, or `unknown`. A call qualifies only if **both** are true: (1) after it returns, the user still has to do something for it to count — they press send; and (2) until they do, nobody else can see it. `create_draft` passes both. `save_comment` fails the first: the comment is posted and Robin is notified, with nothing left to press.
-  - You're going through the call list anyway, so this costs a glance — and it saves `act-or-decide` guessing at plan time. Its default `draft` mode can only promise "nothing happens without you seeing it first" on tools where such a call exists, and on the reference workspace four of five gate-cleared actions ran on tools where it didn't.
-  - **Judge the call, not the product.** One connector often has both a call that stops short and a call that finishes the job. Two things that look like a draft and fail the test: **hiding it isn't the same as not doing it** (a Linear issue `state`, a doc's sharing setting — the issue is created, the team can see it, and taking it back means deleting it); and **a draft message about a commitment is not a draft of the commitment**.
-  - **Write `unknown` when you can't tell — it counts as "no",** which costs a question to the user rather than an unwanted send. Same trade as `Sends?` on the skills table, for the same reason.
-  - Worth knowing: **Linear has drafts in-product but doesn't offer them over MCP**, so today its honest value is `none` — and because `act-or-decide` re-checks the live tool at run time, it flips on its own the day that changes. Raise it with Linear rather than encoding a workaround. **On a re-run against an existing `assets.md`, reconcile it against the template** — an older file can be missing whole sections (*Who this is*, *Agents / skills*); add any that aren't there rather than only updating the rows you find, since downstream skills read those sections by name. **A named tool with no connector still gets a row** — `Connected ☐` plus a note — so the gap shows up in the report ("no Greenhouse connector, so I can't draft there yet") instead of vanishing.
+- **`Draft call` — record what the tool could actually do when you probed it, not what the product can do.** You have its call list in front of you, which is the only moment anyone does. Note **the call that leaves the last step to the user** (`gmail create_draft`), or `none`, or `unknown`. It qualifies only if **both** hold: after it returns the user still has to do something for it to count, and until they do, nobody else can see it. `create_draft` passes; `save_comment` fails the first — posted, notified, nothing left to press.
+  - **Judge the call, not the product** — one connector often has both kinds. Two lookalikes: **hiding it isn't not doing it** (an issue `state`, a doc's sharing setting), and **a draft message about a commitment is not a draft of the commitment**. **`unknown` counts as `no`**, costing a question rather than an unwanted send — same trade as `Sends?`, same reason. Worth knowing: Linear has drafts in-product but not over MCP, so today it's `none`, and `act-or-decide` re-checks live, so it flips itself when that changes.
+
 
 **The roles table is the routing map every skill reads — filling it correctly is the whole point of this step.** Assign from the six roles, and give a tool **every** role it genuinely plays (most work tools carry three):
 
@@ -225,48 +219,14 @@ Schedule recurring **user-visible** routines: `update-brain` (daily full) and th
 
 ## Output — the setup report
 
-**This report is about the setup, not about the work.** What Jupi *would do* with the user's backlog is
-`act-or-decide`'s report, shown whole in step 8 (above) and owned there. Yours answers a different question:
-**what has Jupi got to work with now, and what is it still missing?** Keeping the two separate is what stops
-a user reading one and thinking they've read the other.
+**This report is about the setup, not the work.** What Jupi would *do* with their backlog is `act-or-decide`'s
+report, shown whole in step 8. Yours answers: **what has Jupi got to work with, and what's still missing?**
 
-Print a **per-step status line** (✅/🔧/⚠️) so the run is legible end-to-end, then these, in the user's terms:
+Per-step status lines (✅/🔧/⚠️) throughout, then, in their terms:
 
-**1 · The tools I can reach now** — one line per tool: already connected vs newly connected vs still absent,
-and **for each absent one, the work that stays invisible or undoable** ("no Greenhouse, so I can't see
-candidates move or draft to them"). A gap stated as capability lost is actionable; a gap stated as a missing
-integration is not. Include the **`Draft call`** finding here in plain terms — name the tools where Jupi can
-only prepare something by asking first, because in the default draft mode that is the single biggest
-determinant of what their first week feels like.
+1. **The tools I can reach now** — already connected vs newly connected vs absent, and for each absent one **the work that stays undoable** ("no Greenhouse, so I can't see candidates move or draft to them"). A gap stated as lost capability is actionable; stated as a missing integration it isn't. Include the **`Draft call`** finding plainly — which tools can only ask rather than prepare, since in draft mode that shapes their whole first week.
+2. **What I found here that I can use** — workspace skills/agents registered for reuse and rules already in their store, each with when Jupi would reach for it. **An explicit "none discovered"** when there was nothing: empty and unscanned look identical otherwise.
+3. **What I set up** — the workspace root and that routines boot from it, schedules with their anchor ("before your 11:40 standup") **and the one-per-name check**, brain seeded (counts by type), backlog built.
+4. **What still needs you** — pending OAuth, anything declined, any gap worth closing.
 
-**2 · What I found already here that I can use** — the workspace skills and agents registered for reuse, and
-the rules already in their store, each with when Jupi would reach for it. **An explicit "none discovered"**
-when there was nothing: an empty list and an unscanned workspace look identical otherwise. This is the
-"you don't start from nothing" half of step 2b actually paying off, so it's worth stating as capability
-inherited rather than as a file count.
-
-**3 · What I set up** — the workspace root and that routines boot from it, the schedules with their anchor
-("timed to land before your 11:40 standup") **and the post-scheduling check that there's exactly one of
-each**, the brain seeded (counts by type), the backlog built (candidate tasks created).
-
-**4 · What still needs you** — pending OAuth, anything declined, and any gap from above worth closing.
-
-Also state once, plainly, the things a later reader would otherwise have to rediscover: **which config values
-were already present** (and where you found them) versus collected from them, whether you repaired an
-**orphaned brain**, which **egress paths are live** (443 / 5432), and the **schema apply counts**
-(`{applied, failed}`). These are diagnostics, so keep them to a short closing block rather than threading
-them through the four above.
-
-## Guardrails
-- **Inventory before you ask, but know the blind spot.** A tool is "connected" iff its calls actually resolve in this session; the session usually can't read "Customize" connectors (`list_connectors` is empty here). For a tool that isn't callable, ask the user to *enable it in Customize* before ever proposing a full OAuth — never push a redundant re-auth on a tool they already have.
-- **Discover the stack, don't hardcode it.** No fixed tool menu. Step 2b is a *mandate with exit criteria*, not a question script: you're taking over as much of this person's work as you safely can, so you must leave that step with a verified picture of their role, where work lands, where they act, where their rules live, and where their docs live — then connect what they name.
-- **Work isn't only productivity tools.** Ask the user's role (LinkedIn optional) and use it to *propose* the systems of record that role actually lives in — ATS, CRM, billing, helpdesk, warehouse — not just mail/calendar/docs/tickets.
-- **Never offer Jupi as an answer in the interview.** Jupi is the decision layer only: it carries the `decision` role, assigned automatically, and never appears as a candidate inbox, work surface, rules store, or docs store.
-- **Never recommend the local rulebook.** Business rules belong where the user's team already reads them; `.proactive-jupi/business-rules.md` is the fallback for someone with no external home, never the recommended option.
-- **Silence means away, not unclear — ask once, then wait.** No answer is never a reason to re-ask, rephrase, or continue on a guess: halt the prelude with the outstanding question on screen (having saved what's already settled) and let a re-run resume it.
-- **Narrate progress** — every step opens with what it's doing and closes with ✅/🔧/⚠️. The user should never be left guessing which step is running.
-- **Prefer an installed MCP connector over API-key config** for any service (e.g., Supermemory) — never ask connector-vs-key when a connector is already present.
-- **Never** enter credentials or complete OAuth on the user's behalf — instruct them precisely.
-- **Asset discovery stays within the current project/workspace tree** — read the working directory's files only; never scan the wider filesystem or unrelated personal files.
-- **No external side-effects during setup** — setup only reads, connects, and writes local/DB scaffolding; it never sends, posts, or messages anyone.
-- `.proactive-jupi/config.local.json` is **gitignored** (via `.proactive-jupi/.gitignore`) — never commit it or echo secrets, and never route it through a chat-visible file flow.
+Close with a short diagnostics block, not threaded through the above: which config values were **already present** (and where) vs collected, any **orphaned-brain repair**, **egress** (443 / 5432), and the schema apply's `{applied, failed}`.

@@ -107,37 +107,30 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
        Not your own last message.
      - `external` — `true` if any counterparty is **outside your org** (sender/recipient/attendee
        domain ≠ your org's). Internal tickets/PRs → `false`.
-     - `deadline` — ISO hard due date if the signal has one. **Extract it; don't wait to be handed a
-       structured field.** Most deadlines arrive as ordinary prose, so read for them: an explicit due
-       date, a meeting or event start, *"before the 12th"*, *"by Friday"*, *"ahead of the board"*,
-       *"I'm out from the 2nd"* — resolve relative phrasing against `signal_at`, not against today, or
-       "by Friday" in a three-day-old mail lands a week late. Record the **date the work must be done
-       by**, and when a range is implied take its start.
-       - **Why this is worth the effort rather than a nice-to-have:** urgency is
-         `1 + 2·max(staleness, deadline_u)`, so a task with no `deadline` rides on staleness alone. On the
-         reference backlog only **8 of 38** open tasks carried one, which made the model effectively
-         staleness-only — and a task nobody had touched in weeks outranked a hard cutoff five days out.
-         Every deadline you fail to extract is a commitment competing purely on how long it has been ignored.
-       - Omit it when there genuinely isn't one. **A guessed deadline is worse than none**: it pins urgency
-         to the top for a task that didn't earn it, and nothing downstream can tell an inferred date from a
-         stated one.
-       - **A deadline already in the past still gets recorded.** Extracting more deadlines means finding
-         more overdue ones, and an overdue commitment is the most urgent thing in the backlog, not an error
-         to drop — `deadline_u` pins it to the maximum, which is what you want. Say in the summary that it's
-         overdue so the report doesn't read as though it were still ahead.
-       - **On a calendar event, `signal_at` is the event start** (per the field's own rule), so its
-         staleness term is zero until the event passes and the `deadline` term carries it alone. That's
-         intended: a meeting three weeks out isn't rotting, it's approaching.
-     - `parse_confidence` — `low | medium | high` (default `high`): **how sure you are you read the
-       signal correctly**, which is not the same question as `relevance` (is this a real task worth
-       surfacing) or the act-gate confidence (do we know how to handle it). Go `low`/`medium` when the
-       subject is ambiguous, the thread is mid-conversation, it's in a language or shorthand you're
-       reading loosely, or you had to infer who and what it's about.
-       - **Because a task is currently either in the backlog at full weight or absent, there's otherwise
-         no way to say "I might have this wrong".** On the reference run a mail about *Jupi's own team*
-         was parsed as being about pilot companies and scored **75.65 at #4** — full weight, on a
-         misreading, and the error then propagated into a Fact. Flagging it discounts the score
+     - `deadline` — ISO hard due date if the signal has one. **Extract it; don't wait for a structured
+       field.** Most arrive as prose: an explicit due date, an event start, *"before the 12th"*, *"by
+       Friday"*, *"I'm out from the 2nd"*. Resolve relative phrasing **against `signal_at`, not today**, or
+       "by Friday" in a three-day-old mail lands a week late. Record the date the work must be done by; on a
+       range, its start.
+       - Worth the effort because urgency is `1 + 2·max(staleness, deadline_u)`: with no `deadline` a task
+         rides on staleness alone. Only **8 of 38** tasks on the reference backlog carried one, making the
+         model effectively staleness-only — an untouched thread outranked a hard cutoff five days out.
+       - **Omit it when there isn't one — a guessed deadline is worse than none**, since it pins urgency for
+         a task that didn't earn it and nothing downstream can tell inferred from stated.
+       - **A past deadline still gets recorded** (and flagged as overdue in the summary): finding more
+         deadlines means finding more overdue ones, and an overdue commitment is the most urgent thing in
+         the backlog, not an error. On a calendar event `signal_at` *is* the event start, so staleness is
+         zero until it passes and `deadline` carries it alone — a meeting three weeks out is approaching,
+         not rotting.
+     - `parse_confidence` — `low | medium | high` (default `high`): **how sure you are you read the signal
+       right.** Not `relevance` (is this a real task) and not the act-gate confidence (do we know how to
+       handle it). Go low/medium when the subject is ambiguous, the thread is mid-conversation, or you had
+       to infer who and what it's about.
+       - Without it a task is either in the backlog at full weight or absent. On the reference run a mail
+         about *Jupi's own team* was read as being about pilot companies and scored **75.65 at #4** — full
+         weight, on a misreading that then propagated into a Fact. Flagging it discounts the score
          (`db.mjs § parseFactor`) instead of dropping the task: a shaky reading sinks, it doesn't vanish.
+
    - `relevant_facts` — a **light** `recall` (containerTag `user_<jupiUserId>`, read from config —
      **never** Supermemory's `whoAmI`, which is a different id and points at a different store) for the
      people/orgs/projects named: `[{summary, source}]`. Read-only, shallow. **Do not** launch

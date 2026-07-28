@@ -48,11 +48,9 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
    *opens* the rule store), `ruleThreshold` (default `2` — recurrences before you propose a rule). *(If
    `guardrails` is absent, default `mode:"draft"`, `clusterBudget:10`, `decisionBudget:5`, and the
    conservative policy in §The gate.)*
-   - **`actBudget` is the deprecated name for `clusterBudget`.** If you find it, read it as
-     `clusterBudget` and **say so in the report** ("config uses the deprecated `actBudget`; rename it to
-     `clusterBudget`"). The old name claimed to cap *actions* and never did — it bounds clusters, and one
-     cluster fans out into as many actions as the work needs — so a run under `actBudget: 5` could emit
-     any number of acts while reading as though five were the ceiling.
+   - **`actBudget` is the deprecated name for `clusterBudget`** — read it as such and say so in the report.
+     It always bounded clusters, never actions, so a run under `actBudget: 5` could emit any number of acts.
+
 2. **`.proactive-jupi/assets.md`** — the Asset Map, read in full. It is the **routing map**: which tool holds
    which role. You need `rules` (the one rule store — open it with `rulesStoreRef`), `decision` (the one
    decision store — where you post), `brain` (the one Facts store — where you `recall`), and `context` (what
@@ -220,17 +218,11 @@ the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is wri
 - **DECIDE** → author the Jupi decision (§Posting) via the producer↔validator loop; on PASS, `set-task-gating`
   the task(s) with the decision id. **No `actions` rows are written for pending options** — Jupi holds them.
 
-**Bound the decisions too: raise at most `decisionBudget` per run.** Nothing used to cap this, and under
-§Draft mode it matters far more than it looks — every action with no draft version of it turns into a
-decision, so the count balloons precisely on the runs where the user is least willing to be flooded. A run
-that lands twenty decisions in someone's lap is as unusable as one that sends twenty emails; the point of the
-gate is that what reaches them is worth their attention. If more qualify, **keep the highest-leverage ones**
-(value unblocked per decision, the same ranking as Stage 2) and put **every deferred decision in the Deferred
-block** with its cluster and score, so nothing disappears — it waits for the next run, and the user can see
-that it's waiting.
+**Bound the decisions too: at most `decisionBudget` per run.** Nothing capped this before, and under §Draft
+mode it matters more than it looks — every action with no draft turns into a decision, so the count balloons
+exactly when the user is least willing to be flooded. Keep the **highest-leverage** ones (Stage 2's ranking)
+and put every deferred decision in the Deferred block with its cluster and score.
 
-Then **set each task's status** (you own it): **`blocked`** if it raised a decision (any `gating_decision_ids`
-set), else **`done`** (acted / nothing to do); a ruled-out task → **`dropped`**. *(dry-run: don't write.)*
 
 ### Hand-off — invoke `execute-action`, then record status
 On a **real (non-dry) run**, hand the `ready` rows (this run's ACTs + any swept orphans, §Stage 0) to the
@@ -271,59 +263,39 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   → the `rules`-store entry (Stage 3.3). This is how a task *graduates from decide to act*.
 
 **Draft-mode resolution — the last check before any ACT.** When `mode` is `draft`, you may only ACT if the
-tool call you'd actually make **leaves the last step to the user**. Two questions, and it's a draft only if
-both answers are yes:
-1. **After this call returns, is there still something the user has to do for it to count?** `create_draft`
-   leaves the email sitting in their drafts — they still have to press send. `save_comment` doesn't: the
-   comment is posted, and there is no further step.
-2. **Until they do it, is the user the only person who can see it?** Nobody is notified about a draft.
+call you'd make **leaves the last step to the user**. Two questions; it's a draft only if both are yes:
+1. **Is there still something the user must do for it to count?** `create_draft` leaves them the send.
+   `save_comment` doesn't — the comment is posted.
+2. **Until they do it, are they the only one who can see it?** Nobody is notified about a draft.
 
-If either answer is no, there is no draft version of this action, and it becomes a **DECIDE**, whatever the
-confidence × exposure gate returned. **Carry the content you'd prepared into the
-decision as the recommended option**, so the human approves text you already wrote instead of starting over.
-In `mode: "perform"` this rule doesn't apply; verbs run as written.
+Either answer no → this action has no draft, so it's a **DECIDE** whatever the gate returned. **Carry the
+content you prepared in as the recommended option** — they approve your text rather than starting over. In
+`perform` mode the rule doesn't apply.
 
-This closes a hole rather than adding caution for its own sake: draft mode was written around mail, where a
-draft is a real object you can leave lying around, and it simply had **no defined behaviour** anywhere else.
-On the reference workspace four of five gate-cleared ACTs — two Linear comments, two Jupi contributions —
-fell in that gap, and "draft mode is on" was doing nothing for any of them.
+*Why this exists: draft mode was written around mail, where a draft is a real object, and had no defined
+behaviour anywhere else — four of five gate-cleared ACTs on the reference workspace fell in that gap.*
 
-**Work it out per action, at run time — never from a label on the tool.** Whether something can be drafted
-depends on the *call*, not the product: one connector often has both a call that stops short and a call that
-finishes the job, and its call list changes when the connector is upgraded. So ask, in this order:
-1. **What can this tool actually do, here, now?** Run the two questions above against the call you'd make.
-   **If you can point at a call by name that passes both** — `create_draft` — that call becomes the ACT's
-   verb. If the best you can say is "Linear probably has drafts", it doesn't count: you can't make a call
-   you can't name.
-2. **What setup wrote down.** `assets.md`'s tools table has a **Draft call** column, filled from the call
-   list setup saw when it probed. Use it when you can't check the tool yourself. It's a note from last
-   time, not the last word — a call you *can* name beats a table that says `none`.
-3. **Neither** → treat it as **no**. Getting this wrong towards "no" costs one question to the user;
-   getting it wrong towards "yes" does something in their name that can't be taken back, under the very
-   mode they picked to stop that happening.
+**Answer it per action, at run time.** Draftability belongs to the *call*, not the product: one connector
+often has both kinds, and its call list changes on upgrade. In order — **(a)** run the two questions against
+the call you'd make, and **if you can name a call that passes both**, that call is the ACT's verb ("Linear
+probably has drafts" is not a call you can make); **(b)** else `assets.md`'s **Draft call** column, what
+setup saw when it probed — a note from last time, so a call you *can* name beats a table saying `none`;
+**(c)** else **no**. Wrong towards "no" costs one question; wrong towards "yes" does something irreversible
+in their name, under the mode they picked to prevent exactly that.
 
-Two things that look like a draft and fail one of the two questions:
-- **Hiding it isn't the same as not doing it.** A Linear issue's `state`, a doc's sharing setting: the issue
-  is created and the team can see it. Nothing further is required for it to count, and taking it back means
-  deleting it, not discarding a draft nobody saw. Fails question 1.
-- **A draft email about a booking is not a draft booking.** If sending that mail is what confirms the venue,
-  the booking is the real action — and *it* has no draft. The mail being a draft says nothing about the
-  commitment inside it, which is exactly the trick §The gate warns about.
+**Name the action before you test it — the test is only as good as its input, and the tempting error is to
+name the *channel* instead of the *commitment*.** Ask what changes for the recipient the moment they read it.
+"They now have my yes" means the action is the commitment, and drafting the email doesn't draft it: a reply
+granting the discount has no draft call, however draftable the mail is. If the message only reports or asks
+about a commitment, the action really is the email. Can't tell → DECIDE.
 
-**Which action are you testing? Settle that first, or the two questions give the wrong answer confidently.**
-The test above is sound but it takes an action as its input, so naming the action wrongly poisons it — and
-the tempting wrong name is always the *channel* rather than the *commitment*. When a message is the thing
-that commits (a reply that grants the discount, confirms the venue, accepts the terms), the action is the
-commitment; `create_draft` staging the email doesn't stage it, and this action has no draft call. When the
-message merely *reports* a commitment already made or asks about one, the action really is the email, and
-`create_draft` genuinely stages it. **Ask what changes for the recipient the moment they read it:** if the
-answer is "they now have my yes", you're looking at the commitment. Where you genuinely can't tell, it's a
-DECIDE — a question costs a click, a mistaken yes costs the deal.
+Also fails question 1: **hiding something isn't not doing it** — a Linear issue's `state`, a doc's sharing
+setting: it exists, the team can see it, and taking it back is a deletion.
 
-*(Known and accepted: this makes draft mode materially tighter than perform mode, and `decisionBudget`
-becomes the binding constraint. The intended way out is flipping to `perform` as trust builds, not relaxing
-this rule. Also note Linear supports drafts in-product but does not expose them on its MCP surface today —
-so a Linear comment resolves to `none` on evidence, and would flip on its own the day that changes.)*
+*(Accepted: this makes draft mode materially tighter than perform, and `decisionBudget` becomes the binding
+constraint. The way out is flipping to `perform` as trust builds, not relaxing this. Linear has drafts
+in-product but not over MCP, so its comment resolves to `none` on evidence — and flips itself when that
+changes.)*
 
 ## Draft mode
 `mode` is config, read here. **`draft` (default):** an action gets its draft verb — and so `exposure=low` →
@@ -431,32 +403,29 @@ decision to settle XXX."
 
 ## Reporting — four blocks, every run
 
-Every run reports the same shape, whether it wrote anything or not. `--dry-run` runs the full flow through
-the gate but **writes nothing** — no rows, no decisions, no status changes, **no Stage 0 refresh** (§Stage 0)
-— and **does not invoke `execute-action`**; the report is then the entire deliverable, which is why its shape
-can't be left to whatever seemed worth showing that day. On the reference run these tables existed only
-because a human asked for them afterwards.
+Same shape every run, whether or not anything was written. `--dry-run` goes through the gate but **writes
+nothing** — no rows, decisions, status changes, or Stage 0 refresh — and doesn't invoke `execute-action`, so
+there the report *is* the deliverable. On the reference run these tables existed only because a human asked
+for them afterwards.
 
-**1 · Clusters** — first, or the coordination node is invisible: three rows carrying the same decision title
-read identically whether *one* decision gates three tasks or three duplicate decisions were raised, and that
-difference is the whole point of Stage 2.
+**1 · Clusters** — first, or the coordination node is invisible: three rows sharing a decision title read
+identically whether one decision gates three tasks or three duplicates were raised.
 
 | Cluster | Tasks | Shared open question | conf |
 |---|---|---|---|
 
-**2 · Actions** — one row per candidate action, grouped by task. **Draft-mode effect** is the resolution from
-§The gate, and it takes exactly one of four values — the point of the column is that a *converted* action
-must be distinguishable from one that was always going to be a decision, so don't improvise a fifth:
+**2 · Actions** — one row per candidate action, grouped by task. **Draft-mode effect** takes exactly one of
+four values, because a *converted* action must be distinguishable from one that was always a decision:
 
 | Value | When |
 |---|---|
-| the call, e.g. `gmail create_draft` | it passed both questions — this call is the ACT's verb |
-| `none → DECIDE` | no call passed, so the gate's `act` was overridden. **This row is a conversion.** |
-| `not reached` | the gate already returned `decide` (low confidence, or high × high), so the draft check never ran. **Not a conversion** — it would be a decision in perform mode too. |
-| `n/a (perform mode)` | `mode` is perform; the rule doesn't apply to any row |
+| the call, e.g. `gmail create_draft` | passed both questions — this call is the ACT's verb |
+| `none → DECIDE` | no call passed, so the gate's `act` was overridden. **A conversion.** |
+| `not reached` | the gate already returned `decide`, so the draft check never ran. **Not** a conversion — it'd be a decision in perform mode too. |
+| `n/a (perform mode)` | `mode` is perform |
 
-`not reached` is the common case in a busy run and the one worth getting right: a reader scanning for what
-draft mode *cost* them should be able to find it by looking for `none → DECIDE` and nothing else.
+`not reached` is the common case; getting it right is what lets a reader find what draft mode *cost* by
+scanning for `none → DECIDE`.
 
 | Task | conf (task) | Action | Tool | exposure | Verdict | Draft-mode effect | Why |
 |---|---|---|---|---|---|---|---|
@@ -467,11 +436,9 @@ draft mode *cost* them should be able to find it by looking for `none → DECIDE
 | Title | Link | Assignee | Tasks unblocked | Why it needs a human |
 |---|---|---|---|---|
 
-**4 · Deferred** — everything cut by `clusterBudget` or `decisionBudget`, with its score and the reason.
-**This block is not optional, and "nothing deferred" is written out rather than left as an absent table.**
-Your own guardrails say no silent caps; a budget that trims six items and an empty morning produce the same
-report unless the trimming is on screen, and the user's only way to notice a budget set too low is to see
-what it cost.
+**4 · Deferred** — everything cut by `clusterBudget` or `decisionBudget`, with score and reason. **Not
+optional; "nothing deferred" is written out rather than left as an absent table.** Your own guardrails say no
+silent caps, and a budget that trimmed six items reads exactly like a quiet morning otherwise.
 
 | Item (cluster / decision) | Score | Cut by | Why this one |
 |---|---|---|---|
@@ -479,44 +446,32 @@ what it cost.
 Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Write the whole report to
 `act-or-decide/runs/run-<id>/report.md` and return it.
 
-### The user's version of this report — you own it, wherever it's shown
+### The user's version of this report — yours to define, wherever it's shown
 
-The blocks above are the **run log**: the caller is another skill or a scheduled routine, and the internal
-names belong there. But **the same run also has to be reportable to the user** — after a scheduled run, when
-they ask what you did, and at the end of setup's first dry run, which is the first thing they ever see Jupi
-produce. **That version is yours to define, not the caller's.** Setup shows it; it doesn't get to invent it,
-or every surface would describe your work differently.
+The blocks above are the **run log**, for a skill or a routine. The same run also has to be reportable **to
+the user** — after a scheduled run, when they ask what you did, and at the end of setup's first dry run,
+which is the first thing they ever see Jupi produce. **That version is yours, not the caller's**; setup shows
+it, it doesn't get to invent it, or every surface would describe your work differently.
 
-That reader has never heard of a cluster, an exposure score or a coordination node, and this project's rule
-is to speak their language, not ours. But vague is not the same as plain — *"what I'd do"* is just as
-useless as *"exposure"*, because it still doesn't say what the thing **is**. **Name the actual artifact:** a
-draft, a decision, a comment. Same four blocks, same content, these headings:
+They've never heard of a cluster or an exposure score. But vague isn't plain — *"what I'd do"* is as useless
+as *"exposure"*, because it still doesn't say what the thing **is**. **Name the artifact.** Same four blocks:
 
-**1 · What I handled on my own**
-Per row: what it was, **what they'll actually find** ("a reply drafted in Gmail, ready to send"), and why it
-didn't need them ("you'd already told Nick any time before noon works"). If this block is empty, say so —
-"I didn't do anything on my own this run" is information.
+1. **What I handled on my own** — what it was, **what they'll find** ("a reply drafted in Gmail, ready to
+   send"), why it didn't need them. Empty is worth saying out loud.
+2. **Decisions I've submitted that need your input** — the title as it reads in Jupi, **a link they can
+   click**, what it's holding up ("this also unblocks 2 other things"), why it's theirs to call. This is the
+   block they act on: near the top, never compressed to a count.
+3. **Where one answer covers several things** — only when you actually grouped something. Skip it rather
+   than print a table of one.
+4. **What I've left for next time** — and **say if a limit is why** ("I stop at 5 decisions a run, and 6
+   more qualified today"), which is how they learn a setting is too low.
 
-**2 · Decisions I've submitted that need your input**
-Per row: the decision's title as it reads in Jupi, **a link they can click**, what it's holding up ("answering
-this also unblocks 2 other things"), and why it's theirs to call rather than yours ("the team hasn't agreed
-whether the pilot includes the API"). This is the block they act on, so it goes near the top and never gets
-compressed into a count.
+Close on posture, not config: *"I'm in draft mode, so nothing goes out without you sending it."*
 
-**3 · Where one answer covers several things**
-Only when you actually grouped something. "These three threads are all waiting on the same pricing question,
-so I'm asking once instead of three times." Skip the block entirely rather than printing a table of one.
+**Two rules decide whether this lands.** Numbers only where the number changes what they'd do — "6 left for
+next time" earns its place, a score of 62.1 doesn't. And **never show a person a shorter report than you
+logged**: block 4 is the one they most need and would never think to ask for.
 
-**4 · What I've left for next time**
-Everything the budgets cut, in plain terms, **and say if a limit is the reason** — "I stop at 5 decisions a
-run, and 6 more qualified today" is exactly how they learn a setting is too low. Never silently omit this.
-
-Close with one sentence on the posture, not a config dump: *"I'm in draft mode, so nothing goes out without
-you sending it."*
-
-**Two rules that decide whether this lands.** Give numbers only where the number changes what they'd do — "I
-left 6 for next time" earns its place, a score of 62.1 does not. And **never show a person a shorter report
-than the one you logged**: block 4 is the one they most need and would never think to ask for.
 
 ## Decision links
 A decision you post is only useful if the user can open it, and **no Jupi tool returns a decision URL today**

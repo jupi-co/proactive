@@ -45,33 +45,28 @@ Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a
 
 ## Fact integrity — check what came back, not just that something did
 
-**Sanity-check a sample of what you wrote, each run.** After a batch of saves, `recall` a handful and read
-the returned text. Two failures hide behind a successful write, and both are silent:
+**Screen a sample each run.** After a batch of saves, `recall` a handful and read what returns. Two failures
+hide behind a successful write:
 
-- **Degenerate Facts.** Some memories come back as token loops — one observed at ~2KB of *"Mandate
-  obligating… mandrcer mandatory mandatory props…"*. The sources were written clean; the corruption is
-  store-side. **Recall-verification does not catch this**, which is the trap: the Facts *do* come back, so
-  every "did it land?" check passes, and what's rotten is the content. Screen returned text for a **high
-  repeated-token ratio** (the same token dominating a long string) and for **implausible length** — a Fact
-  is one compact sentence, so anything past a few hundred characters is already suspect.
-- **Lost qualification.** The hedge-and-attribution problem above — check one hedged Fact still carries its
-  attribution in the sentence itself.
+- **Degenerate Facts.** Some come back as token loops — one observed at ~2KB of *"Mandate obligating…
+  mandrcer mandatory mandatory props…"*. Sources were clean; the corruption is store-side. **Recall-
+  verification does not catch this** — the Facts *do* return, so every "did it land?" check passes and only
+  the content is rotten. Screen for a **high repeated-token ratio** and **implausible length** (a Fact is one
+  compact sentence; past a few hundred characters is already suspect).
+- **Lost qualification** — check one hedged Fact still carries its attribution in the sentence itself.
 
-**Surface what you find; never silently drop it.** Re-save a corrected statement (recency wins) and say in
-the summary how many Facts you screened and how many were degenerate. A store quietly returning garbage that
-`act-or-decide` then reasons over is worth interrupting the run to report — it is the failure mode that looks
-most like everything working. Persistent corruption is an **upgrade trigger** toward the HTTP API, where a
-Fact can actually be deleted and rewritten by id.
+**Surface what you find.** Re-save a corrected statement (recency wins) and report how many you screened and
+how many were degenerate — never a clean run. Note that the corrupt memory **stays retrievable** (`forget` is
+unreliable, no delete-by-id), so `act-or-decide` can still recall it: persistent corruption is the **upgrade
+trigger** toward the HTTP API, where a Fact can actually be rewritten by id.
 
-**Provenance back to the source task, so a bad parse can be undone.** When a Fact derives from a task
-`refresh-backlog` parsed (rather than from a tool read you did yourself), **name the task in the Fact's
-source clause** — `(src: task <id> / gmail thread 18f… 2026-06-09; confirmed)`. Without that link there is no
-path from "the Parser misread this signal" to "the Fact it produced is wrong": on the reference run a mail
-about Jupi's own team was parsed as being about pilot companies, the misreading became a Fact, and the brain
-now *corroborates* the error — re-crawling won't correct it, because the Fact reads as independent
-confirmation of the thing it came from. Anything you derive from a task the Parser flagged
-`parse_confidence: low|medium` should carry that hedge into the Fact's own sentence too, for the same reason
-the store strips trailing parentheticals.
+**Provenance back to the source task.** When a Fact derives from a task `refresh-backlog` parsed, **name the
+task in the source clause** — `(src: task <id> / gmail thread 18f… 2026-06-09; confirmed)`. Without it there
+is no path from "the Parser misread this" to "the Fact it produced is wrong": on the reference run a mail
+about Jupi's own team was read as being about pilot companies, became a Fact, and the brain now *corroborates*
+the error — re-crawling won't fix it, because the Fact reads as independent confirmation of its own source.
+Carry a `parse_confidence: low|medium` hedge into the Fact's own sentence too, since the store strips trailing
+parentheticals.
 
 ## Types (the ontology)
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
