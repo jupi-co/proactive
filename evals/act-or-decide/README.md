@@ -43,6 +43,9 @@ Two layers, matching `evals/refresh-backlog/`.
   15. **Report shape + decision links** — all four blocks with their columns; the permalink built via
      `db.mjs decision-url`, never from `get-decision`'s `url` (that's `source.url`, the decision's *origin*)
      and never from an inline slugifier.
+  16. **User-facing report** — the same four blocks in the user's words at setup time: no cluster/exposure/conf
+     vocabulary, each item marked *on my own* vs *I'll ask you*, Deferred still shown. This is the first thing
+     a new user ever sees Jupi produce.
 
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`

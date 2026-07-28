@@ -199,7 +199,8 @@ It reads `schema.sql` from the same directory, resolves the connection string ex
 **One subagent, one sweep (why):** `update-brain` and `refresh-backlog` read overlapping seed windows (their `context` / `inbox` tools × `crawlWindowDays`) back-to-back on a cold start. Reading it **once** and feeding both Facts and tasks roughly halves the tool calls; each consumer still **advances its own cursor** (`crawl_state.consumer` = `brain` vs `backlog`), so they stay fully independent afterward. The shared scan recipes in `shared/signal-sources.md` exist precisely so the two can't drift — reuse the reads, keep the cursors separate.
 
 The subagent runs, in order:
-1. **Seed the brain — `update-brain` in `full` mode** (crawls the **`context`**-tagged tools over `crawlWindowDays`, default 30). It is the **only writer of Facts** and owns how they're stored in Supermemory, **including the hard-coded container tag; setup neither chooses nor asks for it.** It must **verify it wrote Facts** (a quick `recall` on the container tag returns results); if it wrote nothing or a tool was unreachable, the summary **says so (⚠️)** — never a blind success.
+1. **Seed the brain — `update-brain` in `full` mode** (crawls the **`context`**-tagged tools over `crawlWindowDays`, default 30).
+   - **On an orphaned-brain repair (step 2), crawl the gap, not the whole window.** The Facts are already there and they're the expensive artifact — re-crawling 30 days to rebuild what exists burns credits and time to arrive back where you started. Narrow the brain's window to *since the newest existing Fact* and say so in the report. `refresh-backlog` below still takes the full seed window: the backlog was never written, so for it this genuinely is a cold start. *(This is the one place step 2's "don't re-seed the brain" and this step's "seed the brain" would otherwise contradict each other.)* It is the **only writer of Facts** and owns how they're stored in Supermemory, **including the hard-coded container tag; setup neither chooses nor asks for it.** It must **verify it wrote Facts** (a quick `recall` on the container tag returns results); if it wrote nothing or a tool was unreachable, the summary **says so (⚠️)** — never a blind success.
 2. **Initialize the backlog — `refresh-backlog`** (parses the **`inbox`**-tagged tools; reads `crawlWindowDays`, `backlogWindowSize`), **reusing the window just read**. It parses signals into `tasks` and scores them (impact · relevance · urgency · bottleneck) via the shared `db.mjs`, which stamps `user_id` = the step-2 tenant key on every row and scopes every query by it. Read-only on the tools — no external side-effects.
 
 **Returned summary (all setup needs to build the report):** for the brain — facts by type + any unreachable tool; for the backlog — sources scanned, candidate tasks created, the current top window. Fold both in; flag any ⚠️.
@@ -222,10 +223,39 @@ Schedule recurring **user-visible** routines: `update-brain` (daily full) and th
 - **Schedule on-device only — never a cloud routine.** A cloud run has no device bridge, so it can't reach `<root>` on *any* fire: the card looks healthy and does nothing, every morning. So check before you schedule — **no `mcp__remote-devices__*` tools in this session means no bridge here**, and every routine it created would be cloud-class. In that case **create nothing** and report ⚠️: the workspace is ready, but the routines have to be made from the desktop app. A missing routine the user knows about beats a present one that silently no-ops. *(Why not just plumb the cloud path — IMPLEMENTATION-PLAN §12.)*
 - *All five skills now exist (`update-brain`, `refresh-backlog`, `act-or-decide`, `execute-action`, `act-post-decision`), so schedule for real. With `act-post-decision` leading the routine, a decision the user settles is carried out automatically on the next run — the Jupi FINALIZED-status + `selectedOptionIds` read is live via `get-decision`, and executed option-actions are ticked with `mark-option-action-done-tool`. The executed-notification (an EXECUTED ping / status write) is deferred — the trace the action leaves on its signal is the record.*
 
-## Output — setup report
-Print a **per-step status line** (✅/🔧/⚠️) so the run is legible end-to-end: which tools were **already connected** vs newly connected vs skipped (+ the capability lost by each skip), any pending OAuth, **the capability inherited** (workspace skills/agents registered for reuse + rules already in the store — or an explicit "none discovered"), **egress paths live** (443 / 5432), **schema applied** (`{applied, failed}` from the applier), Facts seeded (counts by type), candidate tasks created, schedules set (**and the post-scheduling re-list assertion: one task per name**). Flag anything that needs the user.
+## Output — the setup report
 
-Also state, once, the things a later reader will otherwise have to rediscover: **which config values you found already present** (and where) versus collected, **an orphaned-brain repair** if you detected one, and **the tools whose `Draft call` came back `none` or `unknown`** — because in the default `draft` mode those are the surfaces where work becomes a decision rather than a draft, which is the single biggest determinant of what the user's first week actually feels like.
+**This report is about the setup, not about the work.** What Jupi *would do* with the user's backlog is
+`act-or-decide`'s report, shown whole in step 8 (above) and owned there. Yours answers a different question:
+**what has Jupi got to work with now, and what is it still missing?** Keeping the two separate is what stops
+a user reading one and thinking they've read the other.
+
+Print a **per-step status line** (✅/🔧/⚠️) so the run is legible end-to-end, then these, in the user's terms:
+
+**1 · The tools I can reach now** — one line per tool: already connected vs newly connected vs still absent,
+and **for each absent one, the work that stays invisible or undoable** ("no Greenhouse, so I can't see
+candidates move or draft to them"). A gap stated as capability lost is actionable; a gap stated as a missing
+integration is not. Include the **`Draft call`** finding here in plain terms — name the tools where Jupi can
+only prepare something by asking first, because in the default draft mode that is the single biggest
+determinant of what their first week feels like.
+
+**2 · What I found already here that I can use** — the workspace skills and agents registered for reuse, and
+the rules already in their store, each with when Jupi would reach for it. **An explicit "none discovered"**
+when there was nothing: an empty list and an unscanned workspace look identical otherwise. This is the
+"you don't start from nothing" half of step 2b actually paying off, so it's worth stating as capability
+inherited rather than as a file count.
+
+**3 · What I set up** — the workspace root and that routines boot from it, the schedules with their anchor
+("timed to land before your 11:40 standup") **and the post-scheduling check that there's exactly one of
+each**, the brain seeded (counts by type), the backlog built (candidate tasks created).
+
+**4 · What still needs you** — pending OAuth, anything declined, and any gap from above worth closing.
+
+Also state once, plainly, the things a later reader would otherwise have to rediscover: **which config values
+were already present** (and where you found them) versus collected from them, whether you repaired an
+**orphaned brain**, which **egress paths are live** (443 / 5432), and the **schema apply counts**
+(`{applied, failed}`). These are diagnostics, so keep them to a short closing block rather than threading
+them through the four above.
 
 ## Guardrails
 - **Inventory before you ask, but know the blind spot.** A tool is "connected" iff its calls actually resolve in this session; the session usually can't read "Customize" connectors (`list_connectors` is empty here). For a tool that isn't callable, ask the user to *enable it in Customize* before ever proposing a full OAuth — never push a redundant re-auth on a tool they already have.

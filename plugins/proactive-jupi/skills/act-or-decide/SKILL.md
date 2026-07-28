@@ -140,6 +140,11 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
 1. `recall` Facts (deepen the task's `relevant_facts`). For any **unknown/fuzzy** entity, **delegate**:
    invoke `update-brain` in **targeted** mode with a precise lookup request (it writes `context`/Facts and
    hands you a summary — you never write Facts).
+   - **In `--dry-run`, don't delegate — `recall` only.** `update-brain` *writes Facts*, so invoking it
+     would break dry-run's "writes nothing" guarantee through a delegate, which is the hardest kind of
+     violation to notice: nothing in your own output shows a write. Same reasoning as Stage 0's refresh
+     skip. Reason from what `recall` returns, and **say in the report which entities you'd have looked up**
+     — an unresearched entity is exactly the kind of thing a dry run should expose, not quietly paper over.
 2. Read **past decisions** (`search-decisions-tool`) for this trade-off — a prior settled decision may
    already answer it. **Also count recurrence here** (one read, two uses): how many prior **FINALIZED**
    decisions settled *this same* trade-off, and did they land on a *consistent* outcome? ≥ `ruleThreshold`
@@ -303,8 +308,17 @@ Two things that look like a draft and fail one of the two questions:
   deleting it, not discarding a draft nobody saw. Fails question 1.
 - **A draft email about a booking is not a draft booking.** If sending that mail is what confirms the venue,
   the booking is the real action — and *it* has no draft. The mail being a draft says nothing about the
-  commitment inside it, which is exactly the trick §The gate warns about. Ask what the action really is
-  before you ask whether it can be drafted.
+  commitment inside it, which is exactly the trick §The gate warns about.
+
+**Which action are you testing? Settle that first, or the two questions give the wrong answer confidently.**
+The test above is sound but it takes an action as its input, so naming the action wrongly poisons it — and
+the tempting wrong name is always the *channel* rather than the *commitment*. When a message is the thing
+that commits (a reply that grants the discount, confirms the venue, accepts the terms), the action is the
+commitment; `create_draft` staging the email doesn't stage it, and this action has no draft call. When the
+message merely *reports* a commitment already made or asks about one, the action really is the email, and
+`create_draft` genuinely stages it. **Ask what changes for the recipient the moment they read it:** if the
+answer is "they now have my yes", you're looking at the commitment. Where you genuinely can't tell, it's a
+DECIDE — a question costs a click, a mistaken yes costs the deal.
 
 *(Known and accepted: this makes draft mode materially tighter than perform mode, and `decisionBudget`
 becomes the binding constraint. The intended way out is flipping to `perform` as trust builds, not relaxing
@@ -431,8 +445,18 @@ difference is the whole point of Stage 2.
 |---|---|---|---|
 
 **2 · Actions** — one row per candidate action, grouped by task. **Draft-mode effect** is the resolution from
-§The gate: the draft call you'd use (`gmail create_draft`), or `none → DECIDE`, or `n/a (perform mode)`.
-Without that column a converted action is indistinguishable from one that was always going to be a decision.
+§The gate, and it takes exactly one of four values — the point of the column is that a *converted* action
+must be distinguishable from one that was always going to be a decision, so don't improvise a fifth:
+
+| Value | When |
+|---|---|
+| the call, e.g. `gmail create_draft` | it passed both questions — this call is the ACT's verb |
+| `none → DECIDE` | no call passed, so the gate's `act` was overridden. **This row is a conversion.** |
+| `not reached` | the gate already returned `decide` (low confidence, or high × high), so the draft check never ran. **Not a conversion** — it would be a decision in perform mode too. |
+| `n/a (perform mode)` | `mode` is perform; the rule doesn't apply to any row |
+
+`not reached` is the common case in a busy run and the one worth getting right: a reader scanning for what
+draft mode *cost* them should be able to find it by looking for `none → DECIDE` and nothing else.
 
 | Task | conf (task) | Action | Tool | exposure | Verdict | Draft-mode effect | Why |
 |---|---|---|---|---|---|---|---|
@@ -454,6 +478,45 @@ what it cost.
 
 Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Write the whole report to
 `act-or-decide/runs/run-<id>/report.md` and return it.
+
+### The user's version of this report — you own it, wherever it's shown
+
+The blocks above are the **run log**: the caller is another skill or a scheduled routine, and the internal
+names belong there. But **the same run also has to be reportable to the user** — after a scheduled run, when
+they ask what you did, and at the end of setup's first dry run, which is the first thing they ever see Jupi
+produce. **That version is yours to define, not the caller's.** Setup shows it; it doesn't get to invent it,
+or every surface would describe your work differently.
+
+That reader has never heard of a cluster, an exposure score or a coordination node, and this project's rule
+is to speak their language, not ours. But vague is not the same as plain — *"what I'd do"* is just as
+useless as *"exposure"*, because it still doesn't say what the thing **is**. **Name the actual artifact:** a
+draft, a decision, a comment. Same four blocks, same content, these headings:
+
+**1 · What I handled on my own**
+Per row: what it was, **what they'll actually find** ("a reply drafted in Gmail, ready to send"), and why it
+didn't need them ("you'd already told Nick any time before noon works"). If this block is empty, say so —
+"I didn't do anything on my own this run" is information.
+
+**2 · Decisions I've submitted that need your input**
+Per row: the decision's title as it reads in Jupi, **a link they can click**, what it's holding up ("answering
+this also unblocks 2 other things"), and why it's theirs to call rather than yours ("the team hasn't agreed
+whether the pilot includes the API"). This is the block they act on, so it goes near the top and never gets
+compressed into a count.
+
+**3 · Where one answer covers several things**
+Only when you actually grouped something. "These three threads are all waiting on the same pricing question,
+so I'm asking once instead of three times." Skip the block entirely rather than printing a table of one.
+
+**4 · What I've left for next time**
+Everything the budgets cut, in plain terms, **and say if a limit is the reason** — "I stop at 5 decisions a
+run, and 6 more qualified today" is exactly how they learn a setting is too low. Never silently omit this.
+
+Close with one sentence on the posture, not a config dump: *"I'm in draft mode, so nothing goes out without
+you sending it."*
+
+**Two rules that decide whether this lands.** Give numbers only where the number changes what they'd do — "I
+left 6 for next time" earns its place, a score of 62.1 does not. And **never show a person a shorter report
+than the one you logged**: block 4 is the one they most need and would never think to ask for.
 
 ## Decision links
 A decision you post is only useful if the user can open it, and **no Jupi tool returns a decision URL today**

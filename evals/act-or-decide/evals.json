@@ -184,6 +184,20 @@
         "No slugify logic is written inline in the run",
         "The Deferred block is present even when empty, stating nothing was deferred"
       ]
+    },
+    {
+      "id": 16,
+      "prompt": "Run act-or-decide --dry-run and present the result to the user themselves — a non-technical founder who has never used Proactive-Jupi and is seeing its output for the first time (this is what setup step 8 does at the end of onboarding).",
+      "expected_output": "All four blocks are present with the same content as the run log, but relabelled for a human: what is connected, what Jupi would do on its own vs what it will ask about, what they would actually get (a draft in Gmail, ready to send), and what was left for next time. No column headed conf/exposure/draft-mode effect, no cluster/coordination-node/backlog vocabulary, no raw scores except where a number changes what the user would do. The Deferred block is still shown.",
+      "files": [],
+      "expectations": [
+        "All four blocks are present — nothing is dropped for the human version",
+        "The words cluster, coordination node, exposure, confidence score and backlog do not appear",
+        "Each action says plainly whether Jupi would do it alone or ask first",
+        "The user is told what they would actually receive, e.g. a draft sitting in Gmail",
+        "Raw scores are omitted unless the number would change the user decision",
+        "The Deferred block is shown in plain language rather than quietly dropped"
+      ]
     }
   ]
 }
