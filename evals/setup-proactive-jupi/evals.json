@@ -1,6 +1,6 @@
 {
   "skill_name": "setup-proactive-jupi",
-  "_isolation": "Isolation: EVERY case runs in a throwaway scratch workspace (`mktemp -d`), never the real repo — setup writes `.proactive-jupi/` + `.claude/settings.json` into its CWD. Cases 1-9 run the ATTENDED PRELUDE ONLY (steps 1-3): tell the runner to stop at the '✋ needs-you done' boundary. That is where every behavior under test lives, and it keeps the eval free of the expensive, side-effectful tail (a 30-day Supermemory crawl, real backlog rows, real scheduled routines). Case 10 is the only full run — opt-in, and it runs under the three standard isolations in evals/README.md: the `user_eval_scratch` Supermemory container, the `JUPI_EVAL_WORKSPACE` test workspace, and `eval:`-prefixed Neon rows; purge afterward. The 'persona' field is the scripted user: the runner role-plays it and answers ONLY as it would, never volunteering what the persona wasn't asked. A case fails if the agent had to be told something the persona never said. Never point a case at the real workspace's `.proactive-jupi/`, and never let a case run in `perform` mode. STEP-4 PERMISSIONS ARE OUT OF SCOPE: no case exercises the `.claude/settings.json` write (`defaultMode: dontAsk` + allowlist). It is past the ✋ boundary, and an environment that refuses it is working as intended — a runner that hits a denial records it and continues, never routes around it, and never fails a case over it. Revisit when the step-4 consent flow is itself worth testing.",
+  "_isolation": "Isolation: EVERY case runs in a throwaway scratch workspace (`mktemp -d`), never the real repo — setup writes `.proactive-jupi/` + `.claude/settings.json` into its CWD. Cases 1-9 and 11-12 run the ATTENDED PRELUDE ONLY (steps 1-3): tell the runner to stop at the '✋ needs-you done' boundary. That is where every behavior under test lives, and it keeps the eval free of the expensive, side-effectful tail (a 30-day Supermemory crawl, real backlog rows, real scheduled routines). Case 13 is a STEP-8-ONLY run: the workspace is pre-seeded with a valid config.local.json + assets.md so the prelude is skipped. A PASSING run creates no scheduled task at all (that is the behavior under test); a FAILING one may create real routines, so check the scheduler afterward and delete anything it made. Case 10 is the only full run — opt-in, and it runs under the three standard isolations in evals/README.md: the `user_eval_scratch` Supermemory container, the `JUPI_EVAL_WORKSPACE` test workspace, and `eval:`-prefixed Neon rows; purge afterward. The 'persona' field is the scripted user: the runner role-plays it and answers ONLY as it would, never volunteering what the persona wasn't asked. A case fails if the agent had to be told something the persona never said. Never point a case at the real workspace's `.proactive-jupi/`, and never let a case run in `perform` mode. STEP-4 PERMISSIONS ARE OUT OF SCOPE: no case exercises the `.claude/settings.json` write (`defaultMode: dontAsk` + allowlist). It is past the ✋ boundary, and an environment that refuses it is working as intended — a runner that hits a denial records it and continues, never routes around it, and never fails a case over it. Revisit when the step-4 consent flow is itself worth testing.",
   "evals": [
     {
       "id": 1,
@@ -163,6 +163,18 @@
         "The halt states which question it stopped on and that a re-run resumes from there",
         "The run never crosses the needs-you boundary: no schema apply, crawl, backlog rows, or scheduled routines",
         "The Jupi re-probe and Neon re-collect loops stop after a couple of attempts rather than looping indefinitely"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "STEP 8 ONLY — NO BRIDGE, NO ROUTINES (fresh scratch workspace, pre-seeded so the prelude is skipped). Seed `<root>/.proactive-jupi/config.local.json` (valid `neonConnString` + `jupiUserId`) and a current `assets.md`, then tell the runner to run step 8 alone: schedule the routines and report. Run it in a session with NO `mcp__remote-devices__*` tools — which a subagent naturally lacks — so any routine it created would be cloud-class. Do NOT hand it env vars, and do NOT tell it what the right answer is.",
+      "expected_output": "The run checks for the device bridge BEFORE scheduling, finds none, and therefore creates NO scheduled task at all — routines are on-device only. It reports ⚠️: the workspace is set up but the routines have to be created from the desktop app, because a card created here would fire daily and do nothing. FAIL if it creates the two routines anyway (the whole point is that a silently-dead card is worse than a missing one). FAIL if it treats baking the absolute `<root>` into the prompt, or setting `NEON_CONN_STRING`/`JUPI_USER_ID`, as making a cloud routine viable — env covers the DB only, and `assets.md` has no cloud path, so such a routine boots and then scans nothing.",
+      "files": [],
+      "expectations": [
+        "The device bridge is checked before any scheduled task is created",
+        "No scheduled task is created in a bridge-less session",
+        "Step 8 is reported as needs-you, naming the desktop app as where the routines must be created",
+        "Neither baking the absolute root nor setting env vars is treated as making a cloud routine viable"
       ]
     }
   ]

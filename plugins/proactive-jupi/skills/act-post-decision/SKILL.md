@@ -51,10 +51,10 @@ is absent, `npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared" --no-save` (sand
 if egress is blocked — pre-authorized, promptless in routines). **Run on Node ≥18** (the Neon driver uses the
 global `fetch`, absent on Node 16).
 
-> **Cloud / scheduled boot.** This skill leads the scheduled routine, so it often runs unattended. If the
-> repo isn't on the run's filesystem (a cloud session) or there's no attended shell, the CWD walk won't find
-> config. Provide it via **env** — `NEON_CONN_STRING` + `JUPI_USER_ID`, the sanctioned path — or **mirror
-> `.proactive-jupi/config.local.json` into the run's CWD** first. `db.mjs` resolves env before the file walk.
+> **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
+> inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
+> travel through). **No `mcp__remote-devices__*` tools at all** means this routine was scheduled as a cloud
+> task, which isn't supported: every fire fails identically, so it needs re-creating on-device, not a retry.
 
 All Neon access goes through the helper — **never hand-write SQL, never touch the account-wide Neon MCP.**
 ```
