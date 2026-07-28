@@ -121,6 +121,69 @@
         "The vaguely-described skill is treated as may-send and also DECIDE",
         "The run's reasoning states that the draft transform cannot bind a skill it does not control"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "--dry-run over a window with (a) a high-confidence, low-exposure Linear comment to post on an assigned issue and (b) a high-confidence, low-exposure reply to an internal peer by email. Config is mode:draft.",
+      "expected_output": "(b) ACTs — Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> DECIDE' for (a).",
+      "files": [],
+      "expectations": [
+        "The Gmail reply is ACT and names the draft call it would use",
+        "The Linear comment is DECIDE, converted by the draft-mode resolution rather than by the confidence x exposure gate",
+        "The prepared comment text is carried into that decision as the recommended option, not thrown away",
+        "The Actions table has a draft-mode-effect column filled for both rows",
+        "Nothing is written (dry-run)"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Same window as the previous case, but run with --perform.",
+      "expected_output": "The draft-mode resolution does not apply: both actions carry their real verbs and are gated on confidence x exposure alone, so the Linear comment is an ACT again. The draft-mode-effect column reads 'n/a (perform mode)'. This is the control that proves C1 tightened draft mode without changing perform mode.",
+      "files": [],
+      "expectations": [
+        "The Linear comment is ACT in perform mode, not DECIDE",
+        "No action is converted to a decision by the draft-call rule",
+        "The report's draft-mode-effect column reads n/a for perform mode",
+        "The footer names mode=perform"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "--dry-run over a window that yields 14 clusters and 9 gate-cleared decisions, with guardrails clusterBudget:10 and decisionBudget:5.",
+      "expected_output": "At most 10 clusters are processed and at most 5 decisions raised — the highest-leverage ones. The Deferred block lists every cut item by name with its score and which budget cut it (4 clusters, 4 decisions). Nothing is dropped silently, and the footer states both budgets.",
+      "files": [],
+      "expectations": [
+        "No more than 10 clusters are processed",
+        "No more than 5 decisions are raised",
+        "The Deferred block names every cut cluster and every deferred decision, with score and reason",
+        "The kept decisions are the highest-leverage ones, not the first encountered",
+        "The footer states clusterBudget and decisionBudget"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Run act-or-decide --dry-run against a config whose guardrails block still uses the old key `actBudget: 5` and has no `decisionBudget`.",
+      "expected_output": "It reads actBudget as clusterBudget (the deprecated alias), applies decisionBudget's default of 5, and says in the report that the config uses the deprecated key and should be renamed. It does not stall, and it does not treat actBudget as a cap on the number of actions.",
+      "files": [],
+      "expectations": [
+        "actBudget is honoured as clusterBudget rather than ignored",
+        "The run warns that actBudget is deprecated and names clusterBudget as the replacement",
+        "decisionBudget falls back to its default rather than being unbounded",
+        "actBudget is not applied as a cap on the number of actions"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "A real mode:draft run over eval-prefixed fixtures that raises one decision. Check the report it returns.",
+      "expected_output": "The report has all four blocks — Clusters, Actions, Decisions, Deferred — with the specified columns. The Decisions row carries a working permalink built via `db.mjs decision-url`, not `get-decision`'s `url` (which is source.url, the decision's ORIGIN) and not a hand-rolled slugifier. The Deferred block is present and says 'nothing deferred' explicitly when the budgets cut nothing.",
+      "files": [],
+      "expectations": [
+        "All four report blocks are present with their specified columns",
+        "The decision link is built with the shared decision-url helper",
+        "The link is not taken from get-decision's url field (which is the decision's origin)",
+        "No slugify logic is written inline in the run",
+        "The Deferred block is present even when empty, stating nothing was deferred"
+      ]
     }
   ]
 }

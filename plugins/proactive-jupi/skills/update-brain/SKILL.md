@@ -43,12 +43,42 @@ Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a
 >
 > Therefore: put whose claim it is and how sure you are **in the clause itself** — *"Nick's read after the 22 July call is that Antoine was looking for reasons not to run a pilot (holidays, compliance)"* — and keep the `(src: …)` parenthetical as a bonus for whoever reads the raw document, never as the only place the qualification lives. **Test it, don't assume:** after a batch, `recall` one hedged Fact and check the returned text still carries the attribution. If it doesn't, the sentence was written wrong, not the store.
 
+## Fact integrity — check what came back, not just that something did
+
+**Sanity-check a sample of what you wrote, each run.** After a batch of saves, `recall` a handful and read
+the returned text. Two failures hide behind a successful write, and both are silent:
+
+- **Degenerate Facts.** Some memories come back as token loops — one observed at ~2KB of *"Mandate
+  obligating… mandrcer mandatory mandatory props…"*. The sources were written clean; the corruption is
+  store-side. **Recall-verification does not catch this**, which is the trap: the Facts *do* come back, so
+  every "did it land?" check passes, and what's rotten is the content. Screen returned text for a **high
+  repeated-token ratio** (the same token dominating a long string) and for **implausible length** — a Fact
+  is one compact sentence, so anything past a few hundred characters is already suspect.
+- **Lost qualification.** The hedge-and-attribution problem above — check one hedged Fact still carries its
+  attribution in the sentence itself.
+
+**Surface what you find; never silently drop it.** Re-save a corrected statement (recency wins) and say in
+the summary how many Facts you screened and how many were degenerate. A store quietly returning garbage that
+`act-or-decide` then reasons over is worth interrupting the run to report — it is the failure mode that looks
+most like everything working. Persistent corruption is an **upgrade trigger** toward the HTTP API, where a
+Fact can actually be deleted and rewritten by id.
+
+**Provenance back to the source task, so a bad parse can be undone.** When a Fact derives from a task
+`refresh-backlog` parsed (rather than from a tool read you did yourself), **name the task in the Fact's
+source clause** — `(src: task <id> / gmail thread 18f… 2026-06-09; confirmed)`. Without that link there is no
+path from "the Parser misread this signal" to "the Fact it produced is wrong": on the reference run a mail
+about Jupi's own team was parsed as being about pilot companies, the misreading became a Fact, and the brain
+now *corroborates* the error — re-crawling won't correct it, because the Fact reads as independent
+confirmation of the thing it came from. Anything you derive from a task the Parser flagged
+`parse_confidence: low|medium` should carry that hedge into the Fact's own sentence too, for the same reason
+the store strips trailing parentheticals.
+
 ## Types (the ontology)
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
 
 ## Incremental crawling — the `crawl_state` cursor
 Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.
-- Access via the shared helper: `node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" get-cursor brain <source> [eval]` and `advance-cursor brain <source> <cursor> [eval]`. It reads the project-scoped `neonConnString` **and** `jupiUserId` from config and **scopes every query by `user_id` automatically** (the same id behind your container tag `user_<jupiUserId>`) — so you never hand-write SQL, never pass the user id, and never touch the account-wide Neon MCP. Without that scoping a shared DB would cross users' cursors; the helper guarantees it. *(First run: `npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared"` if `node_modules` is absent.)*
+- Access via the shared helper: `node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" get-cursor brain <source> [eval]` and `advance-cursor brain <source> <cursor> [eval]`. It reads the project-scoped `neonConnString` **and** `jupiUserId` from config and **scopes every query by `user_id` automatically** (the same id behind your container tag `user_<jupiUserId>`) — so you never hand-write SQL, never pass the user id, and never touch the account-wide Neon MCP. Without that scoping a shared DB would cross users' cursors; the helper guarantees it. *(Deps: run `bash "${CLAUDE_PLUGIN_ROOT}/shared/ensure-deps.sh"` once at the top of the run — **the** dependency path every `db.mjs` caller shares, idempotent and silent when they already resolve. Never symlink another directory's `node_modules` into `shared/`; it lasts exactly as long as the session.)*
 - **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never travel through). **No `mcp__remote-devices__*` tools at all** means this routine was scheduled as a cloud task, which isn't supported: every fire fails identically, so it needs re-creating on-device, not a retry.
 
 ## Modes
@@ -61,7 +91,8 @@ Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budg
    - **An empty `context` set means a stale map, not an empty world — never report a clean run having read nothing.** An `assets.md` written before the roles refactor has no `Roles` column at all, so no tool carries `context` even though every one of them is connected and healthy. In that case fall back to the `Connected` tools whose surface is plainly readable context (mail, calendar, docs, issues), **say in the summary that you inferred the sources from a pre-roles `assets.md`**, and recommend re-running `setup-proactive-jupi` to reconcile it. A `Roles` column that exists but tags nothing `context` is a real configuration answer — report it and crawl nothing.
 4. **Advance each cursor** — `db.mjs advance-cursor brain <source> <cursor>` (user-scoped automatically).
 5. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
-6. Return a short summary: budget drained, facts written, cursors advanced, any unreachable tool, zones still uncovered.
+6. **Screen a sample of what you wrote** (§Fact integrity) — `recall` a handful, check for degenerate text and lost qualification, re-save corrections.
+7. Return a short summary: budget drained, facts written, **facts screened + any degenerate ones found**, cursors advanced, any unreachable tool, zones still uncovered.
 
 ### `targeted "<request>"` — focused lookup for act-or-decide
 1. Read `jupiUserId` from config → tag `user_<jupiUserId>`. `recall` what we already know about the entity — don't re-fetch what's known.

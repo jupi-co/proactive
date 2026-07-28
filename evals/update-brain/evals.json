@@ -37,6 +37,29 @@
         "is_eval=true cursors advanced and real brain cursors were untouched",
         "The summary reports what was drained and pushed, with a warning rather than blind success if a tool was unreachable"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Run update-brain in full mode against the eval scratch container, then check what the store actually returned for the Facts just written — one of which comes back as a ~2KB repeated-token loop.",
+      "expected_output": "The post-write screen catches the degenerate Fact on repeated-token ratio and length, even though recall-verification passes (it does come back — it is just garbage). The run re-saves a corrected statement and reports how many Facts were screened and how many were degenerate. It does not report a clean run.",
+      "files": [],
+      "expectations": [
+        "A sample of written Facts is recalled and screened after the batch",
+        "The token-loop Fact is detected despite being retrievable",
+        "The failure is surfaced in the summary with counts, not swallowed",
+        "A corrected statement is re-saved rather than relying on forget"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Synthesize Facts from a task that refresh-backlog parsed with parse_confidence: low — a mail about the user's own team that may have been read as being about a customer.",
+      "expected_output": "The Fact carries provenance back to the source task id alongside the tool ref, and the uncertainty is written INSIDE the sentence (not only in a trailing parenthetical, which the store strips). So a later corrected parse has a path to the derived Fact, and the brain does not silently corroborate a misreading.",
+      "files": [],
+      "expectations": [
+        "The Fact's source clause names the originating task id, not only the tool ref",
+        "The shaky-parse hedge appears inside the sentence, surviving the store's rewrite",
+        "The Fact is not written as a flat confident assertion"
+      ]
     }
   ]
 }

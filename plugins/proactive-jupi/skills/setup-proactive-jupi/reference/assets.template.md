@@ -27,18 +27,36 @@ _Empty until setup runs._
 
 **`decision`, `rules` and `brain` are singular — exactly one tool each.** More than one means an ambiguous target and a split store (a second `brain` is how Facts get written under two container tags). Setup must fail loudly rather than tag a second. The other three roles are free to span many tools.
 
-| Tool | Connected | Roles | When to use it |
-|---|---|---|---|
-| Gmail | ☐ | inbox, context, work | Triage what lands; read threads for context; draft/send replies |
-| Google Calendar | ☐ | inbox, context, work | Meetings that need prep; who-met-whom for the brain; create/move events, book slots |
-| Google Drive | ☐ | context, work | Read the doc behind a decision; comment / create docs |
-| Linear | ☐ | inbox, context, work | Assigned issues; project/owner context; comment + create issues |
-| GitHub | ☐ | inbox, context, work | Review requests; code/PR context; comment, open PRs |
-| Slack | ☐ | inbox, context, work | Mentions + DMs; conversation context; reply in thread |
-| Jupi | ☐ | decision | The one decision store — search / create / finalize |
-| Supermemory | ☐ | brain | The one Facts store — `update-brain` writes, others recall |
-| _(role system of record)_ | ☐ | inbox, context, work | The system the user's role actually runs on — ATS / CRM / helpdesk / billing / warehouse. **One row per system surfaced in step 2b**; work isn't only productivity tools |
-| _(rule store)_ | ☐ | rules | The one business-rule store — the tool the user named in step 2b (their team's SOP home; a local `business-rules.md`/`file` only as fallback) |
+**`Draft call` — what draft mode can actually promise on this tool.** `act-or-decide`'s default `draft` mode
+assumes it can prepare something and leave it for the user to look at. That came from mail, where a draft is
+a real object sitting in a folder; most tools have nothing like it, and draft mode was quietly undefined for
+them. So record, per tool, **the name of the call that only prepares** — `gmail create_draft` — or `none`, or
+`unknown`. Write what the tool could actually do when it was probed, not what the product can do in its own
+UI: Linear has drafts in-product but doesn't offer them over MCP, so its honest value today is `none`.
+
+Two things that look like a draft and aren't: **hiding it isn't the same as not doing it** (an issue `state`,
+a doc's sharing setting — the thing exists and notifies people the moment it's created, and undoing it means
+deleting it); and **a draft message *about* a commitment is not a draft of the commitment**.
+
+This column is **a note from last time, not the last word**. `act-or-decide` works out per action, at run
+time, whether the call it's about to make has a draft version, and falls back to this value when it can't
+check — so a call it can genuinely name beats a `none` here, and a stale row costs a question to the user
+rather than an unwanted send. **`unknown` counts as `no`**, and so does an empty cell: getting it wrong
+towards "no" costs one question; getting it wrong towards "yes" does something in the user's name that can't
+be taken back, under the very mode they picked to stop that.
+
+| Tool | Connected | Roles | Draft call | When to use it |
+|---|---|---|---|---|
+| Gmail | ☐ | inbox, context, work | `create_draft` | Triage what lands; read threads for context; draft/send replies |
+| Google Calendar | ☐ | inbox, context, work | none — `create_event` books and invites | Meetings that need prep; who-met-whom for the brain; create/move events, book slots |
+| Google Drive | ☐ | context, work | none — a file can be unshared, but it exists | Read the doc behind a decision; comment / create docs |
+| Linear | ☐ | inbox, context, work | none — `save_comment` posts and notifies; `save_issue` creates immediately (`state` only hides it) | Assigned issues; project/owner context; comment + create issues |
+| GitHub | ☐ | inbox, context, work | check the tool — a draft PR counts, a comment doesn't | Review requests; code/PR context; comment, open PRs |
+| Slack | ☐ | inbox, context, work | unknown — verify against the connected surface | Mentions + DMs; conversation context; reply in thread |
+| Jupi | ☐ | decision | none — a contribution writes immediately | The one decision store — search / create / finalize |
+| Supermemory | ☐ | brain | n/a — not an action surface | The one Facts store — `update-brain` writes, others recall |
+| _(role system of record)_ | ☐ | inbox, context, work | _fill from the probed surface_ | The system the user's role actually runs on — ATS / CRM / helpdesk / billing / warehouse. **One row per system surfaced in step 2b**; work isn't only productivity tools |
+| _(rule store)_ | ☐ | rules | _fill from the probed surface_ | The one business-rule store — the tool the user named in step 2b (their team's SOP home; a local `business-rules.md`/`file` only as fallback) |
 
 > **Neon carries no role** — it isn't a tool the user works in, it's Proactive-Jupi's own task/action database. Access is via the conn string in config, not this table.
 

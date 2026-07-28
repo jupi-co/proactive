@@ -16,10 +16,12 @@
 //       json: short_label, summary, signal_type, signal_ref, signal_url,
 //             signal_at (ISO), external (bool), deadline (ISO), relevant_facts[], open_questions[]
 //   score-task      <id> '<json>'                   → { id, urgency, score }
-//       json: impact, relevance, bottleneck ('low'|'medium'|'high'). urgency + score computed here
-//       from the row's signal_at/external/deadline (§ scoring model below), and status → 'open'.
+//       json: impact, relevance, bottleneck ('low'|'medium'|'high'), parse_confidence?
+//       ('low'|'medium'|'high', default 'high'). urgency + score computed here from the
+//       row's signal_at/external/deadline (§ scoring model below), and status → 'open'.
 //   query-window    [K]                             → [ {task}, … ]  (default K from BACKLOG_WINDOW_SIZE or 30)
 //   list-open-refs  <signal_type>                   → [ {signal_type, signal_ref, status}, … ]
+//   decision-url    <groupSlug|-> <title> <id>      → { url }   (no DB; '-' = config.jupiWorkspace)
 //   ── Phase 3: the actions queue + status writes ──
 //   insert-action   '<json>'                        → { id, status }   (act-or-decide, Stage 4)
 //       json: task_id, tool, description, exposure ('low'|'high' → stored in `risk`),
@@ -38,6 +40,9 @@
 //      for scheduled / cloud runs, where the repo isn't on the container's fs)
 //   2. walk up from cwd looking for .proactive-jupi/config.local.json
 //      → "neonConnString" / "jupiUserId"
+// The same walk also captures the NEAREST config object whole, so the tunables below
+// (`scoring`, `jupiWorkspace`) are read from it even when the credentials came from env.
+// Keys beginning with `_` in that file are documentation and are never read.
 // EVERY verb is scoped by user_id = jupiUserId — the Jupi-resolved tenant key
 // (setup step 2). Isolation is enforced in the queries, not by the DB grant.
 //
@@ -45,60 +50,145 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_WINDOW = Number(process.env.BACKLOG_WINDOW_SIZE) || 30;
 
-// ── Scoring model (all tunable) ───────────────────────────────────────────
-//   score = impact^Wi · relevance^Wr · urgency · bottleneck^Wb   (product: any low axis tanks it)
+// ── Scoring model ─────────────────────────────────────────────────────────
+//   score = impact^Wi · relevance^Wr · urgency · bottleneck^Wb · parse_factor
+//     (product: any low axis tanks it)
 //   urgency = 1 + 2·max(staleness, deadline_u), continuous 1..3, recomputed each run:
-//     staleness  = 1 − exp(−age_days / T),  T = external ? T_EXTERNAL : T_INTERNAL
-//     deadline_u = 1 if a hard deadline is ≤ DEADLINE_GUARD_DAYS away (can't be buried),
-//                  else clamp((DEADLINE_HORIZON − days_to_deadline) / DEADLINE_HORIZON, 0, 1)
+//     staleness  = 1 − exp(−age_days / T),  T = turnaround{External,Internal}Days
+//     deadline_u = 1 if a hard deadline is ≤ deadlineGuardDays away (can't be buried),
+//                  else clamp((deadlineHorizonDays − days_to_deadline) / deadlineHorizonDays, 0, 1)
+//
+// EVERY constant below is a DEFAULT, overridable per-install from the `scoring` block of
+// .proactive-jupi/config.local.json — retuning the model must never require a code edit.
+// The defaults are the retuned curve: a deadline inside the working week pins urgency,
+// and deadlines start pulling three weeks out. The pre-retune 7/2 pair ranked a hard
+// cutoff five days away BELOW an untouched thread nobody had answered in a month, because
+// at 4.8 days out it scored (7 − 4.8)/7 = 0.32 while pure staleness had already reached
+// ~0.95. Commitment should outrank rot; that is what these numbers encode.
 const LEVEL = { low: 1, medium: 2, high: 3 };
-const W = { impact: 1, relevance: 1, bottleneck: 1 }; // per-axis exponents; bump impact to weight value higher
-const T_EXTERNAL = 2; // expected turnaround (days) — you owe external counterparties a faster reply
-const T_INTERNAL = 5;
-const DEADLINE_HORIZON = 7; // days out at which a deadline starts pulling urgency up
-const DEADLINE_GUARD_DAYS = 2; // a hard deadline this close pins urgency to max
+const SCORING_DEFAULTS = {
+  deadlineHorizonDays: 21, // days out at which a deadline starts pulling urgency up
+  deadlineGuardDays: 5, // a hard deadline this close pins urgency to max
+  turnaroundExternalDays: 2, // expected turnaround — you owe external counterparties a faster reply
+  turnaroundInternalDays: 5,
+  weights: { impact: 1, relevance: 1, bottleneck: 1 }, // per-axis exponents
+  parseConfidenceFloor: 0.6, // multiplier for a task whose parse the Scorer flagged shaky
+};
+
+// Merge the config `scoring` block over the defaults. Shallow per key, one level deep for
+// `weights`, so an install can override a single dial without restating the whole model.
+function scoringModel() {
+  const s = (loadWorkspaceConfig() || {}).scoring || {};
+  const num = (v, d) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+  return {
+    deadlineHorizonDays: num(s.deadlineHorizonDays, SCORING_DEFAULTS.deadlineHorizonDays),
+    deadlineGuardDays: num(s.deadlineGuardDays, SCORING_DEFAULTS.deadlineGuardDays),
+    turnaroundExternalDays: num(s.turnaroundExternalDays, SCORING_DEFAULTS.turnaroundExternalDays),
+    turnaroundInternalDays: num(s.turnaroundInternalDays, SCORING_DEFAULTS.turnaroundInternalDays),
+    parseConfidenceFloor: num(s.parseConfidenceFloor, SCORING_DEFAULTS.parseConfidenceFloor),
+    weights: {
+      impact: num(s.weights?.impact, SCORING_DEFAULTS.weights.impact),
+      relevance: num(s.weights?.relevance, SCORING_DEFAULTS.weights.relevance),
+      bottleneck: num(s.weights?.bottleneck, SCORING_DEFAULTS.weights.bottleneck),
+    },
+  };
+}
 
 // Continuous urgency in [1,3] from the observed facts, evaluated at `now`.
-function computeUrgency({ signal_at, external, deadline }, now) {
+export function computeUrgency({ signal_at, external, deadline }, now, model = scoringModel()) {
   const DAY = 86400000;
   let staleness = 0;
   if (signal_at) {
     const age = Math.max(0, (now - new Date(signal_at)) / DAY);
-    staleness = 1 - Math.exp(-age / (external ? T_EXTERNAL : T_INTERNAL));
+    const T = external ? model.turnaroundExternalDays : model.turnaroundInternalDays;
+    staleness = 1 - Math.exp(-age / T);
   }
   let deadlineU = 0;
   if (deadline) {
     const dtl = (new Date(deadline) - now) / DAY;
-    deadlineU = dtl <= DEADLINE_GUARD_DAYS ? 1 : Math.max(0, Math.min(1, (DEADLINE_HORIZON - dtl) / DEADLINE_HORIZON));
+    const H = model.deadlineHorizonDays;
+    deadlineU = dtl <= model.deadlineGuardDays ? 1 : Math.max(0, Math.min(1, (H - dtl) / H));
   }
   return 1 + 2 * Math.max(staleness, deadlineU);
 }
 
+// How much a shaky parse discounts the score. A misread signal should sink, not vanish —
+// the Parser's reading can be wrong while the underlying signal still matters, so this
+// demotes rather than suppresses. `high` (the default) costs nothing.
+function parseFactor(level, model) {
+  const floor = Math.max(0, Math.min(1, model.parseConfidenceFloor));
+  if (level === "low") return floor;
+  if (level === "medium") return (1 + floor) / 2;
+  return 1;
+}
+
 const clean = (v) => (v && !String(v).includes("<") ? v : null);
 
-function loadConfig() {
-  let connString = process.env.NEON_CONN_STRING || process.env.DATABASE_URL || null;
-  let userId = process.env.JUPI_USER_ID || null;
+// The nearest .proactive-jupi/config.local.json walking up from cwd, parsed once.
+// Returns null when there is none (env-only runs) — every caller must tolerate that.
+let _workspaceConfig; // undefined = not looked up yet; null = looked up, none found
+function loadWorkspaceConfig() {
+  if (_workspaceConfig !== undefined) return _workspaceConfig;
   let dir = process.cwd();
-  for (let i = 0; i < 8 && (!connString || !userId); i++) {
+  _workspaceConfig = null;
+  for (let i = 0; i < 8; i++) {
     const p = join(dir, ".proactive-jupi", "config.local.json");
     if (existsSync(p)) {
-      const cfg = JSON.parse(readFileSync(p, "utf8"));
-      connString = connString || clean(cfg.neonConnString);
-      userId = userId || clean(cfg.jupiUserId);
+      try {
+        _workspaceConfig = JSON.parse(readFileSync(p, "utf8"));
+      } catch (e) {
+        throw new Error(`${p} is not valid JSON (${e.message}). Note it is parsed strictly — '//' comments are not allowed; the '_'-prefixed keys in the template are the comment convention.`);
+      }
+      break;
     }
     const up = dirname(dir);
     if (up === dir) break;
     dir = up;
   }
+  return _workspaceConfig;
+}
+
+function loadConfig() {
+  const cfg = loadWorkspaceConfig() || {};
+  const connString = process.env.NEON_CONN_STRING || process.env.DATABASE_URL || clean(cfg.neonConnString);
+  const userId = process.env.JUPI_USER_ID || clean(cfg.jupiUserId);
   if (!connString)
     throw new Error("no Neon connection string: set $NEON_CONN_STRING or add neonConnString to .proactive-jupi/config.local.json");
   if (!userId)
     throw new Error("no tenant id: set $JUPI_USER_ID or add jupiUserId to .proactive-jupi/config.local.json (setup step 2 resolves it)");
   return { connString, userId };
+}
+
+// ── Decision permalinks (C7) ──────────────────────────────────────────────
+// The ONE slugifier in the codebase. No Jupi MCP tool returns a decision URL today —
+// `get-decision` returns `source.url`, which is the decision's ORIGIN (a meeting
+// transcript, a thread), not the decision. So every consumer would otherwise
+// reconstruct the permalink, and every copy would drift the day Jupi changes slugging.
+// Slug rule, validated against live digest URLs: lowercase → every char outside
+// [a-z0-9] → '-' → collapse runs → trim. Non-ASCII becomes a hyphen rather than being
+// dropped, so "Guénard" → "gu-nard".
+//
+// Two known limits, both inherent to reconstructing rather than being told:
+//   · it silently breaks if Jupi changes its slug rule;
+//   · it yields a stale (though usually still-resolving) URL once a title is edited.
+// The fix is upstream — have the Jupi tools return the url, or groupSlug + slug.
+// Tracked in TECH-459. When it lands, delete this pair and the `decision-url` verb,
+// and have the skills read `url` off the tool result instead.
+export function slugifyDecisionTitle(title) {
+  return String(title ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function decisionUrl(groupSlug, title, id) {
+  const slug = slugifyDecisionTitle(title);
+  return `https://jupi.co/${groupSlug}/decision/${slug ? `${slug}-` : ""}${id}`;
 }
 
 async function getDb() {
@@ -169,8 +259,8 @@ const VERBS = {
     return { id: r.id, prior_status: r.prior_status ?? null };
   },
 
-  // Write the LLM judgments (impact/relevance/bottleneck), COMPUTE urgency + score
-  // from the row's observed facts, and promote candidate → open.
+  // Write the LLM judgments (impact/relevance/bottleneck/parse_confidence), COMPUTE
+  // urgency + score from the row's observed facts, and promote candidate → open.
   async "score-task"(sql, [id, jsonArg], userId) {
     const s = JSON.parse(jsonArg);
     const cur = await sql.query(
@@ -178,37 +268,67 @@ const VERBS = {
       [id, userId],
     );
     if (!cur[0]) return { id: null, error: "no such task for this user" };
-    const urgency = computeUrgency(cur[0], new Date());
+    const model = scoringModel();
+    const parseConfidence = s.parse_confidence ?? "high";
+    const urgency = computeUrgency(cur[0], new Date(), model);
     const score =
-      LEVEL[s.impact] ** W.impact *
-      LEVEL[s.relevance] ** W.relevance *
-      LEVEL[s.bottleneck] ** W.bottleneck *
-      urgency;
+      LEVEL[s.impact] ** model.weights.impact *
+      LEVEL[s.relevance] ** model.weights.relevance *
+      LEVEL[s.bottleneck] ** model.weights.bottleneck *
+      urgency *
+      parseFactor(parseConfidence, model);
     const rows = await sql.query(
       `update tasks
-          set impact = $3, relevance = $4, bottleneck = $5,
+          set impact = $3, relevance = $4, bottleneck = $5, parse_confidence = $8,
               urgency = $6, score = $7, status = 'open', updated_at = now()
         where id = $1 and user_id = $2
       returning id`,
-      [id, userId, s.impact, s.relevance, s.bottleneck, round2(urgency), round2(score)],
+      [id, userId, s.impact, s.relevance, s.bottleneck, round2(urgency), round2(score), parseConfidence],
     );
-    return { id: rows[0].id, urgency: round2(urgency), score: round2(score) };
+    return {
+      id: rows[0].id,
+      urgency: round2(urgency),
+      score: round2(score),
+      parse_confidence: parseConfidence,
+    };
   },
 
   // The top window act-or-decide reads. NULL scores sort last.
+  // The tiebreak is deterministic on purpose: two tasks at an identical score used to
+  // come back in whatever order the planner happened to see, so the TOP of the backlog
+  // — the part that actually gets worked — was arbitrary and unreproducible between
+  // runs. Soonest real deadline first, then the one whose ball has been in the user's
+  // court longest, then id as a total order so the sequence is stable.
   async "query-window"(sql, [k], userId) {
     const limit = Number(k) || DEFAULT_WINDOW;
     return sql.query(
       `select id, short_label, summary, signal_type, signal_ref, signal_url,
               signal_at, external, deadline,
-              impact, relevance, bottleneck, urgency, score,
+              impact, relevance, bottleneck, parse_confidence, urgency, score,
               relevant_facts, open_questions, gating_decision_ids
          from tasks
         where user_id = $1 and status = 'open'
-        order by score desc nulls last, updated_at desc
+        order by score desc nulls last,
+                 deadline asc nulls last,
+                 signal_at asc nulls last,
+                 id asc
         limit $2`,
       [userId, limit],
     );
+  },
+
+  // Build a decision permalink without touching the DB (§ Decision permalinks).
+  // groupSlug '-' means "use config.jupiWorkspace" — the common case.
+  async "decision-url"(_sql, [groupSlug, title, id]) {
+    const slug =
+      !groupSlug || groupSlug === "-" ? clean((loadWorkspaceConfig() || {}).jupiWorkspace) : groupSlug;
+    if (!slug)
+      return {
+        error:
+          "no workspace slug: pass one as the first argument, or set jupiWorkspace in .proactive-jupi/config.local.json",
+      };
+    if (!id) return { error: "decision-url: usage `decision-url <groupSlug|-> <title> <id>`" };
+    return { url: decisionUrl(slug, title, id) };
   },
 
   // Parser dedup pre-check: what's already on file for a source.
@@ -374,6 +494,11 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+// Verbs that touch no database. Routing these around getDb() keeps them usable in the
+// one place they're most needed — a run that has a title and an id in hand but no Neon
+// credentials (a dry-run report, a cloud session, a skill formatting a link).
+const PURE_VERBS = new Set(["decision-url"]);
+
 async function main() {
   const [verb, ...args] = process.argv.slice(2);
   const fn = VERBS[verb];
@@ -383,12 +508,19 @@ async function main() {
     );
     process.exit(1);
   }
-  const { sql, userId } = await getDb();
+  const { sql, userId } = PURE_VERBS.has(verb) ? { sql: null, userId: null } : await getDb();
   const out = await fn(sql, args, userId);
   process.stdout.write(JSON.stringify(out) + "\n");
 }
 
-main().catch((e) => {
-  process.stderr.write(JSON.stringify({ error: String(e.message || e) }) + "\n");
-  process.exit(1);
-});
+// Only run the CLI when invoked as one. The scoring + permalink helpers above are
+// exported so a Node consumer can `import` them without the CLI firing on import.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (invokedDirectly) {
+  main().catch((e) => {
+    process.stderr.write(JSON.stringify({ error: String(e.message || e) }) + "\n");
+    process.exit(1);
+  });
+}

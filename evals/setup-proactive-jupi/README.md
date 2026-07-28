@@ -84,6 +84,15 @@ read as "a careful run *can* do this", not "any run *will*".
 | 11 | Workspace root resolution — repo / nothing durable / two connected folders; never a silent CWD fallback |
 | 12 | Unattended prelude — one question, then halt; never a re-asked round and never an invented answer |
 | 13 | Step 8 on-device only — no bridge in the session ⇒ create no routine at all, report ⚠️ *(pre-seeded, step 8 alone)* |
+| 14 | Secrets already on disk — found in `settings.local.json`/env and confirmed, not re-requested or echoed |
+| 15 | Orphaned brain — Facts under the tag + no config at root reported as a repair, brain left intact |
+| 16 | Scheduler idempotency — twice in a row on-device: match on `taskId`, update in place, one-per-`taskId` assertion |
+| 17 | Identity — `{"items":[]}` is a successful call, not a dead gate; `jupiUserId` accepted as an invocation arg |
+| 18 | `Draft call` filled from the probed surface + schema applied via `apply-schema.mjs` (no hand-rolled splitter) |
+
+Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace). 14, 15 and 17 sit
+in steps 1–2 and run **prelude-only**; 16 and 18 reach steps 5 and 8, so run them against a **scratch Neon
+project** and expect 16 to create real (then updated) on-device routines — delete them afterwards.
 
 ## Prerequisites
 

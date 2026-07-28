@@ -59,12 +59,14 @@ is what lets it scan the whole backlog every run.
    `relevance` against in Stage 2. If the section is missing (an `assets.md` predating it), score relevance
    on the signal alone and say so in the return; don't stall.
 
-**Ensure the DB helper's deps once** (first run / fresh install): if
-`${CLAUDE_PLUGIN_ROOT}/shared/node_modules` is absent, run
-`npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared" --no-save`. If npm/Neon egress is blocked
-by the sandbox, retry with the sandbox network disabled (same fallback setup uses for the
-schema apply) — it's already pre-authorized, so this stays promptless in routines. **Run on Node ≥18** —
-the Neon driver uses the global `fetch` (absent on Node 16).
+**Ensure the DB helper's deps** — one command, at the top of every run:
+```
+bash "${CLAUDE_PLUGIN_ROOT}/shared/ensure-deps.sh"
+```
+That script is **the** dependency path shared by every skill calling `db.mjs` (idempotent, checks Node ≥18,
+tells you when to retry with the sandbox network disabled — the pre-authorized fallback, so routines stay
+promptless). Don't improvise an install or symlink a session's `node_modules` into `shared/`: that works
+until the next cold scheduled run and then stops.
 
 > **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
 > inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
@@ -105,8 +107,30 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
        Not your own last message.
      - `external` — `true` if any counterparty is **outside your org** (sender/recipient/attendee
        domain ≠ your org's). Internal tickets/PRs → `false`.
-     - `deadline` — ISO hard due date if the signal has one (meeting start, explicit due date);
-       else omit.
+     - `deadline` — ISO hard due date if the signal has one. **Extract it; don't wait to be handed a
+       structured field.** Most deadlines arrive as ordinary prose, so read for them: an explicit due
+       date, a meeting or event start, *"before the 12th"*, *"by Friday"*, *"ahead of the board"*,
+       *"I'm out from the 2nd"* — resolve relative phrasing against `signal_at`, not against today, or
+       "by Friday" in a three-day-old mail lands a week late. Record the **date the work must be done
+       by**, and when a range is implied take its start.
+       - **Why this is worth the effort rather than a nice-to-have:** urgency is
+         `1 + 2·max(staleness, deadline_u)`, so a task with no `deadline` rides on staleness alone. On the
+         reference backlog only **8 of 38** open tasks carried one, which made the model effectively
+         staleness-only — and a task nobody had touched in weeks outranked a hard cutoff five days out.
+         Every deadline you fail to extract is a commitment competing purely on how long it has been ignored.
+       - Omit it when there genuinely isn't one. **A guessed deadline is worse than none**: it pins urgency
+         to the top for a task that didn't earn it, and nothing downstream can tell an inferred date from a
+         stated one.
+     - `parse_confidence` — `low | medium | high` (default `high`): **how sure you are you read the
+       signal correctly**, which is not the same question as `relevance` (is this a real task worth
+       surfacing) or the act-gate confidence (do we know how to handle it). Go `low`/`medium` when the
+       subject is ambiguous, the thread is mid-conversation, it's in a language or shorthand you're
+       reading loosely, or you had to infer who and what it's about.
+       - **Because a task is currently either in the backlog at full weight or absent, there's otherwise
+         no way to say "I might have this wrong".** On the reference run a mail about *Jupi's own team*
+         was parsed as being about pilot companies and scored **75.65 at #4** — full weight, on a
+         misreading, and the error then propagated into a Fact. Flagging it discounts the score
+         (`db.mjs § parseFactor`) instead of dropping the task: a shaky reading sinks, it doesn't vanish.
    - `relevant_facts` — a **light** `recall` (containerTag `user_<jupiUserId>`, read from config —
      **never** Supermemory's `whoAmI`, which is a different id and points at a different store) for the
      people/orgs/projects named: `[{summary, source}]`. Read-only, shallow. **Do not** launch
@@ -122,7 +146,8 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
        the question → confidence high → act). You only surface that a rule *might* cover it.
    - **Upsert:** `upsert-task '<json>'` (fields: `short_label, summary, signal_type, signal_ref,
      signal_url, signal_at, external, deadline, relevant_facts, open_questions`). Keys on
-     `(signal_type, signal_ref)`; returns `{ id, prior_status }`.
+     `(signal_type, signal_ref)`; returns `{ id, prior_status }`. *(`parse_confidence` rides along with
+     the Stage-2 `score-task` call, not here — it's a judgment, and `score-task` is where judgments land.)*
 5. **Apply the reopen / no-resurrect rule** using `prior_status`:
    - `null` (new) or `candidate`/`open` → keep it (the upsert already refreshed it).
    - `dropped` or `done` → **leave it closed** *unless* the signal has genuinely new inbound
@@ -169,22 +194,31 @@ compute urgency or the score — `db.mjs` does, from the facts the Parser record
   the outcome's own worth, bottleneck is worth unlocked *in others* — a 2-minute approval that frees
   three people is low-impact / high-bottleneck; a big solo deliverable is high-impact / low-bottleneck.
 
-Then `score-task <id> '{"impact":…,"relevance":…,"bottleneck":…}'` — which **computes**
-`urgency = 1 + 2·max(staleness, deadline)` (from `signal_at`/`external`/`deadline`, refreshed to
-now) and `score = impact · relevance · urgency · bottleneck`, and promotes `candidate → open`. It
-returns the computed `{ urgency, score }`.
+Carry the **`parse_confidence`** you set in Stage 1 through with them (default `high` — omit it when
+you read the signal cleanly).
+
+Then `score-task <id> '{"impact":…,"relevance":…,"bottleneck":…,"parse_confidence":…}'` — which
+**computes** `urgency = 1 + 2·max(staleness, deadline)` (from `signal_at`/`external`/`deadline`,
+refreshed to now) and `score = impact · relevance · urgency · bottleneck · parse_factor`, and promotes
+`candidate → open`. It returns the computed `{ urgency, score, parse_confidence }`.
 
 **Product, not sum:** a low on any axis tanks the score, so high-impact noise can't ride up on
-impact alone. Weights live at the top of `db.mjs` (`W.impact/relevance/bottleneck`, the turnaround
-`T`, deadline horizon) — one-line tunable; don't hand-tune scores here.
+impact alone. **Every constant in the model — the weights, the turnaround `T`s, the deadline horizon and
+guard, the parse-confidence floor — is config**, in the `scoring` block of
+`.proactive-jupi/config.local.json` (defaults in `db.mjs`). Retuning is a config edit, never a code edit,
+and never hand-tuned axes here: if the ordering looks wrong, the model is what's wrong.
 
 *(This is the **local** bottleneck — "is someone waiting on me," observable per-signal. The
 **global** "which task unblocks the most across the whole backlog" is the coordination-node pass in
 act-or-decide, Phase 3 — the Scorer just floats blockers into the top window it reasons over.)*
 
 **The window is a read, not a write.** You don't select the top-K; you just score. Downstream
-narrows with `query-window [backlogWindowSize]` (`order by score desc limit K`). Run it once at
-the end to show the current top window in your summary.
+narrows with `query-window [backlogWindowSize]`, which orders by **score desc, then soonest
+`deadline`, then oldest `signal_at`, then `id`**. That tiebreak lives in SQL so it's the same on every
+run: ties at the top of a backlog are common (three maxed axes and a pinned urgency all land on the same
+number), and without a deterministic order the part of the backlog that actually gets worked was
+whichever row the planner happened to see first. Run it once at the end to show the current top window
+in your summary.
 
 ---
 
