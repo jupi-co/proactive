@@ -46,10 +46,12 @@ Two layers, matching `evals/refresh-backlog/`.
   16. **User-facing report** — the same four blocks in the user's words at setup time: no cluster/exposure/conf
      vocabulary, each item marked *on my own* vs *I'll ask you*, Deferred still shown. This is the first thing
      a new user ever sees Jupi produce.
-  17. **Draft-mode exemptions** — a business rule is an owner-approved settled decision, so a rule-covered
-     action ACTs with its `rule_ref` even with no draft call (without this the whole read-side rule loop is
-     dead in the default mode); a label and an RSVP ACT because they expose nothing. All marked *exempt*,
-     never *converted*.
+  17. **Authorised actions execute in both modes** — a business rule *is* a finalized `[BR]` decision, so a
+     rule-covered action ACTs with a real verb and its `rule_ref` even with no draft call. Without this the
+     read-side rule loop is inert in the default mode, since rules mostly cover commitments.
+  19. **Drafting beats nothing-at-stake** — an action with an available draft call is drafted, never sent
+     real on the grounds that it was harmless. Otherwise the cheap-action path becomes a licence to send
+     live mail in draft mode (a real hole an earlier run found).
   18. **Swept orphans keep their queued verb** — a draft row picked up by a `--perform` run must not become
      a real send. Re-deriving the verb from the run's mode is the failure.
 

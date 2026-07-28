@@ -222,6 +222,13 @@ the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is wri
 - **DECIDE** → author the Jupi decision (§Posting) via the producer↔validator loop; on PASS, `set-task-gating`
   the task(s) with the decision id. **No `actions` rows are written for pending options** — Jupi holds them.
 
+Then **set each task's status** (you own it): **`blocked`** if it raised a decision (any `gating_decision_ids`
+set), else **`done`** (acted / nothing to do); a ruled-out task → **`dropped`**. *(dry-run: don't write.)*
+- **For an ACT task, set `done` only after the hand-off, and only if its rows came back `ok:true`.** Marked
+  `done` up front, a task whose action then fails leaves the row retrying forever against a task that has
+  already left the window — nothing re-plans it, nothing reports it. Leave it `open` instead: the sweep
+  retries the row, and if it keeps failing the task resurfaces where you can see it.
+
 **Bound the decisions too: at most `decisionBudget` per run.** Nothing capped this before, and under §Draft
 mode it matters more than it looks — every action with no draft turns into a decision, so the count balloons
 exactly when the user is least willing to be flooded. Keep the **highest-leverage** ones (Stage 2's ranking)
@@ -268,66 +275,64 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   **ACT**, tagging the acted row's `rule_ref` with the rule's id. You find it via the `assets.md` rules index
   → the `rules`-store entry (Stage 3.3). This is how a task *graduates from decide to act*.
 
-**Draft-mode resolution — the last check before any ACT.** When `mode` is `draft`, you may only ACT if the
-call you'd make **leaves the last step to the user**. Two questions; it's a draft only if both are yes:
+**Draft mode shapes what you EMIT — never what may be executed.** Two paths, and what separates them is
+whether a human has already authorised the action.
+
+**Authorised → executes in both modes.** Actions carried by a **finalized decision** are the source of truth:
+they run with the verb they were written with, in `draft` and `perform` alike (`act-post-decision` runs them
+at settle). A **business rule is a finalized `[BR]` decision about a class**, so an action a rule genuinely
+covers is authorised the same way — **ACT with a real verb**, `rule_ref` on the row, exposure not re-litigated.
+Stage 3.3 must confirm the rule covers *this* instance; an almost-fit is a `[BR]` amendment, never an act.
+*Without this the read-side rule loop would be inert in the default mode, since rules mostly cover
+commitments ("always approve ≤15% on annual prepay") and a commitment has no draft call — "graduates from
+decide to act" would graduate nothing.*
+
+**Not yet authorised → this is what `mode` governs.** For an action you're raising on your own initiative, in
+`draft`, in this order:
+1. **Draft it if you can.** Name the call that prepares without committing (the two questions below) → that
+   call is the ACT's verb. **Prefer this over everything else**: a draft they can read beats a question.
+2. **Otherwise emit a decision**, carrying the content you prepared as its recommended option. **Its
+   option-actions take draft verbs where those exist and real verbs where they don't** — finalizing the
+   decision is what authorises them.
+3. **Unless the action exposes nothing even when performed** — a label, an archive, a read: reversible,
+   nobody notified, nothing to stage and nothing to protect, so it acts with its real verb. Judge by
+   consequence, not by how small the verb sounds. **This only ever applies when step 1 found no draft call**,
+   since drafting is always the better answer.
+
+In `perform`, emit real verbs throughout.
+
+**The two questions — does this call leave the last step to the user?** It's a draft only if both are yes:
 1. **Is there still something the user must do for it to count?** `create_draft` leaves them the send.
    `save_comment` doesn't — the comment is posted.
 2. **Until they do it, are they the only one who can see it?** Nobody is notified about a draft.
 
-Either answer no → this action has no draft, so it's a **DECIDE** whatever the gate returned. **Carry the
-content you prepared in as the recommended option** — they approve your text rather than starting over.
-
-**Four things this rule does NOT touch**, because it exists to stop *unreviewed exposure*, not to add
-ceremony. Where a human has already approved, or where nothing is exposed, there is nothing to protect:
-1. **`perform` mode** — verbs run as written.
-2. **A settled decision's actions** — the decision *was* the approval.
-3. **An action a business rule covers** (Stage 3.3). A rule is *"when X, always Y", approved by an owner* —
-   a settled decision about a whole class, so it carries a real verb for the same reason (2) does, and the
-   acted row keeps its `rule_ref`. **Without this, the rule loop would be nearly dead in the default mode**,
-   since rules mostly cover commitments ("always approve ≤15% on annual prepay") and a commitment never has
-   a draft call — the read-side "graduates from decide to act" would graduate nothing. The rule must cover
-   **this instance**, which Stage 3.3 confirms by opening it; an almost-fit is a `[BR]` amendment, never an
-   act.
-4. **Actions that expose nothing even when performed** — a label, an RSVP, a read, a search: reversible,
-   nobody notified, nothing at stake. There is nothing to stage, so staging is meaningless. Judge this by
-   consequence, not by how small the verb sounds: if undoing it is a deletion someone would notice, it isn't
-   this case.
-
-*Why this exists: draft mode was written around mail, where a draft is a real object, and had no defined
-behaviour anywhere else — four of five gate-cleared ACTs on the reference workspace fell in that gap.*
-
 **Answer it per action, at run time.** Draftability belongs to the *call*, not the product: one connector
 often has both kinds, and its call list changes on upgrade. In order — **(a)** run the two questions against
-the call you'd make, and **if you can name a call that passes both**, that call is the ACT's verb ("Linear
-probably has drafts" is not a call you can make); **(b)** else `assets.md`'s **Draft call** column, what
-setup saw when it probed — a note from last time, so a call you *can* name beats a table saying `none`;
-**(c)** else **no**. Wrong towards "no" costs one question; wrong towards "yes" does something irreversible
-in their name, under the mode they picked to prevent exactly that.
+the call you'd make, and **if you can name a call that passes both**, use it ("Linear probably has drafts" is
+not a call you can make); **(b)** else `assets.md`'s **Draft call** column, what setup saw when it probed — a
+note from last time, so a call you *can* name beats a table saying `none`; **(c)** else there is no draft.
 
 **Name the action before you test it — the test is only as good as its input, and the tempting error is to
 name the *channel* instead of the *commitment*.** Ask what changes for the recipient the moment they read it.
 "They now have my yes" means the action is the commitment, and drafting the email doesn't draft it: a reply
-granting the discount has no draft call, however draftable the mail is. If the message only reports or asks
-about a commitment, the action really is the email. Can't tell → DECIDE.
-Naming it the commitment doesn't by itself make it exposed — **the commitment is then scored on the normal
-ladder** (reversibility, destination, recipient). "Yes, 11:00 works" is a commitment and a trivial one:
-internal, reversible, nothing at stake → exemption 4 → it acts. Granting a discount is not.
+granting a discount has no draft call, however draftable the mail is. If the message only reports or asks
+about a commitment, the action really is the email. Can't tell → emit a decision.
 
 Also fails question 1: **hiding something isn't not doing it** — a Linear issue's `state`, a doc's sharing
 setting: it exists, the team can see it, and taking it back is a deletion.
 
 *(Accepted: this makes draft mode materially tighter than perform, and `decisionBudget` becomes the binding
-constraint. The way out is flipping to `perform` as trust builds, not relaxing this. Linear has drafts
-in-product but not over MCP, so its comment resolves to `none` on evidence — and flips itself when that
-changes.)*
+constraint. The way out is flipping to `perform` as trust builds, or letting rules accrue — not relaxing
+this. Linear has drafts in-product but not over MCP, so its comment resolves to `none` on evidence, and
+flips itself when that changes.)*
 
 ## Draft mode
-`mode` is config, read here. **`draft` (default):** an action gets its draft verb — and so `exposure=low` →
-**ACT** — only when you can name the call that drafts it (§The gate, Draft-mode resolution); anything with
-no draft version, and every non-draftable high-exposure action, becomes a **DECIDE**. Low-exposure
-reversible ones (RSVP, label, search) act in both modes: there's nothing to draft when nothing is at stake.
-**`perform`** (or `--perform`): emit the real verb; exposure is by destination. Either way you only **queue**
-the row — `execute-action` performs whatever verb the row carries, and hands the trace back to you to record.
+`mode` is config, read here, and it governs **emission only** (§The gate). **`draft` (default):** an action
+you raise yourself gets its draft verb when one exists; otherwise it's emitted as a decision whose
+option-actions are drafts where possible. Reversible nothing-at-stake actions act in both modes.
+**`perform`** (or `--perform`): emit real verbs. Either way you only **queue** the row — `execute-action`
+performs whatever verb the row carries and hands the trace back to you.
+
 
 **Settled-decision actions always carry real verbs** (the decision was the approval) — draft mode caps
 only *immediate* acts, never a decision's outcome.

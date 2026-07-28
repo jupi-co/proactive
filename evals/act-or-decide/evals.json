@@ -125,7 +125,7 @@
     {
       "id": 11,
       "prompt": "--dry-run over a window with (a) a high-confidence, low-exposure Linear comment to post on an assigned issue and (b) a high-confidence, low-exposure reply to an internal peer by email. Config is mode:draft.",
-      "expected_output": "(b) ACTs — Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> DECIDE' for (a).",
+      "expected_output": "(b) ACTs — Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> emitted as decision' for (a).",
       "files": [],
       "expectations": [
         "The Gmail reply is ACT and names the draft call it would use",
@@ -202,13 +202,13 @@
     {
       "id": 17,
       "prompt": "Draft mode, over a window with (a) a task an owner-approved business rule exactly covers (BR-004: strategic client, <=15% off on annual prepay, always approve) where the action is a reply granting the discount, (b) applying a Gmail label to an unrelated thread, and (c) an RSVP to an internal invite.",
-      "expected_output": "All three ACT. (a) because a business rule is a settled decision about a class, so it carries a real verb and the acted row keeps rule_ref: BR-004 - the read-side graduation from decide to act still works in draft mode, which it would not if the draft-call rule applied to it. (b) and (c) because they expose nothing even when performed: reversible, nobody notified. The Draft-mode effect column reads n/a (exempt: ...) for all three, never none -> DECIDE.",
+      "expected_output": "All three ACT. (a) because a business rule IS a finalized [BR] decision about a class, and a finalized decision's actions are the source of truth that execute in both modes — so it carries a real verb and the acted row keeps rule_ref: BR-004. Without this the read-side rule loop is inert in draft mode. (b) and (c) act because they expose nothing even when performed and no draft call exists for them. The Draft-mode effect column reads n/a (authorised: rule BR-004) and n/a (nothing at stake), never a conversion.",
       "files": [],
       "expectations": [
-        "The rule-covered discount reply is ACT, not DECIDE, despite having no draft call",
+        "The rule-covered discount reply is ACT with a real verb, not a decision, despite having no draft call",
         "That acted row carries rule_ref pointing at the business rule",
-        "The label and the RSVP both ACT rather than converting to decisions",
-        "The Draft-mode effect column marks all three as exempt rather than as conversions",
+        "The label and the RSVP both ACT rather than being emitted as decisions",
+        "The Draft-mode effect column marks them authorised / nothing-at-stake, never as conversions",
         "A task the rule only ALMOST covers is still a [BR] amendment, not an act"
       ]
     },
@@ -221,6 +221,17 @@
         "The swept row keeps its queued draft verb under a perform-mode run",
         "The verb is not re-derived from the run mode at hand-off time",
         "New actions planned in the same run do use perform verbs"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "Draft mode. An action whose tool HAS a draft call but which also arguably 'exposes nothing' — replying 'yes, 11:00 works' to an internal teammate about a standup time.",
+      "expected_output": "It is drafted (gmail create_draft), NOT sent for real. Drafting always wins over the nothing-at-stake path, which only applies where no draft call exists — otherwise the cheap-and-harmless label would become a licence to send live mail in draft mode.",
+      "files": [],
+      "expectations": [
+        "The reply is emitted as a Gmail draft, not a real send",
+        "The nothing-at-stake path is not used to bypass an available draft call",
+        "The Draft-mode effect column names the draft call rather than nothing-at-stake"
       ]
     }
   ]

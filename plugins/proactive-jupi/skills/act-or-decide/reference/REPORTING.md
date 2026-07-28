@@ -16,12 +16,18 @@ below and no other — a *converted* action must be distinguishable from one tha
 
 | Value | When |
 |---|---|
-| the call, e.g. `gmail create_draft` | passed both questions — this call is the ACT's verb |
-| `none → DECIDE` | no call passed, so the gate's `act` was overridden. **A conversion.** |
-| `not reached` | the gate already returned `decide`, so the draft check never ran. **Not** a conversion — it'd be a decision in perform mode too. |
-| `n/a (perform mode)` | `mode` is perform |
-| `n/a (exempt: <reason>)` | one of the four exemptions above — `rule BR-004`, `settled decision`, `nothing at stake` |
-| `n/a (skill: <name>)` | a `tool: skill` action — draftability was judged from what the skill does (Stage 4), not from a call |
+| `n/a (perform mode)` | `mode` is perform — nothing below applies |
+| `n/a (authorised: <what>)` | executes regardless of mode — `rule BR-004`, `settled decision` |
+| `n/a (swept: queued <verb> <date>)` | an orphan from an earlier run; it keeps the verb it was queued with |
+| the call, e.g. `gmail create_draft` | drafted — this call is the ACT's verb |
+| `none → emitted as decision` | no draft call, so the action was emitted as a decision instead. **This is the conversion** |
+| `n/a (nothing at stake)` | no draft call and nothing exposed — acts with its real verb |
+| `not reached` | the gate returned `decide` on its own (low confidence, or high × high), so emission never got this far |
+
+**Read the table top-down and take the first row that applies** — several can be true at once (a swept
+orphan in a perform run, a rule-covered action that also exposes nothing), and without an order two runs
+render the same action differently, which is what this column exists to prevent. `none → emitted as decision`
+is the one a reader scans for: it's what draft mode actually *cost*.
 
 `not reached` is the common case; getting it right is what lets a reader find what draft mode *cost* by
 scanning for `none → DECIDE`.
@@ -71,8 +77,8 @@ as *"exposure"*, because it still doesn't say what the thing **is**. **Name the 
 
 1. **What I handled on my own** — what it was, **what they'll find** ("a reply drafted in Gmail, ready to
    send"), why it didn't need them. Empty is worth saying out loud, in one line.
-   - **In `--dry-run`, put it in the conditional** — *"What I'd handle on my own"*, *"Decisions I'd put to
-     you"*. Nothing has been handled or submitted yet, and setup's first dry run is where this report is
+   - **In `--dry-run`, put ALL FOUR headings in the conditional** — *"What I'd handle on my own"*,
+     *"Decisions I'd put to you"*, *"What I'd leave for next time"*. Nothing has been handled or submitted yet, and setup's first dry run is where this report is
      most often read: past tense there has Jupi taking credit for work it hasn't done, which is the worst
      possible first impression to give someone deciding whether to trust it.
 2. **Decisions I've submitted that need your input** — the title as it reads in Jupi, **a link they can
@@ -86,8 +92,11 @@ as *"exposure"*, because it still doesn't say what the thing **is**. **Name the 
 **Say why so much is a question, when it is.** In draft mode most items become questions because the tool
 has no draft — Linear posts a comment the moment you call it — not because the work was risky or Jupi was
 unsure. Left unexplained, a report that's mostly questions reads as timid, and the fix they'll reach for
-(loosening the policy) isn't the one that helps. One line: *"Three of these are questions only because
-Linear and the calendar can't prepare something for you to look at first."*
+(loosening the policy) isn't the one that helps. **Separate the two kinds, or you understate your own
+judgement**: some questions exist only because the tool can't prepare anything, others because the call is
+genuinely theirs. *"Two of these are questions only because Linear and the calendar can't prepare something
+for you to look at first. The other two I'd want you to decide either way — one commits money we can't get
+back."*
 
 Close on posture, not config: *"I'm in draft mode, so nothing goes out without you sending it."*
 
