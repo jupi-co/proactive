@@ -261,11 +261,12 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   for review, not that you can describe it in an email.** Wrapping a commitment in a message about the
   commitment doesn't stage it: "draft an email confirming the booking" is still the booking if sending that
   mail is what confirms it, and scoring it `low` would launder a high-exposure act through the draft
-  transform. Ask what is irreversible once the action completes, not what the verb is called. A
-  **non-draftable** action (book a venue, raise a budget, submit a payment, merge a PR, or a skill that may
-  send — Stage 4) is scored by destination directly — read
-  `external`, recipient sensitivity (peer < manager < CEO < external), irreversibility → `high` when any
-  bites. **That ladder is relative to the user, so read it off `assets.md`'s `Who this is`** (role ·
+  transform. Ask what is irreversible once the action completes, not what the verb is called. **Score exposure on destination and
+  irreversibility alone — whether the action can be drafted is NOT an input.** Read `external`, recipient
+  sensitivity (peer < manager < CEO < external), and irreversibility → `high` when any bites. Draftability is
+  the separate emission step that runs after the gate (§Draft mode), and folding it in here makes the same
+  action render two different ways in the report: an internal Linear comment is `low` → the gate says act →
+  the draft step converts it, which is what you want to see, not `high` → decide with the conversion hidden. **That ladder is relative to the user, so read it off `assets.md`'s `Who this is`** (role ·
   accountable for · works with): a VP is a peer to a VP and a skip-level to an IC, and someone inside
   their stated accountabilities is routine where the same name outside them is not. Absent that section,
   fall back to the literal ladder and lean conservative.
@@ -422,11 +423,26 @@ absent history become an excuse for boilerplate — it is the case where a templ
 obviously wrong to the person receiving it.
 
 ## Actions — maximally advanced
+**When the signal source can't be opened, say so and proceed — don't stall and don't invent.** A thread gets
+archived, an issue gets deleted, a permalink rots: `signal_url` stops resolving between the parse and this
+run. "Dig the real tools" then has nothing to dig, and read literally it implies delivering nothing, which
+turns a stale link into a silently dropped task. Instead: work from the task's own `summary`, `signal_ref`
+and `relevant_facts`, **attribute every claim to the backlog record rather than to the source**, and state in
+the action (and the decision, if it becomes one) that the original could not be reopened. A reviewer needs to
+know a claim is second-hand; they don't need the task to vanish.
+
 Before writing each action, **dig the real tools** to make it concrete and far-along: the exact thread to
 reply to, the exact doc + location, the drafted substance (the ask, angle, cc). Resolve unknowns instead of
 deferring (look up the name, pull candidate slots). A shallow "Jupi will draft an email to X" with nothing
 dug is what the validator sends back. If an action hides a fresh trade-off, say so: "Jupi will create a
 decision to settle XXX."
+
+**A reply belongs in its thread, so carry the id that makes that possible.** `create_draft` can take a
+`replyToMessageId`, but `signal_ref`/`signal_url` are thread- or issue-level, so an action built from them
+alone produces a *standalone* draft sitting outside the conversation. That quietly costs the closing loop its
+premise — the trace on the signal *is* the notification, and a detached draft leaves no trace on it. When you
+dig the thread (above) you already have the message in hand: put its id in the action's `description` so
+`execute-action` can thread the reply. If you genuinely can't get one, say the draft will be standalone."
 
 ---
 
@@ -448,18 +464,19 @@ Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Write th
 `act-or-decide/runs/run-<id>/report.md` and return it.
 
 ## Decision links
-A decision you post is only useful if the user can open it, and **no Jupi tool returns a decision URL today**
-— `get-decision` does return a `url`, but that is `source.url`, the decision's *origin* (a meeting transcript,
-a thread). Reaching for it as the decision's link is the trap: it resolves, it looks right, and it goes
-somewhere else entirely.
+**Take the `url` off the create response.** `create-decision-tool` returns the decision's own `url` (also on
+`add-decision-options-tool` / `add-option-actions-tool`), and since you are the one creating it, that is the
+authoritative link — capture it with the `id`. Verified in a live run: it matches the helper's output exactly.
 
-So build the permalink with the shared helper — **never write your own slugifier**, here or in the report:
+**Only reconstruct when you didn't create it** — a decision you found via `search-decisions-tool`, or read
+with `get-decision`. Those return no decision url; `get-decision`'s `url` is `source.url`, the decision's
+*origin* (a transcript, a thread), which resolves cleanly and points somewhere else. For those:
 ```
 node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" decision-url - "<decision title>" <decision id>
 ```
-(`-` means "use `jupiWorkspace` from config".) One implementation means one place to fix when Jupi either
-changes its slug rule or — the real fix, requested upstream in **TECH-459** — starts returning the url
-itself. Once it does, read `url` off the tool result and the helper goes away.
+(`-` = `jupiWorkspace` from config.) **Never write your own slugifier** — one implementation, one place to fix.
+Narrowing the read-side gap is TECH-459.
+
 
 ## Where you write
 - **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`.
