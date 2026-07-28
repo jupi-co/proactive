@@ -46,6 +46,12 @@ Two layers, matching `evals/refresh-backlog/`.
   16. **User-facing report** — the same four blocks in the user's words at setup time: no cluster/exposure/conf
      vocabulary, each item marked *on my own* vs *I'll ask you*, Deferred still shown. This is the first thing
      a new user ever sees Jupi produce.
+  17. **Draft-mode exemptions** — a business rule is an owner-approved settled decision, so a rule-covered
+     action ACTs with its `rule_ref` even with no draft call (without this the whole read-side rule loop is
+     dead in the default mode); a label and an RSVP ACT because they expose nothing. All marked *exempt*,
+     never *converted*.
+  18. **Swept orphans keep their queued verb** — a draft row picked up by a `--perform` run must not become
+     a real send. Re-deriving the verb from the run's mode is the failure.
 
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`

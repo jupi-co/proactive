@@ -198,6 +198,30 @@
         "Raw scores are omitted unless the number would change the user decision",
         "The Deferred block is shown in plain language rather than quietly dropped"
       ]
+    },
+    {
+      "id": 17,
+      "prompt": "Draft mode, over a window with (a) a task an owner-approved business rule exactly covers (BR-004: strategic client, <=15% off on annual prepay, always approve) where the action is a reply granting the discount, (b) applying a Gmail label to an unrelated thread, and (c) an RSVP to an internal invite.",
+      "expected_output": "All three ACT. (a) because a business rule is a settled decision about a class, so it carries a real verb and the acted row keeps rule_ref: BR-004 - the read-side graduation from decide to act still works in draft mode, which it would not if the draft-call rule applied to it. (b) and (c) because they expose nothing even when performed: reversible, nobody notified. The Draft-mode effect column reads n/a (exempt: ...) for all three, never none -> DECIDE.",
+      "files": [],
+      "expectations": [
+        "The rule-covered discount reply is ACT, not DECIDE, despite having no draft call",
+        "That acted row carries rule_ref pointing at the business rule",
+        "The label and the RSVP both ACT rather than converting to decisions",
+        "The Draft-mode effect column marks all three as exempt rather than as conversions",
+        "A task the rule only ALMOST covers is still a [BR] amendment, not an act"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "A --perform run whose orphan sweep picks up a `ready` action row that a previous DRAFT-mode run queued (its description says \"create draft email to the venue\").",
+      "expected_output": "The swept row is handed to execute-action with the verb it was queued with - it stays a draft. The run does NOT re-derive the verb from the current perform mode, which would silently turn last night's draft into a real send to an external counterparty.",
+      "files": [],
+      "expectations": [
+        "The swept row keeps its queued draft verb under a perform-mode run",
+        "The verb is not re-derived from the run mode at hand-off time",
+        "New actions planned in the same run do use perform verbs"
+      ]
     }
   ]
 }
