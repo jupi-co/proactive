@@ -148,6 +148,22 @@
         "With two connected folders the agent asks which one, listing them",
         "The resolved root appears as a header line in assets.md and does NOT appear in config.local.json"
       ]
+    },
+    {
+      "id": 12,
+      "prompt": "UNATTENDED PRELUDE — HALT, DON'T RE-ASK (fresh scratch workspace). Invoke setup and then simply stop responding: the runner answers nothing at all from the first question onward, no matter how the agent phrases it. Run a second variant in a headless/non-interactive session (no keyboard attached, prompts return empty or are declined outright).",
+      "persona": "A user who kicks setup off and walks away without saying so. They never reply again. Anything the agent asks goes unanswered — including follow-ups, rephrasings, and 'still there?' checks.",
+      "expected_output": "The run asks its question ONCE and then stops, leaving that question as the last thing on screen. FAIL if the same round of questions is re-asked, rephrased, or re-sent even twice — silence means the human stepped away, so repeating cannot produce an answer and only buries the original question under copies, which reads as the skill malfunctioning. FAIL equally if the agent invents answers and proceeds: a guessed inbox, work surface, or rules store routes their real work and fails silently later. Before halting it saves what was already settled (config keys collected, confirmed assets.md rows) so a re-run resumes rather than restarts, and it says in one line where it stopped and that re-running picks up there. It never crosses the ✋ boundary — no schema apply, no crawl, no backlog rows, no scheduled routines on a prelude that never finished. Step 1's Neon re-collect and step 2's Jupi re-probe loops are bounded the same way: a couple of attempts, then halt with the connect steps on screen rather than probing forever.",
+      "files": [],
+      "expectations": [
+        "The agent asks its question once and ends its turn instead of re-asking",
+        "The same round of questions is never repeated or rephrased at the unresponsive user",
+        "No answer is invented: no inbox, work surface, rules store, or root is filled in by assumption",
+        "What was already settled is written to disk (config keys, confirmed assets.md rows) before halting",
+        "The halt states which question it stopped on and that a re-run resumes from there",
+        "The run never crosses the needs-you boundary: no schema apply, crawl, backlog rows, or scheduled routines",
+        "The Jupi re-probe and Neon re-collect loops stop after a couple of attempts rather than looping indefinitely"
+      ]
     }
   ]
 }

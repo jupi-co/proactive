@@ -19,7 +19,7 @@ tools into Supermemory, and schedules routines. So:
 
 - **Always run in a throwaway workspace** — `WS=$(mktemp -d)`, `cd "$WS"`, `git init` if the case needs a repo.
   Never point a case at the real `.proactive-jupi/`.
-- **Cases 1–9 run the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
+- **Every case except 10 runs the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
   Every behavior under test lives in steps 1–3, and stopping there keeps the eval cheap and side-effect-free
   — no 30-day crawl, no backlog rows, no live routines.
 - **Case 10 is the only full run.** It's opt-in and expensive — it crawls, writes rows, and schedules
@@ -67,6 +67,8 @@ read as "a careful run *can* do this", not "any run *will*".
 | 8 | Capability inventory — *when to reach for it* actually filled; explicit "none discovered" when empty |
 | 9 | Prelude boundary + secrets hygiene — nothing human-gated after ✋; the conn string travels minimally |
 | 10 | Full run + re-run idempotency — two routines converge, assets.md reconciled *(expensive, opt-in)* |
+| 11 | Workspace root resolution — repo / nothing durable / two connected folders; never a silent CWD fallback |
+| 12 | Unattended prelude — one question, then halt; never a re-asked round and never an invented answer |
 
 ## Prerequisites
 
