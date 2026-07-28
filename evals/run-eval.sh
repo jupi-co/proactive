@@ -43,8 +43,13 @@ case "$CMD" in
     ids=$(python3 -c "
 import json;print(' '.join(str(e['id']) for e in json.load(open('$EVAL_DIR/evals.json'))['evals']))")
     for id in $ids; do
+      # `run-N` is load-bearing, not decoration: aggregate_benchmark discovers a
+      # config dir ONLY if it contains a `run-*` child, and silently skips it
+      # otherwise — so a flat `with_skill/grading.json` benchmarks as 0% ± 0%
+      # across the board, which reads like a catastrophic regression and is
+      # really just a missing directory level.
       for cfg in with_skill without_skill; do
-        mkdir -p "$WS/eval-$id/$cfg/outputs"
+        mkdir -p "$WS/eval-$id/$cfg/run-1/outputs"
       done
       python3 - "$EVAL_DIR/evals.json" "$WS/eval-$id/eval_metadata.json" "$id" <<'PY'
 import json, sys

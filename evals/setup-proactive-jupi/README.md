@@ -19,7 +19,7 @@ tools into Supermemory, and schedules routines. So:
 
 - **Always run in a throwaway workspace** — `WS=$(mktemp -d)`, `cd "$WS"`, `git init` if the case needs a repo.
   Never point a case at the real `.proactive-jupi/`.
-- **Cases 1–9 run the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
+- **Every case except 10 runs the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
   Every behavior under test lives in steps 1–3, and stopping there keeps the eval cheap and side-effect-free
   — no 30-day crawl, no backlog rows, no live routines.
 - **Case 10 is the only full run.** It's opt-in and expensive — it crawls, writes rows, and schedules
@@ -48,6 +48,16 @@ calendar. **If you had to tell the agent something the persona never said, the c
 turn the eval into an open-book exam and you might never notice, because the transcript looks the same
 either way. Write it somewhere the run can't reach.
 
+**A silent persona needs a second leg.** Case 12's persona answers nothing, and a blind subagent already has no
+user channel — so leg 1 is a faithful unattended run, but it proves almost nothing on its own: an agent that
+asks and ends its turn looks the same whether or not it holds the halt rule. The repetition only surfaces when
+the run receives a **continuation carrying no answer**, which is what a real unattended session hands it. So
+resume the same agent with a bare `(continuing — no reply has been received)` and grade what it does next.
+Observed: with that second leg the pre-change skill re-asked the entire round *and* converted silence into
+consent ("correct what's wrong above and I'll take the rest as confirmed"); without it, both versions looked
+identical. Note too that an executor which goes hunting around `eval-<id>/` can read `eval_metadata.json` and
+see the assertions — if that happens, say so and grade only the messages emitted before it.
+
 **Spawn the setup agent blind if you can.** The strongest version of this eval, run in practice: a separate
 agent gets only the workspace path, `SKILL.md`, and "stop at ✋" — no persona, no grading criteria — while
 the runner plays the user and grades. Single-context role-play is the fallback, and its results should be
@@ -67,6 +77,8 @@ read as "a careful run *can* do this", not "any run *will*".
 | 8 | Capability inventory — *when to reach for it* actually filled; explicit "none discovered" when empty |
 | 9 | Prelude boundary + secrets hygiene — nothing human-gated after ✋; the conn string travels minimally |
 | 10 | Full run + re-run idempotency — two routines converge, assets.md reconciled *(expensive, opt-in)* |
+| 11 | Workspace root resolution — repo / nothing durable / two connected folders; never a silent CWD fallback |
+| 12 | Unattended prelude — one question, then halt; never a re-asked round and never an invented answer |
 
 ## Prerequisites
 
