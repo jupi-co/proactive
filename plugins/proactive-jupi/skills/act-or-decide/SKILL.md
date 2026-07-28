@@ -64,8 +64,15 @@ promptless in routines. **Run on Node ≥18** — the Neon driver uses the globa
 
 > **Cloud / scheduled boot.** If the repo isn't on the run's filesystem (a cloud session) or there's no
 > attended shell (a scheduled routine), the CWD walk won't find config. Provide it via **env** —
-> `NEON_CONN_STRING` + `JUPI_USER_ID`, the sanctioned path for unattended runs — or **mirror
+> `NEON_CONN_STRING` + `JUPI_USER_ID`, which is how `db.mjs` takes config when the CWD walk can't reach it (a run launched outside the workspace, a test harness) — or **mirror
 > `.proactive-jupi/config.local.json` into the run's CWD** first. `db.mjs` resolves env before the file walk.
+> That ladder is closed — **env → CWD mirror → stop and report.** Don't go looking for the config anywhere
+> else: searching a connected Drive or inbox for a secret-bearing file is both unbounded and exactly the
+> chat-visible flow the connection string must never travel through. And say *which* failure this was, because
+> the two need opposite responses — **no `mcp__remote-devices__*` tools at all** means this routine was
+> scheduled as a **cloud** task, which Proactive-Jupi doesn't support: it will fail identically on every fire,
+> and the fix is to re-create the schedule **on-device**, not to wait or retry. A bridge that is present but
+> unreachable is just this fire, and the next one likely works.
 
 All Neon access goes through the helper — **never hand-write SQL, never touch the account-wide Neon MCP.**
 It reads `neonConnString` + `jupiUserId` from config and **scopes every query by `user_id` automatically**:
