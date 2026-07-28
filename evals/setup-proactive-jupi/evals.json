@@ -176,6 +176,69 @@
         "Step 8 is reported as needs-you, naming the desktop app as where the routines must be created",
         "Neither baking the absolute root nor setting env vars is treated as making a cloud routine viable"
       ]
+    },
+    {
+      "id": 14,
+      "prompt": "Run setup in a workspace whose .claude/settings.local.json already has NEON_CONN_STRING and JUPI_USER_ID in its env block, and which has no .proactive-jupi/config.local.json.",
+      "expected_output": "Step 1 finds both values before prompting, names where each came from, and asks only for confirmation — never asking the user to paste a production connection string that is already on disk, and never echoing the secret itself. The found string is still validated with the SELECT 1 probe.",
+      "files": [],
+      "persona": "Returning user who set this up once before on another machine. Will paste a connection string if asked, but is visibly annoyed at being asked for something already configured.",
+      "expectations": [
+        "settings.local.json env, jupi.local.json and the environment are searched before any prompt",
+        "Found values are presented for confirmation rather than re-requested",
+        "The secret value itself is never echoed into the conversation",
+        "The found connection string is still validated by the egress probe"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Run setup against a workspace where Supermemory already holds a fully-populated brain under the tenant tag, dated yesterday, and no .proactive-jupi/ folder exists at the resolved root.",
+      "expected_output": "Setup recognizes the orphaned-brain signature (Facts under the tag AND no config at root) and reports it explicitly as a repair of a prior cloud-only run, naming the consequence — the scheduled routines have been reporting-and-stopping in the interim. It does not present itself as a first-time setup, and it does not wipe or re-seed the intact brain.",
+      "files": [],
+      "expectations": [
+        "The Facts-present-but-no-config signature is probed for, not stumbled upon",
+        "It is reported explicitly as a repair rather than a first-time setup",
+        "The report states that the routines were dead in the interim",
+        "The existing brain is left intact, not re-seeded or wiped"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "STEP 8 ONLY, run TWICE in a row against the on-device scheduler (`create_scheduled_task` / `update_scheduled_task`), in a session that HAS the device bridge. Pre-seed the workspace so the prelude is skipped.",
+      "expected_output": "First run creates exactly two tasks under the stable kebab-case taskIds (proactive-jupi-refresh-brain, proactive-jupi-act-and-decide), each with the required one-line description filled in plain language. Second run LISTS first, matches on taskId, and UPDATES both in place — creating nothing. Both runs end by re-listing and asserting exactly one task per taskId, and report that assertion. FAIL if the second run creates a third card, or if either run ends without the assertion.",
+      "files": [],
+      "expectations": [
+        "The first run creates exactly two tasks, with stable cadence-free taskIds",
+        "Each task's one-line description is filled and free of internal jargon",
+        "The second run lists first and updates in place rather than creating",
+        "Both runs re-list afterwards and assert exactly one task per taskId",
+        "The assertion result is reported, not just performed"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Run setup step 2 in a Jupi workspace that is healthy but empty, so search-decisions-tool returns {\"items\":[]}. jupiUserId was supplied in the invocation arguments.",
+      "expected_output": "The empty result is read as a successful call with nothing to read a makerId from — NOT as Jupi being down — so the blocking gate passes. The supplied jupiUserId is accepted as a first-class source and cross-checked against the contacts map. Setup proceeds rather than hard-stopping a perfectly healthy workspace.",
+      "files": [],
+      "expectations": [
+        "An empty items array is treated as a successful call, not a failed gate",
+        "Setup does not hard-stop on the empty result",
+        "jupiUserId passed as an invocation argument is accepted",
+        "The id is cross-checked against a second source before being cached"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "Complete a setup run through step 5 and inspect the assets.md tools table and the schema apply output.",
+      "expected_output": "Every connected tool row carries a Draft call filled from the probed surface — the staging call by name where one exists, `none` where the surface commits immediately, `unknown` where it can't be told — and Linear reads `none` (drafts exist in-product but not over MCP). The schema is applied with shared/apply-schema.mjs in one command, reporting applied/failed counts, with no hand-rolled statement splitter anywhere in the run.",
+      "files": [],
+      "expectations": [
+        "The tools table has a Draft call column filled per connected tool",
+        "The value is derived from the probed tool surface, not from a fixed vendor list",
+        "Tools whose staging cannot be determined are written unknown rather than yes",
+        "The schema is applied via apply-schema.mjs and its applied/failed counts are reported",
+        "No hand-written SQL statement splitter appears in the run"
+      ]
     }
   ]
 }

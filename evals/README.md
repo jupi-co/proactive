@@ -64,12 +64,23 @@ can't be undone in all three isn't isolated — it's a production write with goo
 
 | Store | Isolation | Teardown |
 |---|---|---|
-| **Neon** (tasks, actions, cursors) | Same project, but every fixture row carries a **`signal_ref` prefixed `eval:`**, and cursor writes go to **`crawl_state` rows with `is_eval=true`** | **Delete after.** `bash evals/<skill>/purge-scratch.sh` — deletes `eval:%` tasks (their `actions` cascade) and `is_eval` cursors. Run it after every behavioral eval, not at the end of the day |
+| **Neon** (tasks, actions, cursors) | Same project, but the scratch workspace's config sets a **synthetic `jupiUserId`** (e.g. `eval-scratch-<skill>`), and fixture rows additionally carry a **`signal_ref` prefixed `eval:`** with cursors at `is_eval=true` | **Delete after.** `bash evals/<skill>/purge-scratch.sh` (pass `JUPI_USER_ID=<synthetic id>`) — deletes `eval:%` tasks (their `actions` cascade) and `is_eval` cursors. Run it after every behavioral eval, not at the end of the day |
 | **Supermemory** (Facts) | A **dedicated test container tag — `user_eval_scratch`** — never the real `user_<jupiUserId>`. The skills never read this tag, so a stray eval Fact can't leak into a real run | `bash evals/update-brain/purge-scratch.sh` bulk-deletes the container via the HTTP API (the connector's `forget` is unreliable — see that README) |
 | **Jupi** (decisions) | A **dedicated test workspace** — set `jupiWorkspace` to the eval slug **in the scratch workspace's own `config.local.json`**, because that is the only thing the skills read | Decisions are archived **in the test workspace**, where a leftover is harmless. Nothing needs deleting from the real one because nothing was written there |
 
+> **The `eval:` prefix makes rows *deletable*. Only a synthetic `jupiUserId` makes them *isolated*.** Nothing
+> filters reads by prefix — `query-window` returns the top-K open tasks for the tenant, full stop. So a
+> scratch config that keeps the real `jupiUserId` hands the skill under test **the user's real backlog**, and
+> a write-path eval then drafts real mail to real counterparties. `user_id` is the row-level boundary the
+> schema was built around (the shared-DB path in CLAUDE.md); use it. Caught the hard way on 2026-07-28: a
+> correctly `eval:`-prefixed seed produced a window of 38 production tasks and 4 fixtures.
+>
+> Corollary for **any read verb** — `query-window`, `list-blocked`, `list-actions`, `list-open-refs` — the
+> tenant is the only thing separating you from production. Check the window before you run the skill, not
+> after.
+
 **Why the asymmetry** — Neon rows are cheap to delete precisely, so evals share the project and clean up by
-tag. Supermemory can't reliably delete an individual memory, so isolation has to happen at the container
+tenant and tag. Supermemory can't reliably delete an individual memory, so isolation has to happen at the container
 level, up front. Jupi decisions are the record other people read, so they don't belong in the real workspace
 at all, even briefly, even archived.
 

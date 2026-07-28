@@ -23,6 +23,14 @@ Two eval layers, both isolated so they never pollute real Facts.
 ## 2. Behavioral eval — does the skill produce good Facts?
 - Set: [`evals.json`](evals.json).
 - Per task, run the skill against the **scratch tag** and check: entity-centric Facts, **provenance inline**, retrievable via `recall`, and a good summary.
+- **Cases 4–5 (2026-07-28 edit spec):**
+  - **4 · Degenerate-Fact detection** — a returned Fact that is a ~2KB repeated-token loop is caught by the
+    post-write screen (repeated-token ratio + length) and reported with counts. This is the one that needs
+    care to grade: recall-verification **passes** on a degenerate Fact — it does come back, it's just
+    garbage — so "the Facts are retrievable" is not evidence the case succeeded.
+  - **5 · Provenance to the source task** — a Fact derived from a `parse_confidence: low` task names the
+    originating task id and carries the hedge **inside the sentence**, so a corrected parse has a path to
+    the derived Fact and the brain can't silently corroborate a misreading.
 - **Blind version** (skill-creator): spawn with-skill vs baseline subagents per task, grade, then `generate_review.py` for the viewer. Point every write at `user_eval_scratch`.
 - **Always run `purge-scratch.sh` when done.**
 

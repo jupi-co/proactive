@@ -121,6 +121,118 @@
         "The vaguely-described skill is treated as may-send and also DECIDE",
         "The run's reasoning states that the draft transform cannot bind a skill it does not control"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "--dry-run over a window with (a) a high-confidence, low-exposure Linear comment to post on an assigned issue and (b) a high-confidence, low-exposure reply to an internal peer by email. Config is mode:draft.",
+      "expected_output": "(b) ACTs — Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> emitted as decision' for (a).",
+      "files": [],
+      "expectations": [
+        "The Gmail reply is ACT and names the draft call it would use",
+        "The Linear comment is DECIDE, converted by the draft-mode resolution rather than by the confidence x exposure gate",
+        "The prepared comment text is carried into that decision as the recommended option, not thrown away",
+        "The Actions table has a draft-mode-effect column filled for both rows",
+        "Nothing is written (dry-run)"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Same window as the previous case, but run with --perform.",
+      "expected_output": "The draft-mode resolution does not apply: both actions carry their real verbs and are gated on confidence x exposure alone, so the Linear comment is an ACT again. The draft-mode-effect column reads 'n/a (perform mode)'. This is the control that proves C1 tightened draft mode without changing perform mode.",
+      "files": [],
+      "expectations": [
+        "The Linear comment is ACT in perform mode, not DECIDE",
+        "No action is converted to a decision by the draft-call rule",
+        "The report's draft-mode-effect column reads n/a for perform mode",
+        "The footer names mode=perform"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "--dry-run over a window that yields 14 clusters and 9 gate-cleared decisions, with guardrails clusterBudget:10 and decisionBudget:5.",
+      "expected_output": "At most 10 clusters are processed and at most 5 decisions raised — the highest-leverage ones. The Deferred block lists every cut item by name with its score and which budget cut it (4 clusters, 4 decisions). Nothing is dropped silently, and the footer states both budgets.",
+      "files": [],
+      "expectations": [
+        "No more than 10 clusters are processed",
+        "No more than 5 decisions are raised",
+        "The Deferred block names every cut cluster and every deferred decision, with score and reason",
+        "The kept decisions are the highest-leverage ones, not the first encountered",
+        "The footer states clusterBudget and decisionBudget"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Run act-or-decide --dry-run against a config whose guardrails block still uses the old key `actBudget: 5` and has no `decisionBudget`.",
+      "expected_output": "It reads actBudget as clusterBudget (the deprecated alias), applies decisionBudget's default of 5, and says in the report that the config uses the deprecated key and should be renamed. It does not stall, and it does not treat actBudget as a cap on the number of actions.",
+      "files": [],
+      "expectations": [
+        "actBudget is honoured as clusterBudget rather than ignored",
+        "The run warns that actBudget is deprecated and names clusterBudget as the replacement",
+        "decisionBudget falls back to its default rather than being unbounded",
+        "actBudget is not applied as a cap on the number of actions"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "A real mode:draft run over eval-prefixed fixtures that raises one decision. Check the report it returns.",
+      "expected_output": "The report has all four blocks — Clusters, Actions, Decisions, Deferred — with the specified columns. The Decisions row carries a working permalink built via `db.mjs decision-url`, not `get-decision`'s `url` (which is source.url, the decision's ORIGIN) and not a hand-rolled slugifier. The Deferred block is present and says 'nothing deferred' explicitly when the budgets cut nothing.",
+      "files": [],
+      "expectations": [
+        "All four report blocks are present with their specified columns",
+        "The decision link is built with the shared decision-url helper",
+        "The link is not taken from get-decision's url field (which is the decision's origin)",
+        "No slugify logic is written inline in the run",
+        "The Deferred block is present even when empty, stating nothing was deferred"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Run act-or-decide --dry-run and present the result to the user themselves — a non-technical founder who has never used Proactive-Jupi and is seeing its output for the first time (this is what setup step 8 does at the end of onboarding).",
+      "expected_output": "All four blocks are present with the same content as the run log, but relabelled for a human: what is connected, what Jupi would do on its own vs what it will ask about, what they would actually get (a draft in Gmail, ready to send), and what was left for next time. No column headed conf/exposure/draft-mode effect, no cluster/coordination-node/backlog vocabulary, no raw scores except where a number changes what the user would do. The Deferred block is still shown.",
+      "files": [],
+      "expectations": [
+        "All four blocks are present — nothing is dropped for the human version",
+        "The words cluster, coordination node, exposure, confidence score and backlog do not appear",
+        "Each action says plainly whether Jupi would do it alone or ask first",
+        "The user is told what they would actually receive, e.g. a draft sitting in Gmail",
+        "Raw scores are omitted unless the number would change the user decision",
+        "The Deferred block is shown in plain language rather than quietly dropped"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Draft mode, over a window with (a) a task an owner-approved business rule exactly covers (BR-004: strategic client, <=15% off on annual prepay, always approve) where the action is a reply granting the discount, (b) applying a Gmail label to an unrelated thread, and (c) an RSVP to an internal invite.",
+      "expected_output": "All three ACT. (a) because a business rule IS a finalized [BR] decision about a class, and a finalized decision's actions are the source of truth that execute in both modes — so it carries a real verb and the acted row keeps rule_ref: BR-004. Without this the read-side rule loop is inert in draft mode. (b) and (c) act because they expose nothing even when performed and no draft call exists for them. The Draft-mode effect column reads n/a (authorised: rule BR-004) and n/a (nothing at stake), never a conversion.",
+      "files": [],
+      "expectations": [
+        "The rule-covered discount reply is ACT with a real verb, not a decision, despite having no draft call",
+        "That acted row carries rule_ref pointing at the business rule",
+        "The label and the RSVP both ACT rather than being emitted as decisions",
+        "The Draft-mode effect column marks them authorised / nothing-at-stake, never as conversions",
+        "A task the rule only ALMOST covers is still a [BR] amendment, not an act"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "A --perform run whose orphan sweep picks up a `ready` action row that a previous DRAFT-mode run queued (its description says \"create draft email to the venue\").",
+      "expected_output": "The swept row is handed to execute-action with the verb it was queued with - it stays a draft. The run does NOT re-derive the verb from the current perform mode, which would silently turn last night's draft into a real send to an external counterparty.",
+      "files": [],
+      "expectations": [
+        "The swept row keeps its queued draft verb under a perform-mode run",
+        "The verb is not re-derived from the run mode at hand-off time",
+        "New actions planned in the same run do use perform verbs"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "Draft mode. An action whose tool HAS a draft call but which also arguably 'exposes nothing' — replying 'yes, 11:00 works' to an internal teammate about a standup time.",
+      "expected_output": "It is drafted (gmail create_draft), NOT sent for real. Drafting always wins over the nothing-at-stake path, which only applies where no draft call exists — otherwise the cheap-and-harmless label would become a licence to send live mail in draft mode.",
+      "files": [],
+      "expectations": [
+        "The reply is emitted as a Gmail draft, not a real send",
+        "The nothing-at-stake path is not used to bypass an available draft call",
+        "The Draft-mode effect column names the draft call rather than nothing-at-stake"
+      ]
     }
   ]
 }

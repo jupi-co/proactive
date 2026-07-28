@@ -1,25 +1,74 @@
 {
   "_comment": "Copy to the workspace .proactive-jupi/config.local.json (gitignored) and fill in. Instance-specific; never commit. THIS FILE HOLDS ONLY (1) ids + secrets needed to reach a store, and (2) settings/thresholds. WHICH tool plays which role lives in .proactive-jupi/assets.md, never here.",
+  "_comment_underscore_keys": "Every key starting with `_` is documentation, not configuration — nothing reads them, and they are safe to delete. They stay in the file because JSON has no comment syntax and this file is parsed with a strict JSON.parse (shared/db.mjs), so `//` comments would break the run. Each `_<field>` line says what the field below it reflects — the real-world quantity it stands for — so a reader can tell whether a value is still right for them without opening a skill.",
 
   "_ids_and_secrets": "— access only —",
+
+  "_jupiWorkspace": "The Jupi workspace (group) slug decisions are created in and searched under — the `groupSlug` every Jupi call passes, and the first path segment of a decision permalink. Reflects WHICH TEAM's decision log this instance writes to; point it at a test workspace and no colleague ever sees the decisions.",
   "jupiWorkspace": "<jupi-workspace-slug>",
+
+  "_jupiUserId": "The tenant key — one identity across all three stores: the `user_id` stamped on every Neon row, and the brain's Supermemory container tag `user_<jupiUserId>`. Reflects WHOSE backlog and brain this is. Resolved by setup step 2 from the authenticated Jupi caller (or passed as an invocation argument); never hand-invented, because changing it later orphans every row and every Fact written under the old value.",
   "jupiUserId": "<resolved by setup step 2 from the authenticated Jupi caller — the tenant key across Neon + the brain's container tag; leave blank>",
+
+  "_neonProjectId": "Informational only — nothing in the pipeline reads it. Reflects which Neon project the connection string below belongs to, so a human reading this file can tell prod from scratch at a glance. Leave blank if unknown rather than guessing.",
   "neonProjectId": "<optional, informational — the Neon project id for reference; nothing in the pipeline reads it. Leave blank if unknown.>",
+
+  "_neonConnString": "The project-scoped Postgres connection string for the backlog database (tasks · actions · crawl_state). Reflects the PHYSICAL boundary: it reaches exactly one Neon project, which is why the pipeline uses it instead of the account-wide Neon MCP (whose OAuth spans every project on the account, production included). Secret — this is the one field that makes the file gitignored.",
   "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
-  "rulesStoreRef": "<the id/path needed to OPEN the tool tagged `rules` in assets.md: a Notion page id, a Drive file id, a Confluence space key. Normally the shared space where the team's SOPs already live; '.proactive-jupi/business-rules.md' is a last-resort fallback for someone with no external home, never the recommended answer. Which TOOL it is comes from the assets.md role, not from here.>",
+
+  "_rulesStoreRef": "The id/path needed to OPEN the tool tagged `rules` in assets.md — a Notion page id, a Drive file id, a Confluence space key. Reflects the ADDRESS of the business-rule store, not its identity: which tool it is comes from the assets.md role. Normally the shared space where the team's SOPs already live; '.proactive-jupi/business-rules.md' is a last-resort fallback for someone with no external home, never the recommended answer. Without it, act-or-decide cannot read rules to pre-empt a question and will raise decisions the team's handbook already answers.",
+  "rulesStoreRef": "<the id/path that opens the `rules`-tagged tool: a Notion page id, a Drive file id, a Confluence space key>",
 
   "_settings": "— thresholds + windows —",
+
+  "_crawlWindowDays": "How far back a cold or full crawl reads, in days. Reflects HOW MUCH HISTORY is worth ingesting on a fresh install before incremental cursors take over: bigger means a richer brain and a slower, more expensive first run. Read by update-brain (full mode) and refresh-backlog's first pass; afterwards the crawl_state cursors bound each run instead.",
   "crawlWindowDays": 30,
+
+  "_backlogWindowSize": "Top-K of the scored backlog act-or-decide reasons over per run. Reflects HOW WIDE A SLICE of the backlog one run considers — not how much it acts on (that is guardrails.clusterBudget). Raising it costs context on every run; the tasks below the cut are not lost, they just wait for a later one.",
   "backlogWindowSize": 30,
+
+  "_ruleThreshold": "How many times the same trade-off must have been settled the SAME way before act-or-decide proposes codifying it as a business rule ([BR] decision). Reflects how much evidence counts as a pattern rather than a coincidence: 2 is deliberately eager (a rule proposal is still owner-approved, so a premature one costs a decline, not a wrong action).",
   "ruleThreshold": 2,
+
+  "_scoring": "The urgency + weighting model refresh-backlog's Scorer applies, evaluated in shared/db.mjs (score-task). Every value here is a default that db.mjs falls back to if absent — the block exists so the model can be retuned without a code edit. score = impact^wi · relevance^wr · bottleneck^wb · urgency, and urgency = 1 + 2·max(staleness, deadline_u).",
+  "scoring": {
+    "_deadlineHorizonDays": "How many days out a hard deadline starts pulling urgency up. Reflects the PLANNING HORIZON — the point at which something due begins to deserve attention today. Below this it contributes nothing and the task rides on staleness alone, which is how a dated commitment can rank under an untouched thread nobody wants.",
+    "deadlineHorizonDays": 21,
+
+    "_deadlineGuardDays": "A deadline this close (in days) pins urgency to its maximum, whatever else is true. Reflects the point of no return — near enough that the task cannot be allowed to sit another run. Set it to the length of a working week and a Friday cutoff can't be buried on Monday.",
+    "deadlineGuardDays": 5,
+
+    "_turnaroundExternalDays": "Expected reply turnaround for an EXTERNAL counterparty, in days — the time constant of the staleness curve (staleness = 1 − exp(−age/T)). Reflects how fast you owe someone outside the org an answer; a smaller number makes external threads age into urgency faster.",
+    "turnaroundExternalDays": 2,
+
+    "_turnaroundInternalDays": "Same, for internal counterparties. Reflects the slower clock colleagues are on. The external/internal split is the only place `tasks.external` touches the score.",
+    "turnaroundInternalDays": 5,
+
+    "_weights": "Per-axis EXPONENTS (not multipliers) on the three judged axes. Reflects how much each axis is allowed to dominate: because the score is a product, a `low` on any axis already tanks it, and raising an exponent sharpens that further. Bump `impact` to weight outcome value over the other two.",
+    "weights": { "impact": 1, "relevance": 1, "bottleneck": 1 },
+
+    "_parseConfidenceFloor": "Multiplier applied to the score of a task whose parse the Scorer judged shaky (refresh-backlog records `parse_confidence` low|medium|high). Reflects how much a possibly-misread signal should be discounted rather than dropped: 1.0 disables the discount entirely, 0 would suppress the task. `medium` gets the midpoint, `high` no discount at all.",
+    "parseConfidenceFloor": 0.6
+  },
+
+  "_guardrails": "act-or-decide's operating policy — what it may do unattended, and how much of it per run. Default conservative; loosen as trust builds.",
   "guardrails": {
-    "_comment": "act-or-decide policy. Default conservative; loosen as trust builds.",
+    "_mode": "`draft` (default) or `perform`. Reflects WHETHER JUPI MAY COMMIT anything on its own. In draft mode an action may only be ACTed if the tool call it would issue has a draft call that stages the side-effect for review; everything else becomes a decision — so draft mode is materially tighter than perform, and decisionBudget becomes the binding constraint. The way out is flipping to `perform` as trust builds, not relaxing that rule.",
     "mode": "draft",
-    "actBudget": 5,
+
+    "_clusterBudget": "Maximum CLUSTERS (shared-open-question groups, not actions) act-or-decide processes per run. Reflects how much of the window one run chews through — one cluster can still fan out into several actions. Everything cut must be reported in the run's Deferred block, never silently dropped. (Was `actBudget`, whose name implied a cap on actions it never enforced; the old key is still accepted as an alias and logged as deprecated.)",
+    "clusterBudget": 10,
+
+    "_decisionBudget": "Maximum DECISIONS act-or-decide raises per run. Reflects the user's tolerance for how many calls land in front of them at once — the real noise control, since a run that raises twenty decisions is as unusable as one that sends twenty emails. Matters most in draft mode, where actions that can't be staged convert into decisions and inflate the count.",
+    "decisionBudget": 5,
+
+    "_policy": "The confidence × exposure 2×2, read as policy[confidence][exposure] → 'act' | 'decide'. Reflects the risk appetite itself: the default acts only when Jupi both knows how to handle it (confidence high) and nothing is exposed (exposure low). Loosening the `high`/`high` cell is the single biggest posture change available here.",
     "policy": {
       "high": { "low": "act",    "high": "decide" },
       "low":  { "low": "decide", "high": "decide" }
     },
+
+    "_executedPing": "'none' | 'email' | 'slack' — at most one notification after an action executes. Reflects how the user wants to hear about work already done; the execution trace left on the signal itself (the draft, the comment, the sent message) is the primary record, so 'none' is not silence.",
     "executedPing": "none"
   }
 }

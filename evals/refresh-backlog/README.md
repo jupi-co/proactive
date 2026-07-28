@@ -41,6 +41,16 @@ Two eval layers, both isolated so they never pollute the real backlog. Mirrors
   two comparable threads score differently depending on whether they fall inside the
   accountabilities in `assets.md`'s *Who this is*, and a missing section degrades to
   signal-only scoring instead of stalling.
+- **Cases 8–10 (2026-07-28 edit spec):**
+  - **8 · Deadline extraction from prose** — "before Friday" resolved against `signal_at` (not the run
+    date), a calendar event's start used as its deadline, and a dateless signal left without one rather
+    than given a guess. Only 8 of 38 tasks on the reference backlog carried a deadline, which made the
+    urgency model effectively staleness-only.
+  - **9 · Parse confidence** — an ambiguous mid-thread signal scored `low`/`medium` and *discounted*, not
+    dropped, and never conflated with `relevance`. The reference run had a misparse sitting at #4 on full
+    weight, which then propagated into a Fact.
+  - **10 · Deterministic tiebreak** — two runs over an exact score tie return the same order, from
+    `query-window`'s SQL (score desc → deadline asc → signal_at asc → id), not from prose re-sorting.
 - **Always run `purge-scratch.sh` when done.**
 
 ## Prerequisites

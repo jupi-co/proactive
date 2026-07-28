@@ -46,10 +46,15 @@ task. You are the DECIDE-path counterpart to `act-or-decide` (which handles the 
 2. **`.proactive-jupi/assets.md`** — the Asset Map (which tools are `Connected`; the **Business rules — index**
    you maintain when a `[BR]` decision settles), read in full.
 
-**Ensure the DB helper's deps once** (first run / fresh install): if `${CLAUDE_PLUGIN_ROOT}/shared/node_modules`
-is absent, `npm install --prefix "${CLAUDE_PLUGIN_ROOT}/shared" --no-save` (sandbox-network-disabled fallback
-if egress is blocked — pre-authorized, promptless in routines). **Run on Node ≥18** (the Neon driver uses the
-global `fetch`, absent on Node 16).
+**Ensure the DB helper's deps** — one command, at the top of every run:
+```
+bash "${CLAUDE_PLUGIN_ROOT}/shared/ensure-deps.sh"
+```
+**The** dependency path every `db.mjs` caller shares — idempotent, silent when deps already resolve, checks
+Node ≥18 (the Neon driver needs the global `fetch`), and on failure says whether to retry with the sandbox
+network disabled (pre-authorized, so this stays promptless in routines). You lead the scheduled routine, so
+this matters here most: a `node_modules` symlinked from some earlier session is exactly what a cold
+container doesn't have.
 
 > **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
 > inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
@@ -179,3 +184,9 @@ immediate act — it is always a settled `[BR]` option-action (it carries a Jupi
 Narrate per step (✅ done / 🔧 fixed / ⚠️ needs you). Return a short summary (4–6 lines): decisions polled +
 how many FINALIZED, option-actions executed (with traces) + marked done, tasks completed (`→ done`) vs still
 waiting on other decisions vs reopened on a fork, and any blocker.
+
+**Linking a decision you name:** no Jupi tool returns a decision URL — `get-decision`'s `url` is
+`source.url`, the decision's *origin* (a transcript, a thread), which resolves cleanly and points somewhere
+else. Build the permalink with the shared helper instead, and **never write your own slugifier**:
+`node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" decision-url - "<title>" <id>` (`-` = `jupiWorkspace` from
+config). One implementation, one place to fix when Jupi starts returning the url itself.

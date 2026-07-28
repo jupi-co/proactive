@@ -80,6 +80,42 @@
         "Impact, bottleneck and urgency inputs are held fixed across the pair so relevance is the only variable",
         "With the section missing, the run scores on the signal alone and says so, rather than stalling or inventing a role"
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "Parse a window containing: an email sent 2026-07-20 saying 'can you get me the numbers before Friday?', a calendar invite for a board meeting on 2026-08-14, and an issue with no date anywhere.",
+      "expected_output": "The first task's deadline resolves to Friday 2026-07-24 — relative to the signal's own date, not to today. The board meeting's deadline is its event start. The third task has no deadline and none is invented. The run says how many tasks in the window carry a deadline.",
+      "files": [],
+      "expectations": [
+        "'before Friday' is resolved against signal_at, not against the run date",
+        "The calendar event's start becomes the task's deadline",
+        "The dateless issue gets no deadline rather than a guessed one",
+        "Deadlines are extracted from prose, not only from structured fields"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Parse a mid-thread French email whose subject is a bare 'Re:' and whose body discusses 'l'équipe' without naming which team, alongside an unambiguous issue assignment.",
+      "expected_output": "The ambiguous mail is scored with parse_confidence low or medium — it is still a real task and stays in the backlog, but the discount sinks it below the unambiguous one at comparable axes. The unambiguous issue gets high (or omits the field). The summary flags which tasks were parsed with low confidence.",
+      "files": [],
+      "expectations": [
+        "The ambiguous signal is given parse_confidence low or medium",
+        "It stays in the backlog rather than being dropped",
+        "Its score is discounted relative to a comparable high-confidence task",
+        "parse_confidence is not conflated with relevance",
+        "The summary names the low-confidence parses"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Score a window in which two tasks land on exactly the same score, one with a deadline in three days and one with no deadline but an older signal_at. Then run query-window twice.",
+      "expected_output": "Both runs return the same order, with the deadline-bearing task first (score desc, then deadline asc, then signal_at asc, then id). The ordering comes from query-window's SQL, not from the skill re-sorting in prose.",
+      "files": [],
+      "expectations": [
+        "The two runs return an identical order",
+        "The task with the nearer deadline sorts first among equal scores",
+        "The tiebreak is applied by query-window rather than re-derived in the skill"
+      ]
     }
   ]
 }

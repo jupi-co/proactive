@@ -46,6 +46,8 @@ create table if not exists tasks (
   impact          text check (impact in ('low','medium','high')),        -- intrinsic value of the outcome (LLM)
   relevance       text check (relevance in ('low','medium','high')),     -- is this a real, worth-surfacing task — noise gate (LLM). NOT the act-gate confidence, which lives on actions
   bottleneck      text check (bottleneck in ('low','medium','high')),    -- leverage: who/what is blocked until you do this (LLM). low = nothing waiting
+  parse_confidence text not null default 'high'                          -- how sure the Parser is it READ the signal right (LLM). Discounts score; NOT relevance, NOT the act-gate confidence
+                    check (parse_confidence in ('low','medium','high')),
   urgency         numeric,                             -- COMPUTED by db.mjs = 1 + 2·max(staleness, deadline_u), 1..3; refreshes each run
   score           numeric,                             -- derived priority = impact · relevance · urgency · bottleneck, for ORDER BY
   relevant_facts  jsonb not null default '[]',         -- [{summary, source}] — light Supermemory recall refs (read-only; update-brain owns writes)
@@ -197,6 +199,17 @@ alter table actions alter column status set default 'ready';
 -- Drop the vestigial actions.confidence (Phase 2 shipped it; the Phase-3 gate reads
 -- confidence at the TASK level from open_questions, never off an action row).
 alter table actions drop column if exists confidence;
+
+-- v4: parse confidence — how sure the Parser is it READ the signal correctly. Distinct
+-- from `relevance` (is this a real task worth surfacing) and from the act-gate
+-- confidence (do we know how to handle it). Without it a task is either in the backlog
+-- at full weight or absent, so a misread signal competes on equal terms with a verified
+-- one; it discounts the score instead (db.mjs § parseFactor). Defaults to 'high' so
+-- every existing row keeps the weight it already had.
+alter table tasks add column if not exists parse_confidence text not null default 'high';
+alter table tasks drop constraint if exists tasks_parse_confidence_check;
+alter table tasks add  constraint tasks_parse_confidence_check
+  check (parse_confidence in ('low','medium','high'));
 
 -- ── OPTIONAL HARDENING: Row-Level Security ────────────────────────────
 -- Filtering by user_id in every query is sufficient for the single-writer skill
