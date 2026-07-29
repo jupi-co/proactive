@@ -119,6 +119,16 @@ create index if not exists actions_user_decision_idx on actions (user_id, decisi
 -- then `(user_id, source)`), neither with the consumer/is_eval split. Drop iff
 -- it's an OLD, EMPTY table (never drop data); the create below builds the new
 -- shape. A populated legacy table would need additive alters — not a live case.
+--
+-- The emptiness check is NESTED rather than a third `and` on the outer condition,
+-- and that is load-bearing on a FRESH database. PL/pgSQL prepares each statement
+-- as a whole when it first executes it, so `select 1 from crawl_state` sitting in
+-- the same IF expression gets parsed even when the earlier "does the table exist"
+-- conjunct is false — SQL's `and` gives no parse-time short-circuit. On a brand-new
+-- DB that raised `relation "crawl_state" does not exist` and the statement failed.
+-- It was survivable only because apply-schema.mjs continues past a failed statement,
+-- so every fresh install quietly reported `failed: 1`. Nesting defers the inner
+-- query to a branch that is only reached once the table is known to exist.
 do $$ begin
   if exists (select 1 from information_schema.tables
              where table_schema='public' and table_name='crawl_state')
@@ -126,8 +136,10 @@ do $$ begin
                       where table_name='crawl_state' and column_name='consumer')
           or not exists (select 1 from information_schema.columns
                          where table_name='crawl_state' and column_name='user_id'))
-     and not exists (select 1 from crawl_state) then
-    drop table crawl_state;
+  then
+    if not exists (select 1 from crawl_state) then
+      drop table crawl_state;
+    end if;
   end if;
 end $$;
 create table if not exists crawl_state (
