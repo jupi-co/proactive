@@ -27,9 +27,12 @@ Jupi decision** — one option per way to do it, each carrying the precise actio
 > yourself** (`ready → executed` + trace). The `actions` table is your queue; the worker never reads or
 > writes it.
 
-> **Workspace-relative.** Data paths (`.proactive-jupi/assets.md`, `.proactive-jupi/config.local.json`,
-> `act-or-decide/runs/`) resolve against the **CWD where the run executes**, never the plugin install
-> location. Shared helpers live under **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
+> **Workspace-relative, and the workspace may be a scratch one.** `.proactive-jupi/assets.md` and
+> `.proactive-jupi/config.local.json` resolve against the **CWD where the run executes**, never the plugin
+> install location. Under a scheduled routine that CWD is a container the routine just wrote both files into
+> from its own prompt — read them exactly as you would locally, but **write nothing durable there**: it dies
+> with the run, so your report is your output, not a file. Shared helpers live under
+> **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
 
 ## Contract (hard — never transgress)
 - ✅ **Write only Neon + Jupi.** Neon via the shared `db.mjs` helper (action rows, task status). Jupi
@@ -76,8 +79,9 @@ with the sandbox network disabled — the fallback setup step 4 pre-authorizes, 
 
 > **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
 > inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
-> travel through). **No `mcp__remote-devices__*` tools at all** means this routine was scheduled as a cloud
-> task, which isn't supported: every fire fails identically, so it needs re-creating on-device, not a retry.
+> travel through). A scheduled routine **carries** its config and writes it to
+> `./.proactive-jupi/config.local.json` before invoking you, so config missing under a routine means that
+> boot step didn't happen — the routine needs re-creating by setup, not a retry. Say which case you're in.
 
 All Neon access goes through the helper — **never hand-write SQL, never touch the account-wide Neon MCP.**
 It reads `neonConnString` + `jupiUserId` from config and **scopes every query by `user_id` automatically**:
@@ -152,9 +156,11 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
    decisions settled *this same* trade-off, and did they land on a *consistent* outcome? ≥ `ruleThreshold`
    consistent settlements → this is a **rule candidate** (§Business rules, the `[BR]` path). Below that, or
    inconsistent → keep it a one-off operational decision.
-3. **Consult the business-rule store** (§Business rules). Read the `assets.md` **Business rules — index**
-   in full; if an entry (or a `rule_ref` hint the parser tagged on an `open_question`) looks like it covers
-   the cluster's trade-off, **open that rule in the `rules`-tagged store** (the tool from `assets.md`, opened via `rulesStoreRef`) and confirm it applies
+3. **Consult the business-rule store** (§Business rules). Open the `rules`-tagged tool (from `assets.md`,
+   via `rulesStoreRef`) and read its **index section** in full — the index lives in the store, beside the
+   rules it indexes, because that is the one place both you and a cloud routine can reach. If an entry (or a
+   `rule_ref` hint the parser tagged on an `open_question`) looks like it covers
+   the cluster's trade-off, **open that rule** and confirm it applies
    to *this* instance. A rule that genuinely fits **pre-empts the open question → confidence `high`** and its
    id becomes the acted row's `rule_ref`. A rule that *almost* fits (a wrinkle it doesn't cover) does **not**
    act silently → it's a `[BR]` **amendment** decision (apply-as-is / add-exception / supersede).
@@ -194,10 +200,15 @@ Then, per cluster:
 Expand each task into **one or several concrete parallel actions**, each with its `tool`, a precise
 `description` (recipient, content, location — see §Actions), and its own **`exposure`** (§The gate). Run
 the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is written yet** — Stage 5 emits.
-- **Reuse existing capability before improvising one.** Check the `assets.md` **Agents / skills** table
-  (*When to reach for it*): if a workspace skill or agent already covers this work, the action is to
-  **invoke it** (`tool: skill`) — `description` names the skill and the inputs it needs — rather than
-  recomposing the task by hand. A skill someone built and trusts beats your ad-hoc version, and it's the
+- **Reuse existing capability before improvising one — but only capability you can actually call.** Check
+  the `assets.md` **Agents / skills** table (*When to reach for it*): if a workspace skill or agent already
+  covers this work, the action is to **invoke it** (`tool: skill`) — `description` names the skill and the
+  inputs it needs — rather than recomposing the task by hand. **Read the `Reachable` column first.** A row
+  marked `local only` lives on the user's disk, so it exists when they invoke you themselves and is simply
+  absent under a scheduled routine; planning an action around it there produces a plan that reads as sound
+  and cannot run. In a routine, treat those rows as not present: do the work yourself, or, if the skill is
+  genuinely the only way, say so in the report rather than emitting an action that will fail.
+  A skill someone built and trusts beats your ad-hoc version, and it's the
   same reason you check the rule store in Stage 3.3: known competence first, reasoning only for the remainder.
   - **Score a skill's exposure by what the skill itself does, not by the verb you wrote.** The draft-mode
     transform rewrites *your* verb; it cannot reach inside someone else's skill. A skill that only produces
@@ -273,8 +284,8 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
 - The `high × high` cell → **DECIDE** (an *authorize* decision, "do exactly this?"). It fires in draft mode
   for non-draftable actions; in perform mode also for draftable sends. Same decision mechanism either way.
 - A **business rule** that covers the situation makes confidence `high` (the open question is pre-empted) →
-  **ACT**, tagging the acted row's `rule_ref` with the rule's id. You find it via the `assets.md` rules index
-  → the `rules`-store entry (Stage 3.3). This is how a task *graduates from decide to act*.
+  **ACT**, tagging the acted row's `rule_ref` with the rule's id. You find it via the `rules` store's own
+  index → the rule entry (Stage 3.3). This is how a task *graduates from decide to act*.
 
 **Draft mode shapes what you EMIT — never what may be executed.** Two paths, and what separates them is
 whether a human has already authorised the action.
@@ -381,9 +392,10 @@ for that item and move on.
 absolute.
 
 ## Business rules — read to pre-empt, `[BR]` to codify
-A **business rule** is a resolved *"when X, always Y"* the owner approved. Rules live in the **tool tagged `rules`** in `assets.md`
-(config: `location` + `tool`; default the local `.proactive-jupi/business-rules.md`), **indexed** in the
-`assets.md` "Business rules — index". You touch rules two ways:
+A **business rule** is a resolved *"when X, always Y"* the owner approved. Rules live in the **tool tagged
+`rules`** in `assets.md` (opened via `rulesStoreRef`), and are **indexed in that same store** — the index
+sits beside the rules so a scheduled run can both read and append to it without touching anyone's disk.
+You touch rules two ways:
 
 **Read side (every run) — pre-empt.** In Stage 3.3 you consult the store. A rule that genuinely covers a
 cluster's trade-off makes **confidence `high` → ACT**, and you tag the acted row's `rule_ref` with the rule's
@@ -460,8 +472,10 @@ The shape is specified rather than left to judgement because on the reference ru
 because a human asked for them afterwards, and the Deferred block — the user's only evidence that a budget is
 set too low — was not shown at all.
 
-Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Write the report to
-`act-or-decide/runs/run-<id>/report.md` and return it.
+Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. **Return the report — it is your
+output, not a file.** Under a scheduled routine there is no `runs/` folder to write to and no one to read a
+file left in a container that is about to be discarded; the routine folds what you return into its own run
+record. Locally, the user reads it in the conversation, which is where they already are.
 
 ## Decision links
 **Take the `url` off the create response.** `create-decision-tool` returns the decision's own `url` (also on
@@ -481,9 +495,9 @@ Narrowing the read-side gap is TECH-459.
 ## Where you write
 - **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`.
 - **Jupi** — the decision(s), via `create-decision-tool` (private, STARTED).
-- `act-or-decide/runs/run-<id>/` — `report.md` (the deliverable / dry-run table), `validation.md`
-  (validator passes), `log.md` (narrative).
-- **Never** the user's tools, Supermemory (`update-brain` owns writes), or `context`.
+- **Never** the user's tools, Supermemory (`update-brain` owns writes), or `context` — **and no files.**
+  The report, the validator's passes and the narrative are all things you *return*; a scheduled run has no
+  workspace folder to put them in, and the routine records the run itself.
 
 ## Narrate + return
 Narrate per step (✅ done / 🔧 fixed / ⚠️ needs you). Return a short summary (4–6 lines): clusters kept vs

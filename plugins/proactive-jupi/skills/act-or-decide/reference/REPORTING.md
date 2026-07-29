@@ -61,9 +61,10 @@ starves silently while every report truthfully promises it comes back tomorrow.
 `ok:false` stays `ready` and retries next run, but an all-failed run renders exactly like a quiet one
 otherwise — the same argument block 4 makes for budgets.
 
-Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Write the whole report to
-`act-or-decide/runs/run-<id>/report.md` and return it — a dry run writes `report.md` only (there are no
-validator passes to record, since it authors no decisions).
+Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. **Return the whole report — it is
+the output, not a file.** A scheduled run has no workspace folder to write into and nobody reading a file
+left in a discarded container; a local run's reader is already in the conversation. (A dry run returns the
+report alone — there are no validator passes to record, since it authors no decisions.)
 
 ### The user's version of this report — yours to define, wherever it's shown
 

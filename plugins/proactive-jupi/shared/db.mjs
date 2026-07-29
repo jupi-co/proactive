@@ -31,6 +31,12 @@
 //   set-task-gating   <task_id> '<uuid[] json>'     → { id, gating_decision_ids }   (act-or-decide, Stage 5)
 //   list-actions      <status|decision> <value>     → [ {action}, … ]  (act-or-decide reads status='ready'; the 'decision' branch is deprecated — Phase 4)
 //   list-blocked                                    → [ {task}, … ]    (act-post-decision poll: blocked tasks + gating_decision_ids)
+//   ── Routine run records: the only thing a routine writes about itself ──
+//   run-open        <routine>                       → { id, routine, started_at, status }
+//   run-close       <id> <ok|degraded|failed> ['<degraded json>'] [notes]
+//                                                   → { id, status, … }
+//       degraded json: [{what, cost}] — what was unreachable and what it cost the user
+//   run-last        <routine> [N]                   → [ {run, stalled}, … ] (newest first)
 //   get-cursor      <consumer> <source> [eval]      → { consumer, source, is_eval, last_cursor, last_run_at } | null
 //   advance-cursor  <consumer> <source> <cursor> [eval] → { consumer, source, is_eval, last_cursor }
 //     consumer = 'brain' | 'backlog'; pass a truthy 4th/3rd arg ('eval'|'true'|'1') for eval runs.
@@ -42,6 +48,12 @@
 //      → "neonConnString" / "jupiUserId"
 // The same walk also captures the NEAREST config object whole, so the tunables below
 // (`scoring`, `jupiWorkspace`) are read from it even when the credentials came from env.
+// A SCHEDULED routine has no repo on its container, so it carries its config in its own
+// prompt and writes it to ./.proactive-jupi/config.local.json before doing anything —
+// path 2 then resolves normally and the tunables travel with it. That file is scratch,
+// not state: it is derived from the prompt and dies with the container, which is why a
+// routine can be re-created from setup alone and why nothing here reads durable state
+// off a disk that may not exist.
 // Keys beginning with `_` in that file are documentation and are never read.
 // EVERY verb is scoped by user_id = jupiUserId — the Jupi-resolved tenant key
 // (setup step 2). Isolation is enforced in the queries, not by the DB grant.
@@ -212,7 +224,40 @@ async function getDb() {
   }
   const cfg = loadConfig();
   // HTTP/443 driver: one statement per call, bound params via sql.query(text, params).
-  return { sql: neon(cfg.connString), userId: cfg.userId };
+  const raw = neon(cfg.connString);
+  // Wrap at the driver so EVERY verb inherits the retry — a scheduled routine has
+  // nobody to re-run it, so a transient blip is an unattended run lost.
+  return { sql: { query: (text, params) => withRetry(() => raw.query(text, params)) }, userId: cfg.userId };
+}
+
+// ── Transient-fault retry ─────────────────────────────────────────────────
+// Neon over HTTPS occasionally returns a DNS/socket-level failure that succeeds
+// moments later (observed live: `503 DNS resolution failure` mid-session, fine on
+// the next attempt). Interactively that's a shrug; inside a routine it's the run,
+// gone — and with no human watching, silently. So retry the faults that are
+// genuinely transient and let everything else fail immediately: a constraint
+// violation or a bad credential will not fix itself, and retrying it just delays
+// an error the caller needs to see.
+const RETRY_ATTEMPTS = 3;
+const RETRY_BASE_MS = 400;
+
+function isTransient(e) {
+  const m = String(e?.message || e).toLowerCase();
+  return /dns|fetch failed|network|socket|econnreset|etimedout|enotfound|eai_again|\b(502|503|504)\b|timed? ?out/.test(m);
+}
+
+async function withRetry(fn) {
+  let last;
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isTransient(e) || attempt === RETRY_ATTEMPTS) throw e;
+      last = e;
+      await new Promise((r) => setTimeout(r, RETRY_BASE_MS * 2 ** (attempt - 1)));
+    }
+  }
+  throw last;
 }
 
 // ── verbs ───────────────────────────────────────────────────────────────
@@ -481,6 +526,69 @@ const VERBS = {
       [userId, consumer, source, truthy(isEval), effective],
     );
     return warning ? { ...rows[0], warning } : rows[0];
+  },
+
+  // ── Routine run records ────────────────────────────────────────────────
+  // A scheduled routine's only self-report. Open before doing anything, close on
+  // the way out; `run-last` is what lets a run say "the previous one failed"
+  // instead of starting clean as if nothing had happened.
+  async "run-open"(sql, [routine], userId) {
+    const rows = await sql.query(
+      `insert into routine_runs (user_id, routine) values ($1, $2)
+       returning id, routine, started_at, status`,
+      [userId, routine],
+    );
+    return rows[0];
+  },
+
+  // status: ok | degraded | failed. `degraded` is [{what, cost}] in the user's
+  // terms — the run's report is written from it, so "slack" alone is not enough:
+  // what the user lost ("couldn't see mentions") is the half that means anything.
+  async "run-close"(sql, [id, status, degradedJson, notes], userId) {
+    if (!["ok", "degraded", "failed"].includes(status))
+      throw new Error(`run-close status must be ok|degraded|failed, got '${status}'`);
+    // `-` is the documented placeholder for "nothing degraded, but I do have notes"
+    // — positional args leave no way to skip one. Without this it reaches the
+    // ::jsonb cast as the literal string and the close fails, which loses the run
+    // record for exactly the runs most worth recording: the ones that failed.
+    const degraded = degradedJson && degradedJson !== "-" ? degradedJson : null;
+    if (degraded) {
+      try {
+        JSON.parse(degraded);
+      } catch {
+        throw new Error(
+          `run-close degraded must be JSON like '[{"what":"Slack","cost":"couldn't see mentions"}]' — got ${degradedJson}`,
+        );
+      }
+    }
+    const rows = await sql.query(
+      `update routine_runs
+          set finished_at = now(), status = $3,
+              degraded = coalesce($4::jsonb, degraded), notes = coalesce($5, notes)
+        where id = $1 and user_id = $2
+       returning id, routine, started_at, finished_at, status, degraded, notes`,
+      [id, userId, status, degraded, notes && notes !== "-" ? notes : null],
+    );
+    if (!rows[0]) throw new Error(`no routine_runs row ${id} for this tenant`);
+    return rows[0];
+  },
+
+  // The previous run for a routine. `stalled` is the inference the caller would
+  // otherwise re-derive: still 'running' long after it started means it died or
+  // was interrupted, not that it is working — no routine runs for hours.
+  async "run-last"(sql, [routine, limitArg], userId) {
+    const limit = Math.min(Number(limitArg) || 1, 20);
+    const rows = await sql.query(
+      `select id, routine, started_at, finished_at, status, degraded, notes
+         from routine_runs where user_id = $1 and routine = $2
+        order by started_at desc limit $3`,
+      [userId, routine, limit],
+    );
+    const STALL_MS = 2 * 60 * 60 * 1000;
+    return rows.map((r) => ({
+      ...r,
+      stalled: r.status === "running" && Date.now() - Date.parse(r.started_at) > STALL_MS,
+    }));
   },
 };
 

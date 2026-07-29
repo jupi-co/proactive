@@ -23,9 +23,11 @@ persisted backlog. You are deliberately shallow — the deep context dig, decisi
 drafting and execution all belong to **act-or-decide** downstream. Keeping this stage cheap
 is what lets it scan the whole backlog every run.
 
-> **Workspace-relative.** All data paths (`.proactive-jupi/assets.md`, `.proactive-jupi/config.local.json`,
-> `refresh-backlog/runs/`) resolve against the **CWD where the run executes**, never the plugin
-> install location. Shared helpers live under **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
+> **Workspace-relative, and the workspace may be a scratch one.** `.proactive-jupi/assets.md` and
+> `.proactive-jupi/config.local.json` resolve against the **CWD where the run executes**, never the plugin
+> install location. Under a scheduled routine that CWD is a container the routine just wrote both files into
+> from its own prompt — read them as you would locally, and **write nothing durable there**. Shared helpers
+> live under **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
 
 ## Contract (hard — never transgress)
 - ✅ **Writes only the Neon `tasks` table** (via the shared helper). Never `actions` — that's
@@ -58,6 +60,12 @@ is what lets it scan the whole backlog every run.
    **Also read the `Who this is` section** (role · accountable for · works with) — that's what you score
    `relevance` against in Stage 2. If the section is missing (an `assets.md` predating it), score relevance
    on the signal alone and say so in the return; don't stall.
+4. **The rules index — from the `rules` store, not from `assets.md`.** Open the `rules`-tagged tool (via
+   `config.rulesStoreRef`) and read its **index section** once: it is small, and it's what lets Stage 1 tag a
+   candidate `rule_ref` on an open question. The index lives beside the rules because that is the one place
+   both a local run and a scheduled one can reach it. If the store doesn't resolve, say **"rules index not
+   read — store unreachable"** and carry on without hints; that is a different fact from "no rules", and
+   collapsing the two tells every future run this team has no playbook.
 
 **Ensure the DB helper's deps** — one command, at the top of every run:
 ```
@@ -70,8 +78,9 @@ until the next cold scheduled run and then stops.
 
 > **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
 > inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
-> travel through). **No `mcp__remote-devices__*` tools at all** means this routine was scheduled as a cloud
-> task, which isn't supported: every fire fails identically, so it needs re-creating on-device, not a retry.
+> travel through). A scheduled routine **carries** its config and writes it to
+> `./.proactive-jupi/config.local.json` before invoking you, so config missing under a routine means that
+> boot step didn't happen — the routine needs re-creating by setup, not a retry. Say which case you're in.
 
 All Neon access goes through the helper — **never hand-write SQL, never touch the account-wide
 Neon MCP.** It reads `neonConnString` + `jupiUserId` from config and **scopes every query by
@@ -137,8 +146,8 @@ For each `Connected` tool tagged **`inbox`** in `assets.md` (recipes in `signal-
      `update-brain targeted` and **do not** deep-dig the thread — that's act-or-decide's job.
    - `open_questions` — surface-level uncertainties only: `[{uncertainty_pct, description}]`.
      Not resolved decisions.
-     - **Rules-index tag (shallow, off Jupi).** Scan the `assets.md` **"Business rules — index"**
-       you already loaded at boot (step 3 — small, read in full). If an index entry plainly
+     - **Rules-index tag (shallow, off Jupi).** Scan the **rules index** you already loaded at boot
+       (step 4 — small, read in full). If an index entry plainly
        matches a candidate open question (its *when-X* fits this signal), attach the candidate
        `rule_ref` to that `open_question` (`{uncertainty_pct, description, rule_ref}`) — a **hint**,
        not a resolution. **Do not** open the rule store, **do not** touch Jupi, **do not** judge
@@ -224,9 +233,10 @@ in your summary.
 
 ## Where you write
 - **Neon `tasks`** (via `db.mjs`) — candidate → open rows; `crawl_state` cursors.
-- `refresh-backlog/runs/run-<id>-<date>/run-log.md` — sources scanned, tasks created/updated/
-  reopened, any unreachable source, cursors advanced, the top window at the end.
-- **Never** Supermemory (read-only), the tools (read-only), `actions`, or Jupi.
+- **Never** Supermemory (read-only), the tools (read-only), `actions`, or Jupi — **and no files.** Your run
+  log is what you return: sources scanned, tasks created/updated/reopened, any unreachable source, cursors
+  advanced, the top window at the end. Under a routine there is no `runs/` folder, and a log written into a
+  container about to be discarded is a log nobody reads.
 
 ## Narrate + return
 Narrate per step (✅ done / 🔧 fixed / ⚠️ needs you). Return a short summary (4–6 lines): sources

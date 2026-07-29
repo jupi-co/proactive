@@ -30,18 +30,19 @@ external send is at least as consequential as a posted decision. Draft-mode ACTs
 gate (no external effect), keeping the default path fast. *(This branch is exercised only when `mode:perform`
 is enabled; the closing-loop execution of settled decisions lands in Phase 4.)*
 
-## Files of a run
+## What a run produces
 
-```
-act-or-decide/runs/run-<id>/
-├── report.md       ← the deliverable — the dry-run table, or the posted decision(s) + acted rows
-├── validation.md   ← history of the validator's passes (flags, verdicts, iteration #)
-└── log.md          ← the producer's narrative
-```
+Three texts, all **returned, never written to disk**:
 
-**Harness note:** a sub-agent cannot write a report/findings file (it returns text). So the **orchestrator**
-(main session / runner) persists `report.md` and `validation.md` from the texts the producer and validator
-return.
+- **report** — the deliverable: the dry-run table, or the posted decision(s) + acted rows
+- **validation** — the validator's passes (flags, verdicts, iteration #)
+- **narrative** — the producer's log
+
+**Why not files.** A sub-agent can't write one anyway (it returns text), and the orchestrator shouldn't
+either: under a scheduled routine there is no workspace folder, and anything written to the run's own
+container is discarded with it. The orchestrator assembles the texts the producer and validator return and
+hands them up — the routine's run record (`db.mjs run-open`/`run-close`) is what persists, and the durable
+substance is already in Neon and Jupi.
 
 ## Autonomy
 No human in the loop during the run: the only exit door to the user is a **PASS** (a posted decision) or a

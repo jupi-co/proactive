@@ -65,12 +65,12 @@ be taken back, under the very mode they picked to stop that.
 > **Neon carries no role** — it isn't a tool the user works in, it's Proactive-Jupi's own task/action database. Access is via the conn string in config, not this table.
 
 ## Routines — cadence + why
-Populated by setup step 8. Each routine is anchored to a **real ritual the crawl discovered**, so the user sees *why* it fires when it does. Each entry: **routine** · **schedule** · **anchor event** (the ritual it's timed to).
+Populated by setup step 8. Each routine is anchored to a **real ritual the crawl discovered**, so the user sees *why* it fires when it does. Record the **local** time and **the cron actually set** side by side: schedulers take UTC, the conversion shifts the day whenever it crosses midnight, and an off-by-one day is invisible until a Monday quietly never runs. Two columns cost nothing and make the conversion checkable without re-deriving it.
 
-| Routine | Schedule | Anchored to |
-|---|---|---|
-| _e.g. act-or-decide_ | _~45 min before daily standup_ | _standup 11:40_ |
-| _e.g. update-brain_ | _daily, before the workday_ | _— (pre-day)_ |
+| Routine | Local time | Cron as set | Anchored to |
+|---|---|---|---|
+| _Proactive-Jupi — act & decide_ | _weekdays 10:55 CEST_ | _`55 8 * * 1-5` UTC_ | _standup 11:40_ |
+| _Proactive-Jupi — refresh brain_ | _daily 06:45 CEST_ | _`45 4 * * *` UTC_ | _— (before the workday)_ |
 
 _Empty until setup runs._
 
@@ -79,16 +79,23 @@ _Empty until setup runs._
 
 Proactive-Jupi's own skills (`update-brain`, `refresh-backlog`, `act-or-decide`, `execute-action`, `act-post-decision`) are the pipeline itself and are deliberately **not** listed.
 
-| Name | Kind | Invoked as | Sends? | What it does | When to reach for it |
-|---|---|---|---|---|---|
-| _e.g. weekly-board-report_ | skill | `/weekly-board-report` | no — drafts only | _Builds the investor update from Linear + the metrics sheet_ | _Any "board update / investor report" task — don't recompose it by hand_ |
-| _e.g. partner-digest_ | skill | `/partner-digest` | **yes — emails the partners list** | _Compiles the monthly digest and mails it_ | _Monthly partner comms — but it sends, so it can never be a silent ACT_ |
+**`Reachable` is the other safety field, and it is about *where the skill lives*.** A scheduled routine
+runs in the cloud, so a skill sitting in this workspace's `.claude/skills/` is not callable from one —
+`local only`. A skill from a plugin installed on the user's account travels with them — `yes`. Nothing
+notices this at run time: a routine can plan a whole action around a competence that isn't there, and the
+plan reads as sound until the moment it runs. So an entry marked `local only` is usable when the user
+invokes Jupi themselves and **invisible to the routines** — plan without it, and say what that costs.
+
+| Name | Kind | Invoked as | Sends? | Reachable | What it does | When to reach for it |
+|---|---|---|---|---|---|---|
+| _e.g. weekly-board-report_ | skill | `/weekly-board-report` | no — drafts only | local only | _Builds the investor update from Linear + the metrics sheet_ | _Any "board update / investor report" task — don't recompose it by hand_ |
+| _e.g. partner-digest_ | skill | `/partner-digest` | **yes — emails the partners list** | yes (account plugin) | _Compiles the monthly digest and mails it_ | _Monthly partner comms — but it sends, so it can never be a silent ACT_ |
 
 _Empty until setup runs. If a scan finds nothing, setup writes "none discovered" here — an empty table is ambiguous, an explicit "none" is not._
 
-## Business rules — index
-**Store:** the tool tagged **`rules`** in the tools table above — normally the shared space where the team's SOPs already live (a local `.proactive-jupi/business-rules.md` only when there is no external home). That tag is what names the store — any id or secret needed to *open* it lives in config, never here. This section is the **index** read in full by the context searches (shallow tags a candidate `rule_ref`; the deep dig opens the store entry to confirm and pre-empt the open question → confidence high → act).
+## Business rules
+**Store:** the tool tagged **`rules`** in the tools table above — normally the shared space where the team's SOPs already live (a local `.proactive-jupi/business-rules.md` only when there is no external home). That tag is what names the store; the id or secret needed to *open* it lives in config, never here.
 
-Rules accrete reactively via task → recurring decision → rule: `act-or-decide` posts a `[BR]` rule-decision, the owner approves it in Jupi, `act-post-decision` runs its business-rule-update action (writes the store) and appends the entry here. Each entry: **rule id (Jupi decision)** · *when-X-always-Y* · owner · task types it unblocks · store ref (anchor / block id).
+**The index lives in the store, not in this file.** Rules accrete at run time — `act-or-decide` posts a `[BR]` rule-decision, the owner approves it in Jupi, `act-post-decision` writes the rule and indexes it — and a scheduled routine cannot write back to a file on someone's laptop. Keeping the index beside the rules it indexes is what lets that loop close from anywhere; it also keeps the index next to the text a colleague reads, instead of in a workspace file only Jupi opens. Each entry, in the store's own index section: **rule id (Jupi decision)** · *when-X-always-Y* · owner · task types it unblocks · anchor / block id.
 
-_Empty. No business rules yet._
+_This file names the store. It does not hold the rules._
