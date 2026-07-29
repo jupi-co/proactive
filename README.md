@@ -39,7 +39,7 @@ Setup front-loads everything human-gated into an attended prelude — config key
 **Testing an unreleased build? (Developer mode)** 
 - Clone the repo
 - Ask an AI agent to package the plugin, or run `bash scripts/package-plugin.sh`
-- Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
+- Upload `dist/proactive-jupi.zip` under **Plugins → Add → Upload local plugin**. A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
 
 ## Config — two files, two jobs
 
