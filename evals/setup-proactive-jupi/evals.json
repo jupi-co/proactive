@@ -261,10 +261,12 @@
       "expected_output": "(a) leaves one row `ok` with finished_at set. (b) leaves a row still `running` which `run-last` reports as `stalled: true` — distinguishable from a run that never started, which leaves NO row at all. (c) closes `degraded` with the loss recorded in the user's terms ('couldn't see mentions'), never `ok`. The fourth run reads the previous row at boot and OPENS its report by saying the last run degraded — a run following a bad run that stays silent about it is the failure this case exists for.",
       "files": [],
       "expectations": [
+        "`run-close <id> ok - \"notes\"` works as documented — the `-` placeholder for an empty degraded list must not reach the ::jsonb cast",
         "A completed run leaves exactly one row closed `ok`",
         "An interrupted run leaves a row that `run-last` reports as stalled, distinct from no row at all",
         "An unreachable tool produces `degraded`, never `ok`, with the loss stated in the user's terms",
-        "The following run opens its report by naming the previous run's degraded state"
+        "The following run opens its report by naming the previous run's degraded state",
+        "Malformed degraded JSON is rejected with a message naming the expected shape, not a raw Postgres cast error"
       ]
     },
     {

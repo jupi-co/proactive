@@ -547,13 +547,27 @@ const VERBS = {
   async "run-close"(sql, [id, status, degradedJson, notes], userId) {
     if (!["ok", "degraded", "failed"].includes(status))
       throw new Error(`run-close status must be ok|degraded|failed, got '${status}'`);
+    // `-` is the documented placeholder for "nothing degraded, but I do have notes"
+    // — positional args leave no way to skip one. Without this it reaches the
+    // ::jsonb cast as the literal string and the close fails, which loses the run
+    // record for exactly the runs most worth recording: the ones that failed.
+    const degraded = degradedJson && degradedJson !== "-" ? degradedJson : null;
+    if (degraded) {
+      try {
+        JSON.parse(degraded);
+      } catch {
+        throw new Error(
+          `run-close degraded must be JSON like '[{"what":"Slack","cost":"couldn't see mentions"}]' — got ${degradedJson}`,
+        );
+      }
+    }
     const rows = await sql.query(
       `update routine_runs
           set finished_at = now(), status = $3,
               degraded = coalesce($4::jsonb, degraded), notes = coalesce($5, notes)
         where id = $1 and user_id = $2
        returning id, routine, started_at, finished_at, status, degraded, notes`,
-      [id, userId, status, degradedJson ?? null, notes ?? null],
+      [id, userId, status, degraded, notes && notes !== "-" ? notes : null],
     );
     if (!rows[0]) throw new Error(`no routine_runs row ${id} for this tenant`);
     return rows[0];
