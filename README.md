@@ -10,25 +10,25 @@ The human is bothered **only for genuine trade-offs** (the confidence × risk ga
 
 Installing `proactive-jupi` pulls in **`jupi-skills`** automatically — it's declared as a dependency, because every skill here reaches Jupi through that plugin's MCP server. Add the `jupi-skills` marketplace *first*, though: a dependency whose marketplace you haven't added is left unresolved.
 
-**1. Add the jupi-skills marketplace** (skip if `claude plugin marketplace list` already shows it):
+In the **Claude Desktop app**, every step below is under **Cowork → Customize → Plugins**.
 
-```bash
-claude plugin marketplace add https://github.com/jupi-co/jupi-skills.git
+**1. Add the jupi-skills marketplace** — **Add → Add marketplace**, then paste:
+
+```
+https://github.com/jupi-co/jupi-skills.git
 ```
 
-**2. Add this marketplace:**
+Skip this if `jupi-skills` is already in your marketplace list.
 
-```bash
-claude plugin marketplace add https://github.com/jupi-co/proactive.git
+**2. Add this marketplace** — **Add → Add marketplace** again, with:
+
+```
+https://github.com/jupi-co/proactive.git
 ```
 
-**3. Install the plugin.** `jupi-skills` installs alongside it; the install output lists what came with it.
+**3. Install `proactive-jupi`** from the `proactive-jupi` marketplace. `jupi-skills` installs alongside it as a dependency.
 
-```bash
-claude plugin install proactive-jupi@proactive-jupi
-```
-
-**4. Authorize the Jupi MCP server** — run `/mcp` in an interactive session and complete the OAuth flow for `jupi-skills:Jupi`. Setup blocks on Jupi answering, so this has to happen before step 5.
+**4. Authorize the Jupi MCP server** — connect `jupi-skills:Jupi` and complete the OAuth flow. Setup blocks on Jupi answering, so this has to happen before step 5.
 
 **5. Run setup** in the workspace you want Proactive-Jupi to work in (your existing repo — it namespaces everything under `.proactive-jupi/`):
 
@@ -38,7 +38,9 @@ claude plugin install proactive-jupi@proactive-jupi
 
 Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
 
-**In Cowork instead?** Cowork installs from a zip, which carries no dependency resolution — install `jupi-skills` there yourself, then upload `dist/proactive-jupi.zip` (see [Plugin](#plugin-local-cowork-testing) below).
+**On the CLI instead?** Same sequence, as three commands — `claude plugin marketplace add https://github.com/jupi-co/jupi-skills.git`, the same for `…/proactive.git`, then `claude plugin install proactive-jupi@proactive-jupi`.
+
+**Testing an unreleased build?** Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
 
 ## Config — two files, two jobs
 
