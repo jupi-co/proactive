@@ -26,9 +26,9 @@ https://github.com/jupi-co/proactive.git
 
 **3. Install `proactive-jupi`** from the `proactive-jupi` marketplace. `jupi-skills` installs alongside it as a dependency.
 
-**4. Authorize the Jupi MCP server** — connect `jupi-skills:Jupi` and complete the OAuth flow. Setup blocks on Jupi answering, so this has to happen before step 5.
+**4. Connect to the Jupi MCP server** Under the Connectors tab of the installed plugin, click "Jupi" then "Connect".
 
-**5. Run setup** in the workspace you want Proactive-Jupi to work in:
+**5. Run setup** in the workspace you want Proactive-Jupi to work in by starting a Cowork task and prompting:
 
 ```
 /setup-proactive-jupi
@@ -36,7 +36,10 @@ https://github.com/jupi-co/proactive.git
 
 Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
 
-**Testing an unreleased build?** Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
+**Testing an unreleased build? (Developer mode)** 
+- Clone the repo
+- Ask an AI agent to package the plugin, or run `bash scripts/package-plugin.sh`
+- Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
 
 ## Config — two files, two jobs
 
