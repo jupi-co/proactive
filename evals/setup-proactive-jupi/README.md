@@ -95,7 +95,8 @@ read as "a careful run *can* do this", not "any run *will*".
 | 22 | Cadence — anchored to the real ritual, converted to UTC, day-of-week shifted when it crosses midnight |
 
 Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace); 19–22 from
-[`ROUTINES-SPEC.md`](../../ROUTINES-SPEC.md) (the 29 July install). 14 and 17 sit in steps 1–2 and run
+the 29 July install (rationale in IMPLEMENTATION-PLAN §12; the prompt rule in the
+skill's `reference/routine-prompt.md`). 14 and 17 sit in steps 1–2 and run
 **prelude-only**. 15, 16, 18, 19, 20, 21 and 22 reach steps 5–8, so run them against a **scratch Neon
 project**; 16 and 22 create real (then updated) cloud routines — **delete them afterwards**, and note that a
 newly created routine is on manual approval, so it will not fire on its own in the meantime.
