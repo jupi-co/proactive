@@ -6,6 +6,40 @@ Workspace + skills for the Proactive-Jupi proactive engine (dogfood build). Full
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
 The human is bothered **only for genuine trade-offs** (the confidence × risk gate). Everything confident-and-safe just happens.
 
+## Get started
+
+Installing `proactive-jupi` pulls in **`jupi-skills`** automatically — it's declared as a dependency, because every skill here reaches Jupi through that plugin's MCP server. Add the `jupi-skills` marketplace *first*, though: a dependency whose marketplace you haven't added is left unresolved.
+
+**1. Add the jupi-skills marketplace** (skip if `claude plugin marketplace list` already shows it):
+
+```bash
+claude plugin marketplace add https://github.com/jupi-co/jupi-skills.git
+```
+
+**2. Add this marketplace.** From a clone of `jupi-co/proactive` (the repo is private, so a local path is the reliable route):
+
+```bash
+claude plugin marketplace add /path/to/proactive
+```
+
+**3. Install the plugin.** `jupi-skills` installs alongside it; the install output lists what came with it.
+
+```bash
+claude plugin install proactive-jupi@proactive-jupi
+```
+
+**4. Authorize the Jupi MCP server** — run `/mcp` in an interactive session and complete the OAuth flow for `jupi-skills:Jupi`. Setup blocks on Jupi answering, so this has to happen before step 5.
+
+**5. Run setup** in the workspace you want Proactive-Jupi to work in (your existing repo — it namespaces everything under `.proactive-jupi/`):
+
+```
+/setup-proactive-jupi
+```
+
+Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
+
+**In Cowork instead?** Cowork installs from a zip, which carries no dependency resolution — install `jupi-skills` there yourself, then upload `dist/proactive-jupi.zip` (see [Plugin](#plugin-local-cowork-testing) below).
+
 ## Config — two files, two jobs
 
 Both are gitignored; each has a committed template. **Neither ever names a tool** — which tool plays which role lives in `.proactive-jupi/assets.md` (the roles table: `inbox`, `context`, `work`, `decision`, `rules`, `brain`).

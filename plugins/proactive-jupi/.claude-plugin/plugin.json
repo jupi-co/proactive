@@ -5,5 +5,8 @@
   "author": { "name": "Jupi", "email": "a@jupi.co" },
   "homepage": "https://github.com/jupi-co/jupi-skills",
   "license": "MIT",
-  "keywords": ["jupi", "decisions", "automation", "context", "mcp", "agent", "proactive"]
+  "keywords": ["jupi", "decisions", "automation", "context", "mcp", "agent", "proactive"],
+  "dependencies": [
+    { "name": "jupi-skills", "marketplace": "jupi-skills" }
+  ]
 }
