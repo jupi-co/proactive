@@ -95,7 +95,7 @@ read as "a careful run *can* do this", not "any run *will*".
 | 22 | Cadence — anchored to the real ritual, converted to UTC, day-of-week shifted when it crosses midnight |
 | 23 | No Neon account — ask before demanding a string, walk the signup, dedicated project; never a prerequisites checklist |
 | 24 | No Supermemory account — three-state first, then connector via OAuth (no key), no container-tag question, re-probe |
-| 25 | Both accounts missing and declined — one batched ask, then carry on with the cost stated; only Jupi hard-stops |
+| 25 | Both accounts missing and declined — one batched ask; the decline is answered, not accepted, and the run pauses incomplete |
 
 Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace); 19–22 from
 the 29 July install (rationale in IMPLEMENTATION-PLAN §12; the prompt rule in the
@@ -110,9 +110,11 @@ Neon project and nothing else**: it drives `db.mjs run-open` / `run-close` / `ru
 cheap and worth running on every change to the routine boot sequence.
 
 Cases 23–25 cover the no-account handling (a user with no Neon or Supermemory account yet): setup establishes
-the account exists before asking for anything it issues, walks the signup (`reference/account-setup.md`),
-batches both asks into one trip, and never turns an unfinished signup into a second hard gate — only Jupi
-hard-stops. All three run **prelude-only** against a fresh scratch workspace; none reaches steps 5–8.
+the account exists before asking for anything it issues, walks the signup (`reference/account-setup.md`), and
+batches both asks into one trip. **All three stores are required, not optional** — so a declined or unfinished
+signup pauses the run as **incomplete** (the outstanding signup named, a re-run resuming from there) rather
+than being carried past with a ⚠️; only Jupi *hard-stops* the prelude, but Neon and Supermemory are just as
+required to finish. All three run **prelude-only** against a fresh scratch workspace; none reaches steps 5–8.
 
 ## Prerequisites
 

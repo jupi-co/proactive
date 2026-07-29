@@ -331,14 +331,16 @@
       "id": 25,
       "prompt": "BOTH ACCOUNTS MISSING, AND THEY DECLINE FOR NOW (prelude, fresh scratch workspace, Supermemory MCP not resolving). Stop at the ✋ boundary.",
       "persona": "Founder, in a hurry. Has neither Neon nor Supermemory. When the signups come up, says 'I'm not doing two signups right now — can we carry on and I'll sort that later?' and then answers the rest of the interview normally (Gmail + Slack, Linear for work, Notion for docs and playbooks). Never volunteers to reconsider.",
-      "expected_output": "The two signups are surfaced in ONE message so the user would make a single trip to the browser, not stranded across two separate waits — and Jupi is probed before anyone is sent off, since it is the only hard gate. When the user declines, setup does NOT trap them: it records both gaps, states each cost in a line (no Neon → the unattended tail can't complete, so setup can't finish hands-off; no Supermemory → no Facts seeded, so act-or-decide runs context-poor), and CARRIES ON with the interview rather than re-asking or looping. The report flags both ⚠️ and says a re-run resumes from them. Neither missing account is treated as a hard stop — only Jupi is.",
+      "expected_output": "The two signups are surfaced in ONE message so the user makes a single trip to the browser, not stranded across two separate waits — and Jupi is probed before anyone is sent off. Then the key behavior: ALL THREE STORES ARE REQUIRED, so the decline is NOT accepted as a final state. Setup answers the objection instead of recording it: it names the concrete consequence (no Neon = nowhere to write the backlog, so nothing past the ✋ boundary runs at all; no Supermemory = act-or-decide reasoning about people it knows nothing about), shrinks the errand (both signups ~5 minutes, exact click-paths, stay on the line), and offers the reuse path for Neon (an existing project-scoped string from their engineering team). If the user still can't do it now, setup SAVES what's settled and PAUSES with the outstanding signup named — it does NOT cross the ✋ boundary and does NOT report success with two ⚠️ footnotes. FAIL if the run treats 'not now' as the user's call to make and carries on to a completed-looking setup; that is the pre-change behavior. FAIL equally if it badgers — one substantive push, then a resumable halt, per the ask-once rule. The distinction under test: an unfinished setup the user understands is recoverable, a 'finished' one with no database fails silently every morning.",
       "files": [],
       "expectations": [
         "Both signups are raised in a single message rather than as two separate asks",
         "Jupi is probed before the user is sent off to sign up for anything",
-        "The decline is accepted without re-asking, looping, or halting the interview",
-        "The cost of each missing account is stated concretely rather than left implicit",
-        "The report flags both gaps as needs-you and notes a re-run resumes from them"
+        "The decline is NOT accepted as a final state and the run is not carried through to a completed-looking setup",
+        "The concrete consequence is named — no backlog means nothing runs — rather than recorded as a tolerable gap",
+        "The objection is answered by shrinking the errand (batched, exact steps, free tier, or reusing an existing Neon project) rather than by re-asking the same question",
+        "The ✋ boundary is not crossed and the run is reported as incomplete, not as success with warnings",
+        "The user is not badgered: one substantive push, then a resumable halt"
       ]
     }
   ]

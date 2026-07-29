@@ -65,7 +65,14 @@ postgresql://<role>:<password>@ep-<id>-pooler.<region>.aws.neon.tech/neondb?sslm
 
 ## If they'd rather not, right now
 
-Neither account is a hard gate — **only Jupi is** — so a "not now" is their call to make. Record the gap, say plainly what it costs, and carry on with the interview rather than trapping them in the prelude:
+**Both accounts are required, so "not now" isn't an outcome setup can deliver** — and the honest thing is to say so rather than let someone believe they have a working setup that will quietly do nothing:
 
-- **No Neon** → no schema and no backlog rows, so the unattended tail (steps 5 and 7) can't complete. Setup finishes the prelude and reports ⚠️; a re-run picks up from the connection string.
-- **No Supermemory** → step 6 seeds no Facts, so `act-or-decide` runs context-poor: it still triages and drafts, but it recalls nothing about the people and projects involved, which is most of what makes its judgment good.
+- **No Neon** → no schema and no backlog rows. Steps 5 and 7 have nowhere to write, so *nothing* past the ✋ boundary runs — there is no backlog, which means there is no Proactive-Jupi.
+- **No Supermemory** → step 6 seeds no Facts, so `act-or-decide` reasons about the user's people and projects while knowing nothing about them. It would still emit drafts and decisions, which is worse than emitting none: confident output built on no context.
+
+**What to do instead of accepting it.** Reluctance here is nearly always about time or about signing up for something unfamiliar — so treat it as an objection to answer, not a decision to record:
+
+- **Shrink the errand.** Both signups together are about five minutes. Batch them, hand over the exact click-paths, and stay on the line rather than sending them away with homework.
+- **Answer the real worry.** Free tier, no card, their account and their data, and Jupi is a writer to it rather than an owner of it.
+- **Offer the reuse path** (Neon): an existing project-scoped string from their engineering team works just as well as a new signup, and it may be the faster route.
+- **Then pause, don't proceed.** If they still can't do it now, that's fine and human — save everything already settled, state exactly what's outstanding, and let a re-run resume from there. What you must not do is cross the ✋ boundary, or write a report that reads like success. An unfinished setup the user understands is recoverable; a "finished" one with no database is a system that fails silently every morning.
