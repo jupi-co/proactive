@@ -41,7 +41,11 @@ Rules: **provenance always**; mark `confirmed` vs `inferred` and **never state a
 
 > **Write the hedge and the attribution INSIDE the sentence — a trailing parenthetical does not survive.** Supermemory rewrites each `save` into extracted memories, and the top-ranked results a caller actually reads come back **stripped of the trailing `(src: …)` and the `[Type]` tag** (measured: 26 saves → 96 extracted memories; raw text with provenance survives only as lower-ranked chunks, sometimes not returned at all). So a Fact written as *"Antoine started looking for reasons not to run a pilot. (src: … ; inferred — Nick's read of his motive)"* comes back as the flat assertion **"Antoine is looking for reasons not to run a pilot"** — attribution gone, hedge gone. That is the sentence `act-or-decide` then gates an outbound message on, so this is an exposure bug, not a tidiness one.
 >
-> Therefore: put whose claim it is and how sure you are **in the clause itself** — *"Nick's read after the 22 July call is that Antoine was looking for reasons not to run a pilot (holidays, compliance)"* — and keep the `(src: …)` parenthetical as a bonus for whoever reads the raw document, never as the only place the qualification lives. **Test it, don't assume:** after a batch, `recall` one hedged Fact and check the returned text still carries the attribution. If it doesn't, the sentence was written wrong, not the store.
+> Therefore: put whose claim it is and how sure you are **in the clause itself** — *"Nick's read after the 22 July call is that Antoine was looking for reasons not to run a pilot (holidays, compliance)"* — and keep the `(src: …)` parenthetical as a bonus for whoever reads the raw document, never as the only place the qualification lives.
+>
+> **In-clause hedging helps, but it is a mitigation, not a fix — don't treat it as a guarantee.** Four independent runs (2026-07-29) wrote the hedge inside the clause exactly as prescribed and still lost it at the top rank: *"update-brain's inferred read is that he is the main sourcer of inbound intros"* came back as the flat **"Nick Hernandez is the main sourcer of inbound intros at Jupi"**, and an explicitly-marked inference came back rendered as *"…**confirm** that Beamy is a live account"* — the aggregation layer upgraded a hedge into a confirmation. Temporal qualifiers fare worst: they are dropped essentially always. One run also saw a re-saved correction rank **below** the flattened original (0.81 vs 0.80), so "recency wins" is not dependable either.
+>
+> **So: never let safety rest on a qualifier surviving.** If a Fact is only safe *because* it is hedged or dated, it does not belong in the brain in that form — state the narrower claim you can defend unqualified, or put the qualifier in Neon where it comes back as written (§Voice profiles is the worked example). **Test it, don't assume:** after a batch, `recall` one hedged Fact and read what returns. If the hedge is gone, that is the store behaving as measured — report it, and reach for the structural fix rather than rewording the sentence again.
 
 ## Fact integrity — check what came back, not just that something did
 
@@ -71,26 +75,50 @@ parentheticals.
 ## Types (the ontology)
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
 
-### Voice profiles — a `[Process]` Fact about how the user writes to someone
+### Voice profiles — the record goes in Neon, the prose goes in the brain
 `act-or-decide` has to match the recipient's register before it drafts any message, and its only way to get
 that has been to pull the ten most recent messages the user sent that person in that channel — **every run,
 per recipient**. That is the most repeated expensive read in the whole system, and voice is about the most
-durable thing there is to know about a relationship. So it belongs in the brain:
+durable thing there is to know about a relationship. So it should be stored. The question is *where*.
 
+**Write the observation record to Neon, always:**
 ```
-[Process] <user> → <person> on <channel> — <register>. Observed from <n> sent messages up to <date>.
+node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" put-voice '{"person":"nick","channel":"email",
+  "register":"no greeting, 1–4 lines, question in the first sentence, no emoji, French",
+  "observed_at":"2026-07-24","sample_size":12,"verified":true,
+  "source_note":"gmail in:sent to:n@jupi.co, 12 threads 2026-07-03..21"}'
 ```
-- `[Process] Anne-Claire → Nick on email — writes in English, no greeting, 2–4 lines, signs off "AC", no emoji, asks the question in the first sentence. Observed from 12 sent messages up to 2026-07-24.`
-- `[Process] Anne-Claire → Batch (Antoine) on email — French, formal "Bonjour Antoine", full sentences, closes "Bien à vous". Observed from 10 sent messages up to 2026-06-30.`
+One row per **(person, channel)** pair — the same person is often formal on email and terse in Linear, and a
+merged profile is worse than none.
 
-**The observation date goes inside the sentence, not in the `(src: …)` parenthetical** — same reason as every
-other qualification here: the store strips trailing parentheticals from the chunks a caller actually reads,
-and a voice profile with no date is one the planner can't tell is two years stale. Register drifts as a
-relationship changes; the date is what makes the Fact safely reusable instead of quietly wrong.
+**Why not the brain, when this is so obviously knowledge?** Because the part that makes it *safe* is the part
+Supermemory drops. Measured across four independent runs (2026-07-29): the extraction layer strips the
+observation date and the attribution from the top-ranked memories a caller actually reads — **whether they
+sit in a trailing `(src: …)` parenthetical or inside the clause itself**, which is what this skill used to
+prescribe as the fix. One run also saw a re-saved correction rank *below* the flattened original (0.81 vs
+0.80), so "save a corrected statement and let recency win" doesn't hold here either. A dateless voice profile
+is not a slightly-degraded voice profile: `act-or-decide` can't tell a fresh one from a two-year-stale one,
+and it writes in the user's name from it.
 
-Keep one profile per **(person, channel)** pair — the same person is often formal on email and terse in
-Linear, and a merged profile is worse than none. When you re-observe a pair, save a fresh statement with the
-new date and let recency win (correction works the same way as everywhere else — §full step 5).
+So the split is by **what breaks if it degrades**. Semantic recall over rephrased Facts is exactly what
+Supermemory is good at, and a fuzzy `[Person]` fact costs little when it comes back paraphrased. A dated
+observation record costs a lot, so it lives in a store that returns what was written. `put-voice` is the same
+category as `crawl_state` and `crawl_frontier` — metadata about *observing*, not knowledge about the world —
+which is why holding it in Neon doesn't split the brain or dent the single-writer rule. **You are still the
+only writer of both.**
+
+**Also save the register as a `[Process]` Fact**, for the semantic path (someone asking "how do we talk to
+Nick?" should find it):
+```
+[Process] <user> → <person> on <channel> — <register>.
+```
+Keep the Fact's claims **timeless**, since the date won't survive: state the register, not how fresh it is.
+The date lives in Neon, where `act-or-decide` reads it. If you find yourself wanting to write "as of
+<date>" into the Fact, that's the signal the claim belongs in the record, not the prose.
+
+**Test it, don't assume.** After saving, `recall` one profile and read what comes back. The behaviour above
+is what we measured on this connector; if a future version preserves qualifiers, that changes the design and
+is worth reporting rather than quietly benefiting from.
 
 ## Incremental crawling — the `crawl_state` cursor
 Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.
@@ -115,6 +143,7 @@ crawling without becoming writers of the brain. You still read the tools and aut
 node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" list-frontier [N]        → pending items, oldest first
 node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" push-frontier '<json>'   → {kind, entity, note, source_ref, pushed_by}
 node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" close-frontier <id> done|dropped
+node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" frontier-stats [days]   → pending / pushed vs drained / verdict
 ```
 `kind` routes it: **`entity`** (who/what is this?) · **`voice`** (how does the user write to X in channel Y? —
 §Voice profiles) · **`topic`** (a subject area worth a sweep).
@@ -124,6 +153,24 @@ keeps appearing with no context, a project referenced in three threads you know 
 an address you can't place. Push them (`pushed_by: "update-brain"`) instead of chasing them now: chasing
 blows your budget on whatever you happened to notice first, while pushing lets the next run take them in
 order, and lets an item that was pushed twice from two directions be recognised as one.
+
+**But you are the biggest pusher, so you own the arithmetic.** A measured 5-item sweep of this skill pushed
+**12** items — a healthy discovery rate and a queue that grows about six times faster than a ~1/3 frontier
+budget can retire it. Left alone that ends in a queue nobody can work off, where the gap that blocked a
+decision sits under forty that merely occurred. Two things follow:
+- The queue is **bounded** (`frontierMaxPending`, default 50). At the cap `push-frontier` returns
+  `{capped: true}` and writes nothing. **Say so in your summary with the count** — a refused push is a
+  signal about drain rate, and one nobody sees is worse than the unbounded queue it replaced.
+- **Push what a later run is genuinely better for having; not one row per name you saw.** Ten near-identical
+  `entity` pushes from one calendar sweep is the failure mode — prefer the handful that block real work.
+
+**Size the frontier budget from the queue, not from a fixed fraction.** `frontier-stats` gives you `pending`,
+`pushed_recent` vs `drained_recent`, a `growth_ratio` and a plain `verdict`. Read it at step 2:
+- `keeping up` → the usual ~1/3 to the frontier.
+- `growing` / `growing, nothing drained` → **give the frontier half the budget or more, and say why.** A
+  third of a small budget against a growing queue is a rule that guarantees it never converges.
+- `full — pushes are being refused` → the frontier IS the run. Spend the whole budget draining, push nothing
+  new, and open the summary with it.
 
 **Close what you drain, honestly.** `done` = you looked (whether or not it yielded a Fact — a lookup that
 found nothing is still answered, and re-queuing it forever is how a frontier silts up). `dropped` = not worth
@@ -135,14 +182,14 @@ and pay for it again.
 ### `full` (default) — windowed sweep to build/refresh the brain
 Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budget.
 1. Read `jupiUserId` from config → container tag `user_<jupiUserId>`. Read your cursors via `db.mjs get-cursor brain <source>` (user-scoped automatically).
-2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once). **Split it explicitly between the frontier and the window** (a reasonable default is roughly a third to the frontier) and say the split, so a frontier that's growing faster than you drain it is visible rather than inferred.
+2. **Pick a budget and say it** — a realistic number of items/sources this run. A few well-done beats skimming everything (agent length + credits are the real limits — this is why we crawl incrementally rather than all-at-once). **Read `frontier-stats` first and split the budget from its `verdict`** (§the two halves): `keeping up` → ~a third to the frontier; `growing` → half or more; `full` → all of it. Say the split *and the verdict you sized it from*, so a queue outrunning its drain rate is visible in the report rather than inferred three runs later.
 3. **Drain the frontier first** — `list-frontier [N]`, oldest first, up to your frontier budget. These are gaps a *planner* hit while trying to do the user's work, so they are the highest-value thing you can spend a lookup on: the window is a guess about what matters, the frontier is evidence. Research each per its `kind` (`entity` → who/what is this · `voice` → §Voice profiles · `topic` → a filtered sweep), `save` the Facts, then `close-frontier <id> done|dropped`. Read each item's `note` before you start — it carries *why* it was queued, which is usually the difference between a useful lookup and a generic profile. If the frontier is empty, say so in one line and give the whole budget to the window.
 4. For each `Connected` tool tagged **`context`** in `.proactive-jupi/assets.md` (that role means "read it to feed the brain"): read content **newer than its cursor** within `crawlWindowDays`, using **filters, not bulk reads**. Synthesize Facts → `save` to the container tag. **Push what you trip over** (`push-frontier`) rather than chasing it now.
    - **An empty `context` set means a stale map, not an empty world — never report a clean run having read nothing.** An `assets.md` written before the roles refactor has no `Roles` column at all, so no tool carries `context` even though every one of them is connected and healthy. In that case fall back to the `Connected` tools whose surface is plainly readable context (mail, calendar, docs, issues), **say in the summary that you inferred the sources from a pre-roles `assets.md`**, and recommend re-running `setup-proactive-jupi` to reconcile it. A `Roles` column that exists but tags nothing `context` is a real configuration answer — report it and crawl nothing.
 5. **Advance each cursor** — `db.mjs advance-cursor brain <source> <cursor>` (user-scoped automatically).
 6. **Refresh core facts**: `recall` the durable ones (user identity, key orgs/relationships); if a fact has changed, **`save` the corrected statement** — Supermemory reconciles same-entity memories and favors recency. Do **not** rely on `forget` to remove the stale one: on the connector it is best-effort (semantic match ≥0.85 against Supermemory's *rewritten* stored form) and routinely misses paraphrased facts; there is no delete-by-id. **Reliable correction/deletion needs the HTTP API** (upgrade trigger) — until then, phrase updates as new authoritative statements and let recency win.
 7. **Screen a sample of what you wrote** (§Fact integrity) — `recall` a handful, check for degenerate text and lost qualification, re-save corrections.
-8. Return a short summary: budget drained (**frontier vs window**), facts written, **facts screened + any degenerate ones found**, cursors advanced, **frontier items closed vs pushed, and how many are still pending** — a pending count that only grows is the signal that the frontier budget is too small — any unreachable tool, zones still uncovered.
+8. Return a short summary: budget drained (**frontier vs window, and the `frontier-stats` verdict you sized it from**), facts written, **facts screened + any degenerate ones found**, cursors advanced, **frontier closed vs pushed vs still pending — plus any push that was refused at the cap** (that refusal is the clearest evidence the brain isn't crawled often enough; never drop it silently), any unreachable tool, zones still uncovered.
 
 ### `targeted "<request>"` — focused lookup for act-or-decide
 1. Read `jupiUserId` from config → tag `user_<jupiUserId>`. `recall` what we already know about the entity — don't re-fetch what's known.
@@ -151,18 +198,35 @@ Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budg
 4. **Return a short synthesized summary (4–6 lines)** to the caller — that's the value; don't just say "done".
 5. **Push what you tripped over** (`push-frontier`, `pushed_by: "update-brain"`) — a targeted lookup almost always turns up an adjacent unknown, and it's the cheapest moment to notice it. Don't chase it: the caller is waiting on an answer to *their* question.
 
-**Two shapes of request arrive here, and the second needs no tool read.**
+**Two shapes of request arrive here.**
 - **A lookup** — *"who is X / what is this org / what's the state of this project?"* — the flow above.
 - **An observation to record**, most often a **voice profile** `act-or-decide` observed in its own Stage 6:
-  it has already read the sent history and hands you the register it saw. There is nothing to go and fetch —
-  **write the Fact from what it gave you** (§Voice profiles), in the shape with the observation date inside
-  the sentence, and return one line confirming it. Re-reading the same ten messages to "verify" would burn
-  the exact cost this whole path exists to remove. The reason it routes through you at all is the
-  single-writer rule: `act-or-decide` may observe, but only you author what lands in the brain.
+  it has already read the sent history and hands you the register it saw, plus the query and date range it
+  read. You **spot-check it, then record it** (§Voice profiles). The single-writer rule is why it routes
+  through you at all: `act-or-decide` may observe, but only you author what lands in the brain.
+
+### Spot-check a handed-over observation — one call, not ten
+An earlier version of this skill said to take the observation as given, on the reasoning that re-reading the
+same ten messages would burn the exact cost the path exists to remove. **That was wrong, and an eval caught
+it being wrong in the most direct way available:** a run that re-read the source found the handed-over
+observation had the *language* wrong (French, not English) and the *sign-off* wrong (there wasn't one). A
+voice profile is what `act-or-decide` imitates the user with on outbound mail, so a wrong one doesn't sit
+inertly in the brain — it writes in the user's name, in the wrong language, to their counterparty.
+
+The saving is real; the way to keep it is to make the check **cheap, not absent**:
+- **One filtered call, metadata or a single thread** — the same `search_threads` query the caller says it
+  used. You are checking the observation's *shape* (language, greeting, sign-off, rough length), which is
+  visible in snippets. You are **not** re-reading ten bodies; that is the cost being avoided.
+- **It agrees** → record it `verified: true`. Cost: one call, and the profile is now trustworthy.
+- **It disagrees** → record what *you* saw, `verified: true`, and **say in your return that the hand-over
+  was wrong and on what**. The caller drafted from the wrong register this run; it needs to know.
+- **You genuinely can't check** (channel unreachable, no sent history) → record it `verified: false` and
+  **say so in the register text itself** — *"as reported by act-or-decide, unchecked against the source"*.
+  An unverified profile is still better than none, but only if whoever reads it knows which it is.
 
 **This is a trailing call — treat it as such.** `act-or-decide` invokes it *after* its report is out,
-deliberately off the critical path, so nothing is waiting on you. Be quick and don't expand scope; if the
-observation is thin, save the thin version with its date rather than launching a crawl to enrich it.
+deliberately off the critical path, so nothing is waiting on you. One spot-check call, then write. Don't
+expand it into a crawl.
 
 ## Per-tool exploration (read-only, filtered)
 Explore **what the task asks**, with filters — not exhaustive dumps. Tool names may be namespaced by how each MCP is connected; use whichever the environment exposes (load schemas via ToolSearch as needed).

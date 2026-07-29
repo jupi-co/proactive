@@ -74,6 +74,16 @@ Two layers, matching `evals/refresh-backlog/`.
       pushes nothing and says what it would have. The ordering is the point: bookkeeping that delays the
       user's drafts is bookkeeping that gets cut.
 
+  25. **Voice record read from Neon, not `recall`** — staleness is judged from `age_days` on the
+      `voice_observations` row. Judging it from a recalled Fact is the failure: the store strips the date,
+      which is why the record exists at all.
+  26. **An unverified record is not imitated blindly** — `verified: false` means a run reported it and nobody
+      checked it. Distinctive traits (language, sign-off) get sanity-checked against the thread being replied
+      to. A real eval hand-over had both wrong.
+  27. **Frontier full at push time** — a capped push is reported in the footer with its counts, never retried
+      and never silently dropped; the rest of the run completes. A refusal nobody sees is worse than the
+      unbounded queue it replaced.
+
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`
 is prefixed `eval:`; run `purge-scratch.sh` afterward to delete them (their `actions` cascade). **Never run a

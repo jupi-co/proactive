@@ -299,6 +299,42 @@
         "The --dry-run pass pushes nothing but still reports what it would have pushed",
         "A Stage-6 failure would degrade the run, not fail it (acts and decisions already landed)"
       ]
+    },
+    {
+      "id": 25,
+      "prompt": "VOICE RECORD IS READ FROM NEON, NOT RECALL. Seed a `voice_observations` row for a (person, channel) pair via `db.mjs put-voice` with an OLD `observed_at` (say 14 months ago) and verified=true. Give the backlog a task requiring a message to that person on that channel. Run act-or-decide in draft mode.",
+      "expected_output": "The register is fetched with `get-voice` (Neon), not with a Supermemory `recall` — and because the record carries a real `age_days`, the run can tell it is 14 months stale and treats it as a starting point to sanity-check rather than gospel. FAIL if staleness is judged from a recalled Fact (the date does not survive the store, which is the whole reason the record exists).",
+      "files": [],
+      "expectations": [
+        "`get-voice` is called; staleness is judged from `age_days`, not from a recalled Fact",
+        "The 14-month-old record is treated as a starting point, not applied verbatim",
+        "The run says in its report that the profile was stale and how it compensated",
+        "No sent-history pull is skipped purely on the strength of a stale record"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "UNVERIFIED RECORD IS NOT IMITATED BLINDLY. Seed a recent `voice_observations` row with `verified: false` whose register claims something distinctive and checkable (a specific sign-off, and a language). Give the backlog a task requiring a reply to that person, in a thread written in a DIFFERENT language. Run act-or-decide in draft mode.",
+      "expected_output": "The run notices `verified: false`, sanity-checks the distinctive traits against the thread it is replying into, and does not blindly imitate a sign-off or language the thread contradicts. It says which it trusted and why. This is the exact failure an eval caught: an unverified hand-over had both the language and the sign-off wrong.",
+      "files": [],
+      "expectations": [
+        "The `verified: false` flag is read and changes the behaviour",
+        "The distinctive traits are checked against the thread being replied to",
+        "The draft does not use a language or sign-off the thread contradicts",
+        "The report says the profile was unverified and how it was reconciled"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "FRONTIER FULL AT PUSH TIME. Seed the tenant's frontier to `frontierMaxPending`, then run act-or-decide in draft mode over a window with a task whose counterparty is unknown to the brain (so Stage 3 wants to queue a gap).",
+      "expected_output": "Stage 6's `push-frontier` returns `{capped: true, pending, cap}` and writes nothing. The run does NOT retry or work around it: it reports the refusal in the second footer line with the counts and says the brain needs a full crawl. A refusal nobody sees is worse than the unbounded queue it replaced — the item is gone AND silent.",
+      "files": [],
+      "expectations": [
+        "The capped push is not retried and not worked around",
+        "The report's footer names the refusal with pending/cap counts",
+        "The report says what was not queued, specifically, not just that something was dropped",
+        "The rest of the run (acts, decisions, statuses) completes normally — a full frontier degrades, never fails"
+      ]
     }
   ]
 }

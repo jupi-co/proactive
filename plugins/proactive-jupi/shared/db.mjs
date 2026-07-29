@@ -44,8 +44,15 @@
 //   push-frontier   '<json>'                        → { id, kind, entity, … } | { deduped: true }
 //       json: note (required — the WHY + source), kind? ('entity'|'voice'|'topic', default
 //             'entity'), entity?, source_ref?, pushed_by?, is_eval?
+//       Refuses at `frontierMaxPending` (default 50) → { capped: true, pending, cap } — an
+//       unbounded queue buries the items that mattered under the ones that merely occurred.
 //   list-frontier   [N] [eval]                      → [ {id, kind, entity, note, …}, … ] (oldest first)
 //   close-frontier  <id> <done|dropped>             → { id, kind, entity, status }
+//   frontier-stats  [days] [eval]                   → { pending, pushed_recent, drained_recent, growth_ratio, verdict }
+//   ── Voice observations: WHEN we last looked at how the user writes to someone ──
+//   put-voice       '<json>'                        → { person, channel, observed_at, verified }
+//       json: person, channel, register, observed_at (required); sample_size?, verified?, source_note?
+//   get-voice       <person> <channel>              → { register, observed_at, age_days, verified, … } | null
 //   list-dropped    [days] [N]                      → [ {task}, … ]  (drops, newest first — the
 //       evidence base for a `[BR] When X, do nothing` rule; defaults 90 days / 50 rows)
 //
@@ -73,6 +80,10 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_WINDOW = Number(process.env.BACKLOG_WINDOW_SIZE) || 30;
+// How many pending frontier items before pushes are refused (config:
+// `frontierMaxPending`). Sized so a full queue is still drainable in a handful of
+// normal runs — a cap you can never work off is the same as no cap, just later.
+const DEFAULT_FRONTIER_CAP = 50;
 
 // ── Scoring model ─────────────────────────────────────────────────────────
 //   score = impact^Wi · relevance^Wr · urgency · bottleneck^Wb · parse_factor
@@ -551,6 +562,31 @@ const VERBS = {
     const f = JSON.parse(jsonArg);
     if (!f.note) return { id: null, error: "push-frontier: `note` is required (the WHY, with its source)" };
     const kind = f.kind ?? "entity";
+    // Backpressure. A queue nothing bounds is not a queue, it is a landfill: one
+    // measured 5-item brain sweep pushed 12 frontier items while a ~1/3 drain
+    // budget retires under 2 per run, so pending grows ~6x faster than it falls
+    // and the items that mattered end up buried under the ones that merely
+    // occurred. Refusing at the cap (rather than inserting and hoping someone
+    // notices) makes the pressure visible AT THE PUSH, to the skill best placed
+    // to decide what is worth queueing — and the refusal is reported, never silent.
+    const cap = Number((loadWorkspaceConfig() || {}).frontierMaxPending) || DEFAULT_FRONTIER_CAP;
+    const [{ count: pending }] = await sql.query(
+      `select count(*)::int from crawl_frontier
+        where user_id = $1 and is_eval = $2 and status = 'pending'`,
+      [userId, truthy(f.is_eval)],
+    );
+    if (pending >= cap)
+      return {
+        id: null,
+        capped: true,
+        pending,
+        cap,
+        entity: f.entity ?? null,
+        kind,
+        error:
+          `frontier is full (${pending}/${cap} pending) — not queued. Drain it (update-brain full mode) ` +
+          `or raise frontierMaxPending. Report this: the discovery rate is outrunning the drain rate.`,
+      };
     const rows = await sql.query(
       `insert into crawl_frontier (user_id, kind, entity, note, source_ref, pushed_by, is_eval)
        select $1, $2, $3, $4, $5, $6, $7
@@ -602,6 +638,87 @@ const VERBS = {
       [id, userId, status],
     );
     return rows[0] ?? { id: null, error: "no such frontier item for this user" };
+  },
+
+  // Is the frontier keeping up? `pending` alone can't tell you: a steady 40 looks
+  // identical whether nothing is being pushed and nothing drained, or twelve are
+  // pushed and twelve drained every run. The drained/pushed split over a recent
+  // window is what says whether the queue is converging, and it is what update-brain
+  // sizes its frontier budget from.
+  async "frontier-stats"(sql, [daysArg, isEval], userId) {
+    const days = Math.min(Number(daysArg) || 7, 365);
+    const [row] = await sql.query(
+      `select
+         count(*) filter (where status = 'pending')::int as pending,
+         count(*) filter (where status = 'done'    and drained_at > now() - make_interval(days => $3))::int as drained_recent,
+         count(*) filter (where status = 'dropped' and drained_at > now() - make_interval(days => $3))::int as dropped_recent,
+         count(*) filter (where created_at > now() - make_interval(days => $3))::int as pushed_recent,
+         min(created_at) filter (where status = 'pending') as oldest_pending
+       from crawl_frontier
+      where user_id = $1 and is_eval = $2`,
+      [userId, truthy(isEval), days],
+    );
+    const cap = Number((loadWorkspaceConfig() || {}).frontierMaxPending) || DEFAULT_FRONTIER_CAP;
+    const retired = row.drained_recent + row.dropped_recent;
+    return {
+      ...row,
+      window_days: days,
+      cap,
+      // >1 means the queue is growing. Named rather than left to the caller so two
+      // skills can't disagree about which direction "healthy" is.
+      growth_ratio: retired > 0 ? round2(row.pushed_recent / retired) : row.pushed_recent > 0 ? null : 0,
+      verdict:
+        row.pending >= cap ? "full — pushes are being refused"
+        : retired === 0 && row.pushed_recent > 0 ? "growing, nothing drained"
+        : row.pushed_recent > retired ? "growing"
+        : "keeping up",
+    };
+  },
+
+  // ── Voice observations ─────────────────────────────────────────────────
+  // When we last looked at how the user writes to someone, off how much, and
+  // whether anyone checked it. The register PROSE is still a Supermemory Fact;
+  // this is the observation record, which Supermemory demonstrably cannot hold —
+  // its extraction layer strips the date and the attribution from the top-ranked
+  // memory a caller actually reads, wherever in the sentence they sit.
+  async "put-voice"(sql, [jsonArg], userId) {
+    const v = JSON.parse(jsonArg);
+    for (const k of ["person", "channel", "register", "observed_at"])
+      if (!v[k]) return { error: `put-voice: \`${k}\` is required` };
+    const rows = await sql.query(
+      `insert into voice_observations
+         (user_id, person, channel, register, observed_at, sample_size, verified, source_note, updated_at)
+       values ($1, lower($2), lower($3), $4, $5, $6, coalesce($7,false), $8, now())
+       on conflict (user_id, person, channel) do update
+         set register    = excluded.register,
+             observed_at = excluded.observed_at,
+             sample_size = excluded.sample_size,
+             -- verified never silently downgrades: a later unverified hand-over must not
+             -- erase the fact that someone once checked this against the source.
+             verified    = voice_observations.verified or excluded.verified,
+             source_note = coalesce(excluded.source_note, voice_observations.source_note),
+             updated_at  = now()
+       returning person, channel, observed_at, sample_size, verified`,
+      [
+        userId, v.person, v.channel, v.register, v.observed_at,
+        v.sample_size ?? null, v.verified ?? false, v.source_note ?? null,
+      ],
+    );
+    return rows[0];
+  },
+
+  // What act-or-decide reads before it pulls any sent history. `age_days` is
+  // computed here so staleness is one judgement in one place, not re-derived
+  // (differently) by every caller.
+  async "get-voice"(sql, [person, channel], userId) {
+    const rows = await sql.query(
+      `select person, channel, register, observed_at, sample_size, verified, source_note,
+              extract(day from now() - observed_at)::int as age_days
+         from voice_observations
+        where user_id = $1 and person = lower($2) and channel = lower($3)`,
+      [userId, person, channel],
+    );
+    return rows[0] ?? null;
   },
 
   // The negative memory's evidence base. A task ruled "nothing to do" is `dropped`

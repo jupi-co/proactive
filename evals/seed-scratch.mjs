@@ -79,11 +79,23 @@ function writeWorkspace(skill, id, { rules = [], ruleIndex = [] } = {}) {
 
 ## Tools — roles
 
+> **No tool carries the \`work\` role, and every \`Draft call\` is \`none\`. This is deliberate and is the
+> eval harness's fourth isolation boundary.** Neon, Supermemory and Jupi each have an isolation story
+> (synthetic tenant / scratch container / test workspace); the user's *tools* had none, because the
+> connectors reachable in a session are the real ones. On 2026-07-29 that gap produced a real Gmail draft
+> addressed to a counterparty invented by a fixture — the skill behaved correctly throughout, and
+> \`execute-action\` wrote it to the live mailbox because \`assets.md\` said Gmail was \`work\` with
+> \`create_draft\`. Withholding the role removes the write surface without touching the skill under test:
+> reads still work, so research, clustering and the gate are all still exercised.
+>
+> **A case that must exercise a real tool write cannot be isolated this way and must not run here.** Give it
+> a throwaway account, or assert on the queued \`ready\` row rather than on the side-effect.
+
 | Tool | Connected | Roles | Draft call |
 |---|---|---|---|
-| Gmail | yes | inbox, context, work | \`create_draft\` |
+| Gmail | yes | inbox, context | none |
 | Calendar | yes | inbox, context | none |
-| Linear | yes | inbox, context, work | none |
+| Linear | yes | inbox, context | none |
 | Jupi | yes | decision | n/a |
 | Supermemory | yes | brain | n/a |
 | Rulebook (\`./.proactive-jupi/rules.md\`) | yes | rules | n/a |

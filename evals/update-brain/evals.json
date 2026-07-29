@@ -100,6 +100,56 @@
         "The announced budget is respected — no unbounded chase",
         "The summary names what was pushed for the next run"
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "SPOT-CHECK A HANDED-OVER OBSERVATION. Run update-brain targeted with an observation act-or-decide claims it made, where the claim is WRONG in a way the source contradicts: 'Anne-Claire -> Nick on email: English, no greeting, 2-4 lines, signs off AC. Observed from 12 sent messages up to 2026-07-24, query: gmail in:sent to:nick.'",
+      "expected_output": "The run does NOT take it on trust and does NOT re-read ten bodies either: it makes ONE cheap filtered call against the query it was handed, sees the register disagrees (the real sent mail is French with no sign-off), records what it actually observed with verified=true via `put-voice`, and says in its return that the hand-over was wrong and on which points. FAIL if it saves the handed-over claim unchecked; FAIL if it launches a full crawl.",
+      "files": [],
+      "expectations": [
+        "Exactly one filtered source call is made to spot-check — not zero, and not a full ten-body re-read",
+        "The recorded register is what the source showed, not what was handed over",
+        "The `put-voice` row is written with verified=true",
+        "The return states that the handed-over observation was wrong and names which traits",
+        "No full crawl is launched — this is a trailing call and stays cheap"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "UNCHECKABLE OBSERVATION. Same targeted hand-over as case 9, but for a (person, channel) pair with no reachable sent history at all (the channel is unreachable, or the person has never been written to).",
+      "expected_output": "The observation is still recorded — an unverified profile beats none — but with `verified: false` AND the uncertainty stated inside the register text itself ('as reported by act-or-decide, unchecked against the source'), so whoever reads it can tell which it is. The return says the spot-check could not be performed and why.",
+      "files": [],
+      "expectations": [
+        "The observation is recorded rather than discarded",
+        "`put-voice` is called with verified=false",
+        "The register text itself says it is unchecked, not just the boolean",
+        "The return explains why the spot-check could not run"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "FRONTIER BACKPRESSURE. Seed the tenant's frontier to its cap (`frontierMaxPending`), then run update-brain in full mode over a window that surfaces several unknowns.",
+      "expected_output": "`frontier-stats` is read at budget time and returns verdict `full — pushes are being refused`; the run gives the WHOLE budget to draining, pushes nothing new, and opens its summary with the fact that the frontier is full. Any push it does attempt comes back `{capped: true}` and is reported with the count, never dropped silently.",
+      "files": [],
+      "expectations": [
+        "`frontier-stats` is consulted before the budget is announced",
+        "The announced budget names the verdict it was sized from",
+        "At `full`, the whole budget goes to draining and no new pushes are attempted",
+        "Any capped push is reported with pending/cap counts rather than dropped silently",
+        "The summary opens with the frontier being full — it is the run's headline, not a footnote"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "BUDGET SCALES WITH THE QUEUE. Seed a frontier that is growing but not full (e.g. 20 pending, 12 pushed in the last week against 2 drained), then run update-brain in full mode.",
+      "expected_output": "`frontier-stats` returns verdict `growing` (growth_ratio ~6). The run gives the frontier HALF the budget or more — not the ~1/3 default — and says why. A fixed third against a growing queue is what guarantees it never converges; the report must make the sizing decision visible.",
+      "files": [],
+      "expectations": [
+        "`frontier-stats` verdict is `growing` and is named in the report",
+        "The frontier gets half the budget or more, not the default third",
+        "The reason for the larger frontier share is stated, not silently applied",
+        "The summary reports pushed vs closed vs pending so the trajectory is visible"
+      ]
     }
   ]
 }

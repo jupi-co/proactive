@@ -91,7 +91,8 @@ node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" <verb> [args]
 Verbs you use: `query-window [K]` · `insert-action '<json>'` · `set-action-status <id> executed <trace_ref>`
 (you write this after the worker runs the row) · `set-task-status <id> <status>` · `set-task-gating <task_id>
 '<uuid[] json>'` · `list-actions status ready` (your own queue + the orphan-sweep — §Stage 0) ·
-`push-frontier '<json>'` (queue what you couldn't resolve — §What your searches leave behind) ·
+`push-frontier '<json>'` (queue what you couldn't resolve — §What your searches leave behind; refuses at
+the cap) · `get-voice <person> <channel>` (the dated register record — §Messaging) ·
 `list-dropped [days]` (what you've already ruled nothing-to-do — §Negative memory) ·
 `decision-url - "<title>" <id>` (the decision permalink — §Decision links).
 
@@ -179,12 +180,13 @@ run it after the dig and you've already paid for everything it was meant to save
    act silently → it's a `[BR]` **amendment** decision (apply-as-is / add-exception / supersede).
    *(A **do-nothing** rule is the one whose match produces no action — you already applied it at the top of
    this stage, before spending the research this step is part of.)*
-4. **Before any message draft**, get the voice — **from the brain first, from the tools only if it isn't
-   there.** `recall` a voice profile for this (person, channel) pair. If one comes back and it isn't stale
-   (the profile carries its own observation date — §Messaging), **use it and skip the history pull.** If it
-   doesn't, pull the **≥10 most recent messages you sent that person in that same channel** (Gmail
-   sent/thread for email, Linear comments for Linear…) as before, and **note the register you observed for
-   Stage 6** — don't persist it here.
+4. **Before any message draft**, get the voice — **from the record first, from the tools only if it isn't
+   there.** `get-voice <person> <channel>` (Neon, not `recall` — §Messaging says why). It returns the
+   register with `observed_at`, `age_days` and `verified`. Usable record → **use it and skip the history
+   pull.** No record, or one you shouldn't lean on → pull the **≥10 most recent messages you sent that
+   person in that same channel** (Gmail sent/thread for email, Linear comments for Linear…), and **note for
+   Stage 6**: the register you saw, the query you ran, the date range, and how many messages — `update-brain`
+   needs those to spot-check it.
 
    This is the one search in the skill that is **pure repeated cost**: voice barely changes, the pull is ten
    messages every time, and until now every run threw the result away and paid again.
@@ -284,9 +286,11 @@ table instead (§Dry-run).
 ### Stage 6 — Leave the trail (LAST, after the report — never in the critical path)
 Everything Stage 3 noted for the next run gets written **here**, once the work is done and the report is out:
 - **Frontier pushes** — `push-frontier '<json>'` per noted gap (§What your searches leave behind).
-- **Voice profiles** — one `update-brain` targeted delegation per (person, channel) observed in Stage 3.4,
-  handing over the register you saw (greeting, sign-off, language, typical length, how many messages and
-  through what date). You never author Facts; `update-brain` writes them.
+- **Voice profiles** — one `update-brain` targeted delegation per (person, channel) observed in Stage 3.4.
+  Hand over the register you saw (greeting, sign-off, language, typical length) **and the evidence behind
+  it**: the query you ran, the date range, the message count. It spot-checks that against the source with one
+  call before recording, so the evidence isn't a courtesy — without it the check can't happen and the record
+  lands `verified: false`. You never author Facts or voice records; `update-brain` writes both.
 
 **Why it is last.** These writes buy nothing for *this* run — they exist so the next one is cheaper. Run them
 mid-flight and a slow save or a sub-agent delegation delays the drafts and decisions the user is actually
@@ -518,9 +522,20 @@ one that reads the tools and authors what lands in the brain. That's what keeps 
 letting your run steer what gets crawled next — the same delegation as a targeted lookup, just asynchronous
 because the answer isn't needed *now*.
 
-**Be sparing.** Push what a future run would genuinely be better for knowing, not everything you saw. The
-frontier is drained on a budget; a hundred low-value items don't slow it down so much as bury the three that
-mattered. Pushing is cheap, so the discipline has to come from you.
+**Be sparing — and know what the ceiling costs you.** Push what a future run would genuinely be better for
+knowing, not everything you saw. This is not a style note: a measured brain sweep pushed **12 items on a
+5-item budget**, against a drain rate under 2 per run. At that ratio the queue grows about six times faster
+than it empties, and the three items that mattered end up under fifty that merely occurred.
+
+So the queue is **bounded** (`frontierMaxPending`, default 50). At the cap, `push-frontier` returns
+`{capped: true, pending, cap}` and **writes nothing**. When that happens:
+- **Don't retry, and don't work around it.** A full frontier is a real signal — the brain isn't being drained
+  often enough for the rate at which work uncovers gaps.
+- **Say it in the report's second footer line**, with the count: *"frontier full (50/50) — 3 gaps not
+  queued; the brain needs a full crawl."* A refusal nobody sees is worse than the unbounded queue it
+  replaced, because now the item is gone *and* silent.
+- **Push your best one first.** If you have five candidates and room for two, that ordering is yours to make;
+  nothing downstream can do it for you, since only you know which gap actually blocked a decision.
 
 **Note them in Stage 3, write them in Stage 6** — after the report, off the critical path. The report names
 what you're about to persist; Stage 6 persists it and confirms in a closing line.
@@ -533,12 +548,21 @@ they're written in (greeting, sign-off, tone, FR/EN, length) — never a generic
 shortest message that does the job.
 
 **Where the register comes from, in order (Stage 3.4):**
-1. **A voice profile in the brain** for this (person, channel) pair. It carries the date it was observed, in
-   its own sentence — that's what lets you judge staleness rather than trusting it blindly. Treat one older
-   than a few months as a starting point to sanity-check against the current thread, not as gospel: people's
-   register shifts as a relationship changes, and a profile from before a deal closed can read wrong now.
-2. **The ≥10 recent messages you sent them in that channel** — pull them when there's no usable profile, then
-   delegate the observation to `update-brain` so the next run starts at (1).
+1. **The voice record** — `get-voice <person> <channel>`. **Read it from Neon, not from `recall`.** The brain
+   holds the register as prose for semantic lookup, but it cannot hold the *date*: Supermemory's extraction
+   strips temporal qualifiers from the top-ranked memory a caller reads, wherever in the sentence they sit
+   (measured, four runs). A register you can't date is one you can't tell is two years stale — and you draft
+   in the user's name from it. So the dated record lives where it comes back as written.
+   - **`verified: false` means nobody checked it against the source** — it was reported by a run like yours
+     and taken on trust. Use it, but sanity-check it against the thread you're replying into before you
+     imitate anything distinctive (language, sign-off). An eval found exactly this kind of hand-over wrong on
+     both.
+   - **`age_days` beyond a few months** → a starting point, not gospel. Register shifts as a relationship
+     changes; a profile from before a deal closed can read wrong now.
+2. **The ≥10 recent messages you sent them in that channel** — pull them when (1) gives you nothing usable,
+   then hand the observation to `update-brain` in Stage 6 so the next run starts at (1). Hand over **the
+   evidence, not just the conclusion**: the query, the date range, the message count. It spot-checks with one
+   call before recording, which is what turns your observation into a `verified` record instead of a rumour.
 
 **First contact — no history to mirror.** A new counterparty has no sent thread, and "never a generic
 template" still holds, so fall back in this order: (1) the register of **the thread you're replying into** —

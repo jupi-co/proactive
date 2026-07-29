@@ -67,6 +67,15 @@ can't be undone in all three isn't isolated — it's a production write with goo
 | **Neon** (tasks, actions, cursors) | Same project, but the scratch workspace's config sets a **synthetic `jupiUserId`** (e.g. `eval-scratch-<skill>`), and fixture rows additionally carry a **`signal_ref` prefixed `eval:`** with cursors at `is_eval=true` | **Delete after.** `bash evals/<skill>/purge-scratch.sh` (pass `JUPI_USER_ID=<synthetic id>`) — deletes `eval:%` tasks (their `actions` cascade) and `is_eval` cursors. Run it after every behavioral eval, not at the end of the day |
 | **Supermemory** (Facts) | A **dedicated test container tag — `user_eval_scratch`** — never the real `user_<jupiUserId>`. The skills never read this tag, so a stray eval Fact can't leak into a real run | `bash evals/update-brain/purge-scratch.sh` bulk-deletes the container via the HTTP API (the connector's `forget` is unreliable — see that README) |
 | **Jupi** (decisions) | A **dedicated test workspace** — set `jupiWorkspace` to the eval slug **in the scratch workspace's own `config.local.json`**, because that is the only thing the skills read | Decisions are archived **in the test workspace**, where a leftover is harmless. Nothing needs deleting from the real one because nothing was written there |
+| **The user's tools** (Gmail, Linear, Calendar…) | **Withhold the `work` role and set every `Draft call` to `none`** in the scratch `assets.md` (`evals/seed-scratch.mjs` does this). The connectors reachable in a session are the *real* ones — there is no test Gmail — so the only lever is to give `execute-action` nothing to write to. Reads stay on, so research and the gate are still exercised | **There is none — that is the point.** A draft in a real mailbox cannot be rolled back by a purge script, and the Gmail connector exposes no delete-draft call |
+
+> **The tools row is newer than the other three, and it exists because of a specific failure.** On 2026-07-29
+> a write-path `act-or-decide` eval created a **real Gmail draft addressed to a counterparty that existed only
+> in a fixture** (`camille.roux@serena.vc`, invented for eval case 24). Nothing malfunctioned: the skill
+> scored a draft as low-exposure and queued it, and `execute-action` did exactly its job. The isolation table
+> simply had no row for tools, so a fixture's fictional recipient reached a live mailbox by construction.
+> **A case that genuinely needs a real tool write does not belong in this directory** — assert on the queued
+> `ready` row instead, which is the artifact `act-or-decide` is actually responsible for.
 
 > **The `eval:` prefix makes rows *deletable*. Only a synthetic `jupiUserId` makes them *isolated*.** Nothing
 > filters reads by prefix — `query-window` returns the top-K open tasks for the tenant, full stop. So a
