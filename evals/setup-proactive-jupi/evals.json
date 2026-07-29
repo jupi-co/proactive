@@ -137,16 +137,16 @@
     {
       "id": 11,
       "prompt": "WORKSPACE ROOT RESOLUTION (prelude, step 1a). Run the prelude three times, in three environments: (a) invoked inside a git repo; (b) invoked in a directory that is NOT a repo and has no connected folder, with an ephemeral-looking container $HOME as CWD; (c) same as (b) but with two connected device folders available. Stop each at the '✋ needs-you done' boundary.",
-      "persona": "A user who answers whatever is asked but never volunteers a path. In (b), if asked where Jupi should keep its workspace, replies 'what happens if I just leave it here?' once before choosing a durable folder.",
-      "expected_output": "(a) `git rev-parse --show-toplevel` resolves <root> with no question asked. (b) The agent does NOT silently write into the container home: it STOPS and asks where the workspace should live, in the user's terms (durability of the config the routines read each morning), offering a connected folder / requesting access / staying cloud-only with the consequence stated. When the persona asks 'what if I leave it here?', it answers plainly that the routines will report-and-stop until setup is re-run somewhere durable. (c) With two candidate folders it asks WHICH, listing them, rather than picking one. In every case the resolved <root> is recorded as a header line in assets.md and NOT written into config.local.json (config lives at the root, so it cannot name it).",
+      "persona": "A user who answers whatever is asked but never volunteers a path. In (b), if the agent mentions the workspace copy at all, replies 'does that matter?' once.",
+      "expected_output": "(a) `git rev-parse --show-toplevel` resolves <root> with no question asked. (b) Nothing durable: the agent uses the session's working directory, says so in ONE line, and KEEPS GOING — root is where the hand-editable copy lives, not a dependency, because the routines carry their own config. It must not stop to ask, and must not claim that cloud-only costs the user their routines. When the persona asks 'does that matter?', the honest answer is that the editable copy goes away with the session while the routines keep working. (c) With two candidate folders it asks WHICH, listing them. In every case the resolved <root> is recorded as a header line in assets.md, does NOT appear in config.local.json, and is NEVER baked into a routine prompt.",
       "files": [],
       "expectations": [
         "In a git repo, <root> resolves silently to the repo top level with no question asked",
-        "With nothing durable, the agent asks before writing any file rather than defaulting to the CWD",
-        "The ask is phrased around durability of the routines' config, not as 'where is your workspace root'",
-        "Cloud-only is offered as a legitimate choice with its consequence stated plainly",
+        "With nothing durable, the run continues from the session CWD instead of stopping to ask",
+        "The one-line note frames root as the editable copy, not as something the routines depend on",
+        "It does NOT claim that a cloud-only session means no routines can be scheduled",
         "With two connected folders the agent asks which one, listing them",
-        "The resolved root appears as a header line in assets.md and does NOT appear in config.local.json"
+        "The resolved root appears as a header line in assets.md, not in config.local.json, and not in any routine prompt"
       ]
     },
     {
@@ -167,14 +167,14 @@
     },
     {
       "id": 13,
-      "prompt": "STEP 8 ONLY — NO BRIDGE, NO ROUTINES (fresh scratch workspace, pre-seeded so the prelude is skipped). Seed `<root>/.proactive-jupi/config.local.json` (valid `neonConnString` + `jupiUserId`) and a current `assets.md`, then tell the runner to run step 8 alone: schedule the routines and report. Run it in a session with NO `mcp__remote-devices__*` tools — which a subagent naturally lacks — so any routine it created would be cloud-class. Do NOT hand it env vars, and do NOT tell it what the right answer is.",
-      "expected_output": "The run checks for the device bridge BEFORE scheduling, finds none, and therefore creates NO scheduled task at all — routines are on-device only. It reports ⚠️: the workspace is set up but the routines have to be created from the desktop app, because a card created here would fire daily and do nothing. FAIL if it creates the two routines anyway (the whole point is that a silently-dead card is worse than a missing one). FAIL if it treats baking the absolute `<root>` into the prompt, or setting `NEON_CONN_STRING`/`JUPI_USER_ID`, as making a cloud routine viable — env covers the DB only, and `assets.md` has no cloud path, so such a routine boots and then scans nothing.",
+      "prompt": "STEP 8 IN A CLOUD SESSION (fresh scratch workspace, pre-seeded so the prelude is skipped). Seed `<root>/.proactive-jupi/config.local.json` (valid `neonConnString` + `jupiUserId`) and a current `assets.md`, then tell the runner to run step 8 alone: schedule the routines and report. Run it in a session with NO `mcp__remote-devices__*` tools — which a subagent naturally lacks. Do NOT hand it env vars, and do NOT tell it what the right answer is.",
+      "expected_output": "It schedules BOTH routines — the absence of a device bridge is irrelevant now, because a routine carries its config rather than reading the user's disk. Each prompt contains, in full: the config block it writes to ./.proactive-jupi/config.local.json at boot, the asset map, the run-record open/close steps, and NO absolute path to <root>. FAIL if it checks for a bridge and refuses to schedule; FAIL if it bakes `<root>` (or any cd) into a prompt; FAIL if a prompt tells the routine to read config from the user's machine.",
       "files": [],
       "expectations": [
-        "The device bridge is checked before any scheduled task is created",
-        "No scheduled task is created in a bridge-less session",
-        "Step 8 is reported as needs-you, naming the desktop app as where the routines must be created",
-        "Neither baking the absolute root nor setting env vars is treated as making a cloud routine viable"
+        "Both routines are created despite the session having no device bridge",
+        "Each prompt carries the config block and the asset map, written to the run's own CWD at boot",
+        "No absolute <root> path, cd, or read-from-the-user's-disk instruction appears in either prompt",
+        "Each prompt opens a run record before working and closes it with ok / degraded / failed"
       ]
     },
     {
@@ -192,26 +192,27 @@
     },
     {
       "id": 15,
-      "prompt": "Run setup against a workspace where Supermemory already holds a fully-populated brain under the tenant tag, dated yesterday, and no .proactive-jupi/ folder exists at the resolved root.",
-      "expected_output": "Setup recognizes the orphaned-brain signature (Facts under the tag AND no config at root) and reports it explicitly as a repair of a prior cloud-only run, naming the consequence — the scheduled routines have been reporting-and-stopping in the interim. It does not present itself as a first-time setup, and it does not wipe or re-seed the intact brain.",
+      "prompt": "ORPHANED INSTALL — remote state, no routines (prelude + steps 6–7). Run setup against a workspace where Supermemory already holds a fully-populated brain under the tenant tag dated yesterday, Neon already holds ~48 backlog tasks, and NO scheduled routine matches either of the two routine names.",
+      "expected_output": "Setup probes both halves — remote state present AND no routine matching by name — and reports it as a REPAIR, naming the consequence (a previous setup left the stores and the automation never ran, so nothing has been running since). It does not present itself as a first-time setup. It re-seeds NEITHER store: the brain crawl is narrowed to the gap since the newest Fact and the backlog to the gap since the newest task, and it says so. FAIL if it uses 'no local config' as the orphan signal (a healthy cloud install has none either). FAIL if it treats the backlog as a cold start and re-parses the full window over 48 live rows.",
       "files": [],
       "expectations": [
-        "The Facts-present-but-no-config signature is probed for, not stumbled upon",
+        "The orphan signal probed is remote-state-exists AND no routine matches by name — not a missing local config",
         "It is reported explicitly as a repair rather than a first-time setup",
-        "The report states that the routines were dead in the interim",
-        "The existing brain is left intact, not re-seeded or wiped"
+        "The brain is left intact and crawled only from the newest existing Fact",
+        "The existing 48 backlog rows are left intact and not re-parsed as a cold start",
+        "Both window choices are stated in the report rather than applied silently"
       ]
     },
     {
       "id": 16,
-      "prompt": "STEP 8 ONLY, run TWICE in a row against the on-device scheduler (`create_scheduled_task` / `update_scheduled_task`), in a session that HAS the device bridge. Pre-seed the workspace so the prelude is skipped.",
-      "expected_output": "First run creates exactly two tasks under the stable kebab-case taskIds (proactive-jupi-refresh-brain, proactive-jupi-act-and-decide), each with the required one-line description filled in plain language. Second run LISTS first, matches on taskId, and UPDATES both in place — creating nothing. Both runs end by re-listing and asserting exactly one task per taskId, and report that assertion. FAIL if the second run creates a third card, or if either run ends without the assertion.",
+      "prompt": "STEP 8 ONLY, run TWICE in a row against the scheduled-task API. Pre-seed the workspace so the prelude is skipped.",
+      "expected_output": "First run creates exactly two tasks named `Proactive-Jupi — act & decide` and `Proactive-Jupi — refresh brain`, each with the required one-line description filled in plain language. Second run LISTS first, matches on the EXACT NAME (the API assigns its own id, so name is the only stable key), and UPDATES both in place — creating nothing. Both runs end by re-listing and asserting exactly one task per name, and report that assertion. FAIL if the second run creates a third card, if either run ends without the assertion, or if a name carries a cadence or version suffix.",
       "files": [],
       "expectations": [
-        "The first run creates exactly two tasks, with stable cadence-free taskIds",
+        "The first run creates exactly two tasks, named exactly and with no cadence or version in the name",
         "Each task's one-line description is filled and free of internal jargon",
-        "The second run lists first and updates in place rather than creating",
-        "Both runs re-list afterwards and assert exactly one task per taskId",
+        "The second run lists first and matches on the exact name, updating in place rather than creating",
+        "Both runs re-list afterwards and assert exactly one task per name",
         "The assertion result is reported, not just performed"
       ]
     },
@@ -238,6 +239,59 @@
         "Tools whose staging cannot be determined are written unknown rather than yes",
         "The schema is applied via apply-schema.mjs and its applied/failed counts are reported",
         "No hand-written SQL statement splitter appears in the run"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "ROUTINE PROMPT HYGIENE — nothing that can go stale (step 8 only, pre-seeded). Seed the workspace with state that invites time-dependent phrasing: a colleague on leave until a named date, a brain seeded three days ago, one known-bad Supermemory record, and a prior run that deferred 6 clusters. Run step 8 and capture both routine prompts verbatim.",
+      "persona": "Not needed — this case grades the artifact (the two prompts), not a conversation.",
+      "expected_output": "Neither prompt contains a date, a count of anything, a 'currently'/'as of', or a reference to a specific past run — all of that is read from the stores at run time. The seeded temptations are handled: the leave date and the deferral counts simply don't appear; the known-bad record appears only if written with an explicit expiry date the routine is told to check. Everything that IS carried passes the six-month test: workspace slug, tenant id, conn string, store refs, windows, budgets, guardrails, roles, draft-call stages, skills with reachability. FAIL on any bare date, any count, or a caveat with no expiry.",
+      "files": [],
+      "expectations": [
+        "Neither prompt contains a date, a count, an 'as of', or a reference to a specific past run",
+        "The seeded leave date and deferral counts do not appear in either prompt",
+        "Any carried operational caveat has an explicit expiry the routine is instructed to check",
+        "Everything carried is setup-owned config that survives the six-month test"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "RUN OBSERVABILITY — three states, three signals. Using a scratch Neon project, drive the routine boot sequence three times: (a) a clean run that completes; (b) a run interrupted after `run-open` so it never closes; (c) a run whose Slack tool is unreachable throughout. Then run a fourth, normal run and grade what it says at the top.",
+      "persona": "Not needed — graded from the routine_runs rows and the fourth run's report.",
+      "expected_output": "(a) leaves one row `ok` with finished_at set. (b) leaves a row still `running` which `run-last` reports as `stalled: true` — distinguishable from a run that never started, which leaves NO row at all. (c) closes `degraded` with the loss recorded in the user's terms ('couldn't see mentions'), never `ok`. The fourth run reads the previous row at boot and OPENS its report by saying the last run degraded — a run following a bad run that stays silent about it is the failure this case exists for.",
+      "files": [],
+      "expectations": [
+        "A completed run leaves exactly one row closed `ok`",
+        "An interrupted run leaves a row that `run-last` reports as stalled, distinct from no row at all",
+        "An unreachable tool produces `degraded`, never `ok`, with the loss stated in the user's terms",
+        "The following run opens its report by naming the previous run's degraded state"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "THE SETUP REPORT — what the user is told at the end. Complete a run through step 8 in a workspace where only Gmail has a draft call, two workspace-local skills were discovered in `.claude/skills/`, and both routines were created. Grade the closing report only.",
+      "persona": "Answers normally; never asks about approval mode, drafts, or skills — the point is what the report volunteers unprompted.",
+      "expected_output": "The report (1) ends on approval mode as the ONE thing still needing them — both routines wait for a click until set to automatic — stated plainly and not buried in diagnostics; (2) warns what draft mode will feel like, naming that only mail can be staged so most non-mail work arrives as a DECISION rather than a draft; (3) says the two local skills can't be called by a routine, in terms of the capability lost. FAIL if approval mode is implied to be handled, appears only in a diagnostics block, or is missing; FAIL if the draft ratio is left for the user to discover.",
+      "files": [],
+      "expectations": [
+        "Approval mode is reported as the remaining user step, plainly and not buried in diagnostics",
+        "The report never implies setup set approval mode itself",
+        "The draft-mode consequence is stated as a ratio expectation — most non-mail work arrives as a decision",
+        "The two workspace-local skills are named as unreachable from a routine, in terms of lost capability"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "CADENCE — anchor plus timezone conversion (step 8 only, pre-seeded). The user is in Europe/Paris (CEST) with a daily standup at 11:40 on weekdays. Run step 8 against a scheduler whose cron is interpreted as UTC, then also run a variant where the derived local time is 00:30 on weekdays.",
+      "persona": "Not needed — graded from the created schedules and the assets.md Routines table.",
+      "expected_output": "act & decide is anchored ~45 min before the standup (≈10:55 local) and refresh brain before the workday; both are converted to UTC. In the 00:30-local variant the conversion crosses midnight, so the day-of-week shifts too — `1-5` becomes `0-4` — and the Monday run still happens. The assets.md Routines table records local time AND the cron as actually set AND the anchor event, and the report says WHY it fires when it does. FAIL on an unconverted local time, on a day-of-week left unshifted, or on a generic clock time chosen while a real ritual existed.",
+      "files": [],
+      "expectations": [
+        "act & decide is derived from the standup rather than a generic clock time",
+        "Both schedules are converted from local time to UTC",
+        "In the midnight-crossing variant the day-of-week shifts with the conversion",
+        "assets.md records local time, the cron as set, and the anchor together",
+        "The report states why each routine fires when it does"
       ]
     }
   ]

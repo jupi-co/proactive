@@ -19,11 +19,11 @@ tools into Supermemory, and schedules routines. So:
 
 - **Always run in a throwaway workspace** — `WS=$(mktemp -d)`, `cd "$WS"`, `git init` if the case needs a repo.
   Never point a case at the real `.proactive-jupi/`.
-- **Case 13 is a step-8-only run** — the workspace is pre-seeded with a valid `config.local.json` + `assets.md`
-  so the prelude is skipped, and the runner does step 8 alone. A **passing** run creates no scheduled task at all
-  (that's the behavior under test — routines are on-device only, and the eval session has no bridge); a **failing**
-  one may create real routines, so check the scheduler afterward and delete anything it made.
-- **Every case except 10 and 13 runs the attended prelude only.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
+- **Cases 13, 16, 19, 21 and 22 are step-8-only runs** — the workspace is pre-seeded with a valid
+  `config.local.json` + `assets.md` so the prelude is skipped. They **create real cloud routines** (that is now
+  the behavior under test), so list the scheduler afterwards and delete what they made. A freshly created
+  routine sits on manual approval, so it won't fire while you're cleaning up — but don't rely on that.
+- **The prelude-only cases are 1–9, 11, 12, 14 and 17.** Tell the runner: *stop at the "✋ needs-you done" boundary.*
   Every behavior under test lives in steps 1–3, and stopping there keeps the eval cheap and side-effect-free
   — no 30-day crawl, no backlog rows, no live routines.
 - **Case 10 is the only full run.** It's opt-in and expensive — it crawls, writes rows, and schedules
@@ -81,18 +81,29 @@ read as "a careful run *can* do this", not "any run *will*".
 | 8 | Capability inventory — *when to reach for it* actually filled; explicit "none discovered" when empty |
 | 9 | Prelude boundary + secrets hygiene — nothing human-gated after ✋; the conn string travels minimally |
 | 10 | Full run + re-run idempotency — two routines converge, assets.md reconciled *(expensive, opt-in)* |
-| 11 | Workspace root resolution — repo / nothing durable / two connected folders; never a silent CWD fallback |
+| 11 | Workspace root resolution — repo / nothing durable / two connected folders; root is the editable copy, never a dependency |
 | 12 | Unattended prelude — one question, then halt; never a re-asked round and never an invented answer |
-| 13 | Step 8 on-device only — no bridge in the session ⇒ create no routine at all, report ⚠️ *(pre-seeded, step 8 alone)* |
+| 13 | Step 8 in a cloud session — no bridge ⇒ still schedules both; prompts carry config, no path baked in *(pre-seeded, step 8 alone)* |
 | 14 | Secrets already on disk — found in `settings.local.json`/env and confirmed, not re-requested or echoed |
-| 15 | Orphaned brain — Facts under the tag + no config at root reported as a repair, brain left intact |
-| 16 | Scheduler idempotency — twice in a row on-device: match on `taskId`, update in place, one-per-`taskId` assertion |
+| 15 | Orphaned install — remote state + no routines is the signal; neither store re-seeded, gap crawled |
+| 16 | Scheduler idempotency — twice in a row: match on the exact NAME, update in place, one-per-name assertion |
 | 17 | Identity — `{"items":[]}` is a successful call, not a dead gate; `jupiUserId` accepted as an invocation arg |
 | 18 | `Draft call` filled from the probed surface + schema applied via `apply-schema.mjs` (no hand-rolled splitter) |
+| 19 | Routine-prompt hygiene — no date, count, "as of", or past-run reference survives into a prompt |
+| 20 | Run observability — ok / stalled / degraded / no-row-at-all are four distinguishable states, and the next run says so |
+| 21 | The setup report — approval mode last and plain, the draft-mode ratio warned about, local skills named as unreachable |
+| 22 | Cadence — anchored to the real ritual, converted to UTC, day-of-week shifted when it crosses midnight |
 
-Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace). 14, 15 and 17 sit
-in steps 1–2 and run **prelude-only**; 16 and 18 reach steps 5 and 8, so run them against a **scratch Neon
-project** and expect 16 to create real (then updated) on-device routines — delete them afterwards.
+Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace); 19–22 from
+[`ROUTINES-SPEC.md`](../../ROUTINES-SPEC.md) (the 29 July install). 14 and 17 sit in steps 1–2 and run
+**prelude-only**. 15, 16, 18, 19, 20, 21 and 22 reach steps 5–8, so run them against a **scratch Neon
+project**; 16 and 22 create real (then updated) cloud routines — **delete them afterwards**, and note that a
+newly created routine is on manual approval, so it will not fire on its own in the meantime.
+
+**19 and 22 grade artifacts, not conversation** — the two prompts and the two schedules. Capture the prompts
+verbatim from the create/update calls rather than from the report, which paraphrases. **20 needs a scratch
+Neon project and nothing else**: it drives `db.mjs run-open` / `run-close` / `run-last` directly, so it is
+cheap and worth running on every change to the routine boot sequence.
 
 ## Prerequisites
 

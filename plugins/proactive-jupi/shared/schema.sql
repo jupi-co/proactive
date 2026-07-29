@@ -1,8 +1,9 @@
 -- Proactive-Jupi backlog store — Neon Postgres.
 -- The plugin's DB contract; applied by the setup skill (step 5). Idempotent.
 --
--- Three tables: TASKS (the backlog) · ACTIONS (units of execution) · CRAWL_STATE
--- (incremental cursors, shared with update-brain).
+-- Four tables: TASKS (the backlog) · ACTIONS (units of execution) · CRAWL_STATE
+-- (incremental cursors, shared with update-brain) · ROUTINE_RUNS (did the
+-- scheduled routine run? — the one thing a routine writes about itself).
 -- There is no decision_registry: the canonical decision + its lifecycle
 -- (STARTED → FINALIZED → EXECUTED) live in Jupi. The "pile" is just the
 -- gated action rows — each carries the Jupi decision/option it depends on
@@ -138,6 +139,36 @@ create table if not exists crawl_state (
   updated_at   timestamptz not null default now(),
   primary key (user_id, consumer, source, is_eval)
 );
+
+-- ── ROUTINE_RUNS ──────────────────────────────────────────────────────
+-- The ground truth for "did the routine run?". A scheduled routine leaves no
+-- other trace: a run that wrote some rows and stopped is indistinguishable from
+-- one still working, one that died, and one that never started because it was
+-- waiting on an approval nobody saw. Three states, one observation — so each
+-- routine opens a row before it does anything and closes it on the way out.
+-- Reading the rows back distinguishes all of them:
+--   no row for a fire time that has passed → never started (gated, or disabled)
+--   started_at set, finished_at null, old   → died mid-run
+--   status 'degraded'                       → ran, lost something (see `degraded`)
+-- A run also READS the previous row for its routine at boot, so a run following
+-- a failure says so instead of silently starting clean.
+--   routine  : 'act-and-decide' | 'refresh-brain' — the two scheduled routines
+--   degraded : [{what, cost}] — what was unreachable, in the USER's terms
+--              ("Slack" / "couldn't see mentions"), so the report writes itself
+create table if not exists routine_runs (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      text not null,                       -- tenant key = Jupi user id
+  routine      text not null,
+  started_at   timestamptz not null default now(),
+  finished_at  timestamptz,
+  status       text not null default 'running'
+                 check (status in ('running','ok','degraded','failed')),
+  degraded     jsonb not null default '[]',
+  notes        text                                 -- one line: why it failed, or what it did
+);
+-- The only query shape: the latest runs for one routine, one tenant.
+create index if not exists routine_runs_user_routine_idx
+  on routine_runs (user_id, routine, started_at desc);
 
 -- ── MIGRATIONS ─────────────────────────────────────────────────────────
 -- Idempotent reconciliation for a tasks table created before the current shape.

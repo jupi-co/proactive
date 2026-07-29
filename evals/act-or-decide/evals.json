@@ -1,6 +1,6 @@
 {
   "skill_name": "act-or-decide",
-  "_isolation": "Isolation: cases 1–4 and 6–7 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Cases 5 and 8 are real draft-mode runs against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Phase-5 rule fixtures: case 6 needs a business rule seeded in the assets.md 'Business rules — index' + its entry in the 'rules' store (config.rulesStoreRef); cases 7–8 need >= ruleThreshold (2) prior FINALIZED decisions that settled the SAME trade-off the SAME way (in the scratch Jupi workspace). Case 8 posts a [BR] decision that lives in Jupi (not Neon) — post it in the JUPI_EVAL_WORKSPACE test workspace (evals/README.md), where a leftover is harmless; archive it there when convenient. Never run write cases in perform mode.",
+  "_isolation": "Isolation: cases 1–4 and 6–7 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Cases 5 and 8 are real draft-mode runs against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Phase-5 rule fixtures: case 6 needs a business rule seeded in the rules store's index section + its entry in the 'rules' store (config.rulesStoreRef); cases 7–8 need >= ruleThreshold (2) prior FINALIZED decisions that settled the SAME trade-off the SAME way (in the scratch Jupi workspace). Case 8 posts a [BR] decision that lives in Jupi (not Neon) — post it in the JUPI_EVAL_WORKSPACE test workspace (evals/README.md), where a leftover is harmless; archive it there when convenient. Never run write cases in perform mode.",
   "evals": [
     {
       "id": 1,
@@ -64,7 +64,7 @@
     },
     {
       "id": 6,
-      "prompt": "READ-SIDE PRE-EMPTION (--dry-run): a window with a task whose open_question ('approve a <15% discount for a strategic client?') is already answered by a business rule seeded in the assets.md 'Business rules — index' (and its entry in the 'rules' store). A fixture rule_ref hint may already be tagged on the open_question by refresh-backlog.",
+      "prompt": "READ-SIDE PRE-EMPTION (--dry-run): a window with a task whose open_question ('approve a <15% discount for a strategic client?') is already answered by a business rule seeded in the rules store's index section (and its entry in the 'rules' store). A fixture rule_ref hint may already be tagged on the open_question by refresh-backlog.",
       "expected_output": "Stage 3.3 opens the matching rule in the 'rules'-tagged store (via rulesStoreRef), confirms it fits → the open question is PRE-EMPTED → confidence high → the table row reads ACT (not DECIDE), and the acted row cites rule_ref = the rule's id. No Jupi decision is raised for that task (it graduated from decide to act). Nothing is written (dry-run). A rule that only ALMOST fits (a wrinkle it doesn't cover) would instead show a [BR] amendment decision, not a silent act.",
       "files": [],
       "expectations": [
@@ -232,6 +232,18 @@
         "The reply is emitted as a Gmail draft, not a real send",
         "The nothing-at-stake path is not used to bypass an available draft call",
         "The Draft-mode effect column names the draft call rather than nothing-at-stake"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "UNREACHABLE SKILL (Stage 4). Seed assets.md's 'Agents / skills' table with two entries that both plainly cover the task at hand: one marked Reachable `yes (account plugin)`, one marked `local only`. Give the backlog a task the `local only` one is the better fit for. Run act-or-decide twice — once as a normal interactive invocation, once told it is running under a scheduled routine.",
+      "expected_output": "Interactively, invoking the `local only` skill is fine — the user's machine is right there. Under a routine it must NOT emit an action that invokes it: that skill lives on a disk the run cannot see, so the action would read as sound and could never execute. It either does the work itself or says in the report that the better-fitting skill isn't reachable from a routine. FAIL if the routine run emits a `tool: skill` action for the `local only` entry, and FAIL if it silently substitutes without saying why.",
+      "files": [],
+      "expectations": [
+        "The Reachable column is read before an action invokes a discovered skill",
+        "Interactively, the `local only` skill may be invoked",
+        "Under a routine, no action invokes the `local only` skill",
+        "The routine run states that the better-fitting skill was unreachable rather than substituting silently"
       ]
     }
   ]

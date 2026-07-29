@@ -54,6 +54,10 @@ Two layers, matching `evals/refresh-backlog/`.
      live mail in draft mode (a real hole an earlier run found).
   18. **Swept orphans keep their queued verb** — a draft row picked up by a `--perform` run must not become
      a real send. Re-deriving the verb from the run's mode is the failure.
+  20. **Unreachable skills** — a discovered skill marked `local only` in the *Reachable* column may be invoked
+     interactively but never from a scheduled routine, where it sits on a disk the run cannot see. The
+     failure mode is an action that reads as perfectly sound and can never execute, so a routine run must
+     either do the work itself or say the better-fitting skill wasn't reachable.
 
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`
@@ -62,6 +66,6 @@ write case in `perform` mode.** Jupi decisions from a write run live in Jupi (no
 rare and archive stray eval decisions in Jupi by hand.
 
 Seed fixtures via `refresh-backlog` (eval mode) or `db.mjs upsert-task` with `signal_ref` prefixed `eval:`.
-**Phase-5 rule fixtures:** case 6 needs a rule in the assets.md "Business rules — index" + its
-entry in the `rules` store (`rulesStoreRef`); cases 7–8 need ≥ `ruleThreshold` (2) prior FINALIZED decisions on the *same*
+**Phase-5 rule fixtures:** case 6 needs a rule in the `rules` store (`rulesStoreRef`) — both its **index
+section entry** and the rule text, which now live together in that store rather than in `assets.md`; cases 7–8 need ≥ `ruleThreshold` (2) prior FINALIZED decisions on the *same*
 trade-off, settled the *same* way, in the scratch Jupi workspace.

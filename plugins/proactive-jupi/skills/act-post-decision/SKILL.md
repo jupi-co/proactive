@@ -26,9 +26,11 @@ task. You are the DECIDE-path counterpart to `act-or-decide` (which handles the 
 > tools directly (that is `execute-action`). `act-or-decide` owns every *other* `tasks.status` transition
 > (out of `open`).
 
-> **Workspace-relative.** Data paths (`.proactive-jupi/assets.md`, `.proactive-jupi/config.local.json`,
-> `act-post-decision/runs/`) resolve against the **CWD where the run executes**. Shared helpers live under
-> **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
+> **Workspace-relative, and the workspace may be a scratch one.** `.proactive-jupi/assets.md` and
+> `.proactive-jupi/config.local.json` resolve against the **CWD where the run executes**. Under a scheduled
+> routine that CWD is a container the routine just wrote both files into from its own prompt — so read them
+> exactly as you would locally, but **never write anything durable there**: it dies with the run. Shared
+> helpers live under **`${CLAUDE_PLUGIN_ROOT}/shared/`**.
 
 ## Contract (hard — never transgress)
 - ✅ **Only act on FINALIZED decisions.** A decision the user hasn't settled is left alone — you never
@@ -43,8 +45,9 @@ task. You are the DECIDE-path counterpart to `act-or-decide` (which handles the 
 ## Boot — read these, then go (no tree exploration)
 1. **`.proactive-jupi/config.local.json`** → `guardrails` (`mode`), `jupiWorkspace` (the Jupi group slug),
    `rulesStoreRef` (the id/path that opens the rule store; the *tool* is whichever `assets.md` tags `rules` — for indexing a settled `[BR]` rule, §Business rules).
-2. **`.proactive-jupi/assets.md`** — the Asset Map (which tools are `Connected`; the **Business rules — index**
-   you maintain when a `[BR]` decision settles), read in full.
+2. **`.proactive-jupi/assets.md`** — the Asset Map (which tools are `Connected`, and which one holds the
+   `rules` role), read in full. The **rules index** you maintain when a `[BR]` decision settles lives in that
+   store, not in this file.
 
 **Ensure the DB helper's deps** — one command, at the top of every run:
 ```
@@ -58,8 +61,9 @@ container doesn't have.
 
 > **Config not found at boot.** Stop and report — don't hunt for it elsewhere (searching a connected Drive or
 > inbox for a secret-bearing file is unbounded, and is the chat-visible flow the connection string must never
-> travel through). **No `mcp__remote-devices__*` tools at all** means this routine was scheduled as a cloud
-> task, which isn't supported: every fire fails identically, so it needs re-creating on-device, not a retry.
+> travel through). A scheduled routine **carries** its config and writes it to
+> `./.proactive-jupi/config.local.json` before invoking you, so config missing under a routine means that
+> boot step didn't happen — the routine needs re-creating by setup, not a retry. Say which case you're in.
 
 All Neon access goes through the helper — **never hand-write SQL, never touch the account-wide Neon MCP.**
 ```
@@ -116,16 +120,19 @@ actions run for real even in `draft` mode). For each result the worker returns:
   nothing else is pushed.
   - **If this action was a business-rule-update** (a `[BR]` decision's rule write — its `tool` is the
     the `rules`-tagged tool and `execute-action` returned the store anchor as its `trace`), **index it**:
-    append one line to the `assets.md` "Business rules — index" (rule id = the decision id · *when-X-always-Y*
-    · owner · task types it unblocks · the `trace` store ref). This index write is **yours** (config
-    bookkeeping, like your Neon/Jupi writes) — `execute-action` only wrote the rule *text* into the store and
-    stayed pure (§Business rules). From the next run, the context searches read that index → the rule pre-empts
-    its trade-off → those tasks act instead of decide.
+    append one line to the **index section inside the `rules` store itself** (rule id = the decision id ·
+    *when-X-always-Y* · owner · task types it unblocks · the `trace` anchor). This index write is **yours**
+    (bookkeeping, like your Neon/Jupi writes) — `execute-action` only wrote the rule *text* and stayed pure
+    (§Business rules). **It goes in the store, not in `assets.md`:** you may be running in the cloud, where
+    the user's `assets.md` doesn't exist and anything you wrote to it would vanish with the container — an
+    index that silently fails to persist is worse than none, because the rule is in the store and nothing
+    ever finds it again. From the next run, the context searches read that index → the rule pre-empts its
+    trade-off → those tasks act instead of decide.
 - `ok:false` → **leave it `to-do`**; it retries next poll. If the failure is a genuine new trade-off (venue
   gone, send bounced needing a fresh approach), note it for the Stage 3 fork.
 
 *(These option-actions never become Neon rows — Jupi is their home, the `done` flag is their ledger. The
-business-rule *text* is the exception's exception: it lands in the `rules` store, indexed in `assets.md`
+business-rule *text* is the exception's exception: it lands in the `rules` store, indexed in that same store
 — never in Neon either.)*
 
 ### Stage 3 — Complete the task (or, on a fork, reopen it)
@@ -155,8 +162,8 @@ labor:
 - **`execute-action`** performs the rule write into the `rules` store (its tool routes it — `file` →
   the markdown rulebook, `drive`/`notion` → the connector) and returns the store anchor as `trace`. It stays
   pure — no status, no index.
-- **You** own the **`assets.md` rules-index** append (Stage 2, `ok:true` branch) — the same category as your
-  Neon/Jupi bookkeeping. One skill writes the index; never two.
+- **You** own the **rules-index** append into the store (Stage 2, `ok:true` branch) — the same category as
+  your Neon/Jupi bookkeeping. One skill writes the index; never two.
 Then the operational action completes as usual and — both option-actions `done`, the sole gating decision
 FINALIZED — the task goes **`blocked → done` directly** (Stage 3). Approving the rule thus writes it **and**
 unblocks the instance in one settle. A business-rule-update never originates here and never runs as an
@@ -173,11 +180,14 @@ immediate act — it is always a settled `[BR]` option-action (it carries a Jupi
 ## Where you write
 - **Neon `tasks.status`** (via `db.mjs`) — `blocked → done` (complete) / `blocked → open` (fork only).
 - **Jupi** — `mark-option-action-done-tool` on the executed option-actions. **Never** posts or finalizes decisions.
-- **`.proactive-jupi/assets.md` — the Business rules index** — one appended line when a `[BR]` decision's
-  business-rule-update action runs `ok` (§Business rules). The rule *text* itself goes to the `rules` store
-  via `execute-action`, not here.
-- `act-post-decision/runs/run-<id>/log.md` — decisions polled, which were FINALIZED, actions run (with
-  traces), tasks completed vs reopened vs still-waiting, any unreachable source.
+- **The `rules` store — its Business rules index** — one appended line when a `[BR]` decision's
+  business-rule-update action runs `ok` (§Business rules). The rule *text* itself goes to the same store via
+  `execute-action`. **Nothing goes to `assets.md`** — that file may not exist where you're running.
+- **Your run log is your output, not a file.** Report decisions polled, which were FINALIZED, actions run
+  (with traces), tasks completed vs reopened vs still-waiting, and any unreachable source. Don't write it to
+  a `runs/` folder: under a routine there is no such folder, and a report written to a container that is
+  about to disappear is a report nobody reads. The scheduled routine records the run itself (`db.mjs
+  run-open` / `run-close`); your job is to hand it the substance.
 - **Never** the user's tools (that's `execute-action`), Neon `actions`, Supermemory, or `context`.
 
 ## Narrate + return
