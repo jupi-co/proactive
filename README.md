@@ -1,10 +1,45 @@
-# Proactive-Jupi — `proactive/`
+# Proactive-Jupi
 
-Workspace + skills for the Proactive-Jupi proactive engine (dogfood build). Full design in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+Workspace + skills for the Proactive-Jupi engine.
 
 ## What it does
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
-The human is bothered **only for genuine trade-offs** (the confidence × risk gate). Everything confident-and-safe just happens.
+The human is bothered **only for genuine decisions** (the confidence × risk gate). Everything confident-and-safe just happens.
+
+## Get started
+
+In the **Claude Desktop app**, every step below is under **Cowork → Customize → Plugins**.
+
+**1. Add the jupi-skills marketplace** — **Add → Add marketplace**, then paste:
+
+```
+https://github.com/jupi-co/jupi-skills.git
+```
+
+Skip this if `jupi-skills` is already in your marketplace list.
+
+**2. Add this marketplace** — **Add → Add marketplace** again, with:
+
+```
+https://github.com/jupi-co/proactive.git
+```
+
+**3. Install `proactive-jupi`** from the `proactive-jupi` marketplace. `jupi-skills` installs alongside it as a dependency.
+
+**4. Connect to the Jupi MCP server** Under the Connectors tab of the installed plugin, click "Jupi" then "Connect".
+
+**5. Run setup** in the workspace you want Proactive-Jupi to work in by starting a Cowork task and prompting:
+
+```
+/setup-proactive-jupi
+```
+
+Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
+
+**Testing an unreleased build? (Developer mode)** 
+- Clone the repo
+- Ask an AI agent to package the plugin, or run `bash scripts/package-plugin.sh`
+- Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
 
 ## Config — two files, two jobs
 
