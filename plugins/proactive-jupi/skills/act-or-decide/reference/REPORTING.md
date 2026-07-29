@@ -44,12 +44,18 @@ is worse than an honest blank.
 | Title | Link | Assignee | Tasks unblocked | Why it needs a human |
 |---|---|---|---|---|
 
-**4 · Deferred** — everything cut by `clusterBudget` or `decisionBudget`, with its leverage and the reason. **Not
+**4 · Deferred** — everything in the window that didn't get worked, with its leverage and the reason. **Not
 optional; "nothing deferred" is written out rather than left as an absent table.** Your own guardrails say no
 silent caps, and a budget that trimmed six items reads exactly like a quiet morning otherwise.
 
 | Item (cluster / decision) | Leverage | Cut by | Why this one |
 |---|---|---|---|
+
+**`Cut by` takes a budget name — or `do-nothing rule <id>`.** A cluster dropped because a do-nothing rule
+covered it (§Negative memory) belongs in this block for the same reason a budget cut does, and arguably more:
+that rule's entire job is to stop showing the user this class of work, so the run where it fires is the one
+chance they get to notice it fires on the wrong thing. Give the rule id, so a mis-scoped rule can be found and
+amended rather than merely resented.
 
 **Leverage, not raw score** — the same measure Stage 2 ranked by (value unblocked across tasks per decision
 raised), because that's what the cut was actually made on; a column of task scores would suggest a different
@@ -61,8 +67,18 @@ starves silently while every report truthfully promises it comes back tomorrow.
 `ok:false` stays `ready` and retries next run, but an all-failed run renders exactly like a quiet one
 otherwise — the same argument block 4 makes for budgets.
 
-Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. **Return the whole report — it is
-the output, not a file.** A scheduled run has no workspace folder to write into and nobody reading a file
+**Footer, two lines.** First the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. Then **what this
+run is leaving for the next one**: frontier items to push (count + what kind), voice profiles observed, and
+any do-nothing rule proposed. One line, and it is not decoration — this is the only visible evidence that an
+expensive run of searching produced anything durable, and the failure it guards against is a skill that
+quietly stops compounding while every report still looks healthy.
+
+Written in the *future* tense because it is: the report ships before Stage 6 writes any of it, so that
+bookkeeping never delays the work the reader is waiting for. Stage 6 then confirms — or says what didn't
+land — in one closing line after the report. In `--dry-run` nothing is written at all; say what *would* have
+been pushed and saved.
+
+**Return the whole report — it is the output, not a file.** A scheduled run has no workspace folder to write into and nobody reading a file
 left in a discarded container; a local run's reader is already in the conversation. (A dry run returns the
 report alone — there are no validator passes to record, since it authors no decisions.)
 

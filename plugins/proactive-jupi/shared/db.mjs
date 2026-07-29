@@ -40,6 +40,14 @@
 //   get-cursor      <consumer> <source> [eval]      → { consumer, source, is_eval, last_cursor, last_run_at } | null
 //   advance-cursor  <consumer> <source> <cursor> [eval] → { consumer, source, is_eval, last_cursor }
 //     consumer = 'brain' | 'backlog'; pass a truthy 4th/3rd arg ('eval'|'true'|'1') for eval runs.
+//   ── The crawl frontier: what to look up next (crawl_state is the visited set) ──
+//   push-frontier   '<json>'                        → { id, kind, entity, … } | { deduped: true }
+//       json: note (required — the WHY + source), kind? ('entity'|'voice'|'topic', default
+//             'entity'), entity?, source_ref?, pushed_by?, is_eval?
+//   list-frontier   [N] [eval]                      → [ {id, kind, entity, note, …}, … ] (oldest first)
+//   close-frontier  <id> <done|dropped>             → { id, kind, entity, status }
+//   list-dropped    [days] [N]                      → [ {task}, … ]  (drops, newest first — the
+//       evidence base for a `[BR] When X, do nothing` rule; defaults 90 days / 50 rows)
 //
 // Config resolution — connection string + tenant id (first hit wins):
 //   1. $NEON_CONN_STRING / $DATABASE_URL  and  $JUPI_USER_ID  (the sanctioned path
@@ -526,6 +534,95 @@ const VERBS = {
       [userId, consumer, source, truthy(isEval), effective],
     );
     return warning ? { ...rows[0], warning } : rows[0];
+  },
+
+  // ── Crawl frontier ─────────────────────────────────────────────────────
+  // The other half of the crawler. `crawl_state` is the visited set; this is the
+  // frontier — what's worth looking up next, pushed by whoever tripped over it.
+  // Rows are REQUESTS TO LOOK, never Facts, so pushing one doesn't make you a
+  // writer of the brain (update-brain still authors everything that lands there).
+  //
+  // Dedup is best-effort and lives here rather than in a unique index: pushing the
+  // same unknown on five consecutive runs should collapse to one row, but a unique
+  // violation inside an unattended routine would fail the whole run over a
+  // duplicate note. So the insert simply declines when an identical pending entity
+  // is already queued, and reports `deduped: true` instead of erroring.
+  async "push-frontier"(sql, [jsonArg], userId) {
+    const f = JSON.parse(jsonArg);
+    if (!f.note) return { id: null, error: "push-frontier: `note` is required (the WHY, with its source)" };
+    const kind = f.kind ?? "entity";
+    const rows = await sql.query(
+      `insert into crawl_frontier (user_id, kind, entity, note, source_ref, pushed_by, is_eval)
+       select $1, $2, $3, $4, $5, $6, $7
+        where $3::text is null
+           or not exists (
+             select 1 from crawl_frontier
+              where user_id = $1 and is_eval = $7 and status = 'pending'
+                and kind = $2 and lower(entity) = lower($3))
+       returning id, kind, entity, status, created_at`,
+      [
+        userId,                       // $1
+        kind,                         // $2
+        f.entity ?? null,             // $3
+        f.note,                       // $4
+        f.source_ref ?? null,         // $5
+        f.pushed_by ?? "unknown",     // $6
+        truthy(f.is_eval),            // $7
+      ],
+    );
+    return rows[0] ?? { id: null, deduped: true, entity: f.entity, kind };
+  },
+
+  // What update-brain drains at the top of a `full` run, oldest first. FIFO on
+  // purpose: an item pushed three runs ago has been waiting three runs, and a
+  // frontier that keeps serving the newest push is one where old gaps never close.
+  async "list-frontier"(sql, [limitArg, isEval], userId) {
+    const limit = Math.min(Number(limitArg) || 20, 200);
+    return sql.query(
+      `select id, kind, entity, note, source_ref, pushed_by, created_at
+         from crawl_frontier
+        where user_id = $1 and is_eval = $2 and status = 'pending'
+        order by created_at asc
+        limit $3`,
+      [userId, truthy(isEval), limit],
+    );
+  },
+
+  // Spend a frontier item: `done` (looked at it — whether or not it yielded a Fact)
+  // or `dropped` (not worth it / no longer meaningful). Both take it out of the
+  // queue; the split is so a drainer that keeps dropping items is visible.
+  async "close-frontier"(sql, [id, status], userId) {
+    if (!["done", "dropped"].includes(status))
+      throw new Error(`close-frontier status must be done|dropped, got '${status}'`);
+    const rows = await sql.query(
+      `update crawl_frontier
+          set status = $3, drained_at = now()
+        where id = $1 and user_id = $2
+      returning id, kind, entity, status`,
+      [id, userId, status],
+    );
+    return rows[0] ?? { id: null, error: "no such frontier item for this user" };
+  },
+
+  // The negative memory's evidence base. A task ruled "nothing to do" is `dropped`
+  // and leaves the window — which is right, but it also means the SAME recurring
+  // noise gets re-parsed, re-scored and re-investigated from scratch every run,
+  // because nothing accumulates across the drops. This read is what lets
+  // act-or-decide notice "I have dropped this same shape four times" and propose a
+  // `[BR] When X, do nothing` rule. Recurrence for ordinary rules is counted from
+  // settled Jupi decisions; drops never reach Jupi, so they are counted here.
+  async "list-dropped"(sql, [daysArg, limitArg], userId) {
+    const days = Math.min(Number(daysArg) || 90, 730);
+    const limit = Math.min(Number(limitArg) || 50, 500);
+    return sql.query(
+      `select id, short_label, summary, signal_type, signal_ref, closed_at
+         from tasks
+        where user_id = $1 and status = 'dropped'
+          and closed_at > now() - make_interval(days => $2)
+        order by closed_at desc
+        limit $3`,
+      [userId, days, limit],
+    );
   },
 
   // ── Routine run records ────────────────────────────────────────────────

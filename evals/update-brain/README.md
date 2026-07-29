@@ -31,6 +31,20 @@ Two eval layers, both isolated so they never pollute real Facts.
   - **5 · Provenance to the source task** — a Fact derived from a `parse_confidence: low` task names the
     originating task id and carries the hedge **inside the sentence**, so a corrected parse has a path to
     the derived Fact and the brain can't silently corroborate a misreading.
+- **Cases 6–8 (the crawler's second half):**
+  - **6 · Frontier drain** — seeded `crawl_frontier` items are drained **before** the window sweep, on an
+    announced frontier/window budget split, and every drained item is **closed** (`done` even when the lookup
+    found nothing). An item left `pending` is one the next run pays for again; the window running first means
+    a planner's evidenced gap lost to a guess about what matters.
+  - **7 · Voice observation** — an observation handed over by `act-or-decide` is written **without re-reading
+    the sent history**, with the date inside the sentence. Re-verifying it burns the exact cost the path
+    exists to remove; grade the tool calls, not just the Fact.
+  - **8 · Push on discovery** — unknowns met mid-sweep are **queued, not chased**, with notes that say where
+    and why. Chasing them blows the budget on whatever was noticed first.
+  - **Fixtures + teardown for 6 and 8:** seed/inspect with `db.mjs push-frontier '<json>'` (pass
+    `"is_eval": true`) and `list-frontier N eval`; delete them afterwards with
+    `evals/act-or-decide/purge-scratch.sh`, which clears `is_eval` frontier rows. Neon frontier rows are
+    **not** covered by this directory's Supermemory purge.
 - **Blind version** (skill-creator): spawn with-skill vs baseline subagents per task, grade, then `generate_review.py` for the viewer. Point every write at `user_eval_scratch`.
 - **Always run `purge-scratch.sh` when done.**
 

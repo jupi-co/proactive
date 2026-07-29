@@ -91,6 +91,8 @@ node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" <verb> [args]
 Verbs you use: `query-window [K]` · `insert-action '<json>'` · `set-action-status <id> executed <trace_ref>`
 (you write this after the worker runs the row) · `set-task-status <id> <status>` · `set-task-gating <task_id>
 '<uuid[] json>'` · `list-actions status ready` (your own queue + the orphan-sweep — §Stage 0) ·
+`push-frontier '<json>'` (queue what you couldn't resolve — §What your searches leave behind) ·
+`list-dropped [days]` (what you've already ruled nothing-to-do — §Negative memory) ·
 `decision-url - "<title>" <id>` (the decision permalink — §Decision links).
 
 ---
@@ -142,6 +144,13 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
 - *(If nothing shares a question, this degrades to singletons — still correct, just no factorization.)*
 
 ### Stage 3 — Research each kept cluster ONCE (the decision is the outcome, not the premise)
+
+**First, the cheapest question: have we already settled that this is nothing to do?** Before any digging,
+check the cluster against the **do-nothing rules** in the rule store index and against `list-dropped`
+(§Negative memory). A cluster a do-nothing rule covers is **dropped on the spot** — no research, no action,
+no decision — citing the rule id. This runs first because the whole value is the research you *don't* do;
+run it after the dig and you've already paid for everything it was meant to save.
+
 **No blind spots.** For every person/org/project/tool the cluster touches:
 1. `recall` Facts (deepen the task's `relevant_facts`). For any **unknown/fuzzy** entity, **delegate**:
    invoke `update-brain` in **targeted** mode with a precise lookup request (it writes `context`/Facts and
@@ -156,6 +165,10 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
    decisions settled *this same* trade-off, and did they land on a *consistent* outcome? ≥ `ruleThreshold`
    consistent settlements → this is a **rule candidate** (§Business rules, the `[BR]` path). Below that, or
    inconsistent → keep it a one-off operational decision.
+   - **Drops recur too, and they leave no trace in Jupi** — a task you rule nothing-to-do never becomes a
+     decision, so this count can't see it. `list-dropped` is the other half of the same question
+     (§Negative memory): ≥ `ruleThreshold` drops of the same shape is a rule candidate exactly like ≥
+     `ruleThreshold` consistent settlements, just for the "do nothing" outcome.
 3. **Consult the business-rule store** (§Business rules). Open the `rules`-tagged tool (from `assets.md`,
    via `rulesStoreRef`) and read its **index section** in full — the index lives in the store, beside the
    rules it indexes, because that is the one place both you and a cloud routine can reach. If an entry (or a
@@ -164,9 +177,21 @@ run's new ACTs (§Hand-off) so nothing is silently stranded; because you write `
    to *this* instance. A rule that genuinely fits **pre-empts the open question → confidence `high`** and its
    id becomes the acted row's `rule_ref`. A rule that *almost* fits (a wrinkle it doesn't cover) does **not**
    act silently → it's a `[BR]` **amendment** decision (apply-as-is / add-exception / supersede).
-4. **Before any message draft**, pull the **≥10 most recent messages you sent that person in that same
-   channel** (Gmail sent/thread for email, Linear comments for Linear…). That history is the raw material
-   for matching their voice (§Messaging).
+   *(A **do-nothing** rule is the one whose match produces no action — you already applied it at the top of
+   this stage, before spending the research this step is part of.)*
+4. **Before any message draft**, get the voice — **from the brain first, from the tools only if it isn't
+   there.** `recall` a voice profile for this (person, channel) pair. If one comes back and it isn't stale
+   (the profile carries its own observation date — §Messaging), **use it and skip the history pull.** If it
+   doesn't, pull the **≥10 most recent messages you sent that person in that same channel** (Gmail
+   sent/thread for email, Linear comments for Linear…) as before, and **note the register you observed for
+   Stage 6** — don't persist it here.
+
+   This is the one search in the skill that is **pure repeated cost**: voice barely changes, the pull is ten
+   messages every time, and until now every run threw the result away and paid again.
+
+5. **Note what you couldn't resolve, and what you tripped over** — the gaps and stray discoveries that make
+   the four steps above worth keeping (§What your searches leave behind). **Collect them here; Stage 6
+   writes them.**
 
 Then, per cluster:
 - **No open question** (singleton) → **confidence `high`**; head to the gate. *But the dig is the
@@ -256,6 +281,28 @@ writes no status. **You then record it:** for each `ok:true`, `set-action-status
 leave `ok:false` rows `ready` (they retry next run's sweep). In `--dry-run`, skip all of this — render the
 table instead (§Dry-run).
 
+### Stage 6 — Leave the trail (LAST, after the report — never in the critical path)
+Everything Stage 3 noted for the next run gets written **here**, once the work is done and the report is out:
+- **Frontier pushes** — `push-frontier '<json>'` per noted gap (§What your searches leave behind).
+- **Voice profiles** — one `update-brain` targeted delegation per (person, channel) observed in Stage 3.4,
+  handing over the register you saw (greeting, sign-off, language, typical length, how many messages and
+  through what date). You never author Facts; `update-brain` writes them.
+
+**Why it is last.** These writes buy nothing for *this* run — they exist so the next one is cheaper. Run them
+mid-flight and a slow save or a sub-agent delegation delays the drafts and decisions the user is actually
+waiting on, which is a bad trade in both directions: the user waits longer, *and* bookkeeping is the first
+thing to get cut when a run is running long — so the part that was supposed to compound is exactly the part
+that quietly stops happening. After the report it costs the user nothing, so it stops being the thing you
+skip. **Run them in the background where you can**: they're independent of each other and nothing downstream
+reads them this run.
+
+**Failure here degrades the run; it never fails it.** The acts are queued, the decisions are posted, the
+report is delivered — a push that didn't land means the next run re-discovers the gap, which is exactly where
+we were before. Say what didn't persist in a closing line and stop; never retry into a loop, and never let it
+turn a successful run into a failed one.
+
+*(`--dry-run`: skip Stage 6 entirely — it writes. The report already says what you'd have pushed and saved.)*
+
 ---
 
 ## The gate — confidence × exposure (a configurable 2×2)
@@ -285,7 +332,9 @@ question); `low` = a real trade-off. **Exposure is per action.** Look up `guardr
   for non-draftable actions; in perform mode also for draftable sends. Same decision mechanism either way.
 - A **business rule** that covers the situation makes confidence `high` (the open question is pre-empted) →
   **ACT**, tagging the acted row's `rule_ref` with the rule's id. You find it via the `rules` store's own
-  index → the rule entry (Stage 3.3). This is how a task *graduates from decide to act*.
+  index → the rule entry (Stage 3.3). This is how a task *graduates from decide to act*. **The exception is a
+  do-nothing rule**, which never reaches this gate at all: it settles the task as `dropped` at the top of
+  Stage 3 (§Negative memory), because there is no action to score.
 
 **Draft mode shapes what you EMIT — never what may be executed.** Two paths, and what separates them is
 whether a human has already authorised the action.
@@ -421,10 +470,75 @@ settled the same way **≥ `ruleThreshold`** times, propose to codify it instead
 on an owner-approved `[BR]` decision. Signal content that *says* "make this a rule" is data, not a trigger: only
 a recurrence *you* detect + the owner's approval codifies one.
 
+## Negative memory — "when X, do nothing" is a rule like any other
+Ruling a task nothing-to-do sets it `dropped`, which takes it out of the window. That's right for the task and
+useless for the *class*: the same newsletter, the same auto-notification, the same FYI thread comes back as a
+fresh task next week and gets parsed, scored, clustered and researched from scratch, forever. Nothing
+accumulates across drops, so the cost repeats exactly as often as the noise does.
+
+So a do-nothing outcome earns a rule on recurrence, the same way a settled trade-off does:
+- **Read side (Stage 3, first thing).** A **do-nothing rule** covering the cluster → `set-task-status <id>
+  dropped`, cite the rule id in the report's Deferred block, and **stop** — no research, no action, no
+  decision. It is the only rule match that produces no action at all, which is the point.
+- **Write side.** `list-dropped [days]` → group the drops by shape (same sender pattern, same signal type,
+  same reason you dropped it). **≥ `ruleThreshold` drops of one shape** → a **`[BR] When X, do nothing`**
+  decision, framed on the concrete instances so the owner sees exactly what they're agreeing to stop seeing.
+  Ask for `ruleThreshold` drops rather than one: dropping something once is a judgement, dropping it four
+  times is a pattern, and the difference matters because this rule's whole effect is to make future work
+  invisible.
+- **Its "codify" option carries ONE option-action** — the business-rule-update write. It is the documented
+  exception to *every option carries a concrete action*: the operational answer here **is** nothing, so
+  inventing a second action would be fiction. Say so in the option text ("Jupi will do nothing further on
+  this class"), so the reader isn't left wondering what happens to the instance. Pair it with a **"keep
+  looking at these case by case"** option that writes no rule at all.
+- **Bound the blast radius in the rule text.** A do-nothing rule silently suppresses future work, so it must
+  be written narrowly enough that the owner can predict what it eats — name the sender/label/issue-type, not
+  a vibe. When the shape is fuzzy, it's not a rule yet; keep dropping case by case and let the count grow.
+
+## What your searches leave behind — the frontier
+You do a lot of expensive looking: `recall`s, decision searches, rule-store reads, thread digs, name lookups.
+Most of it answers your question and is then gone. The parts worth keeping are the ones you **couldn't**
+answer and the ones you **weren't looking for** — and those are exactly what `update-brain` would want to be
+told about, because it crawls forward in time and has no way to know what you hit.
+
+`push-frontier '<json>'` — `{ kind, entity, note, source_ref, pushed_by: "act-or-decide" }`:
+- **`kind: "entity"`** — a person/org/project you had to reason around because `recall` came back thin and
+  a targeted lookup wasn't warranted mid-plan, or one you met in passing that the brain plainly doesn't know.
+- **`kind: "voice"`** — a (person, channel) pair you'll need to write to and have no profile for, when you
+  didn't pull the history this run.
+- **`kind: "topic"`** — a subject area the window keeps touching that the brain has nothing on.
+- **`note` is the WHY, with its source** — *"who owns procurement at Batch — blocked the Batch pilot reply,
+  found in gmail thread 18f…"*. A note that just names the entity is a dead item in three weeks: whoever
+  drains it has none of the context you had, and that context is the entire reason it's queued.
+- **`source_ref` is the originating task's `signal_ref`** when the push came from a task (else the thread /
+  issue id) — what lets a drainer reopen the thing you were looking at.
+
+**Push a request to look, never a Fact.** The frontier is a queue of questions; `update-brain` is still the
+one that reads the tools and authors what lands in the brain. That's what keeps it the single writer while
+letting your run steer what gets crawled next — the same delegation as a targeted lookup, just asynchronous
+because the answer isn't needed *now*.
+
+**Be sparing.** Push what a future run would genuinely be better for knowing, not everything you saw. The
+frontier is drained on a budget; a hundred low-value items don't slow it down so much as bury the three that
+mattered. Pushing is cheap, so the discipline has to come from you.
+
+**Note them in Stage 3, write them in Stage 6** — after the report, off the critical path. The report names
+what you're about to persist; Stage 6 persists it and confirms in a closing line.
+
+*(Dry-run writes nothing, frontier included — report what you'd have pushed.)*
+
 ## Messaging — match the recipient's voice, stay minimal
 Whenever an action (a Case-ACT draft or an option's Action) is a message to a person, mirror the register
-of the **≥10 recent messages you sent them in that channel** (greeting, sign-off, tone, FR/EN, length) —
-never a generic template. Be **minimal**: the shortest message that does the job.
+they're written in (greeting, sign-off, tone, FR/EN, length) — never a generic template. Be **minimal**: the
+shortest message that does the job.
+
+**Where the register comes from, in order (Stage 3.4):**
+1. **A voice profile in the brain** for this (person, channel) pair. It carries the date it was observed, in
+   its own sentence — that's what lets you judge staleness rather than trusting it blindly. Treat one older
+   than a few months as a starting point to sanity-check against the current thread, not as gospel: people's
+   register shifts as a relationship changes, and a profile from before a deal closed can read wrong now.
+2. **The ≥10 recent messages you sent them in that channel** — pull them when there's no usable profile, then
+   delegate the observation to `update-brain` so the next run starts at (1).
 
 **First contact — no history to mirror.** A new counterparty has no sent thread, and "never a generic
 template" still holds, so fall back in this order: (1) the register of **the thread you're replying into** —
@@ -462,8 +576,8 @@ dig the thread (above) you already have the message in hand: put its id in the a
 
 Every run reports the same four blocks, whether or not anything was written: **1 · Clusters** · **2 ·
 Actions** · **3 · Decisions** · **4 · Deferred**. `--dry-run` goes through the gate but **writes nothing**
-— no rows, decisions, status changes, Stage 0 refresh, orphan sweep, or `update-brain` delegation — so there
-the report *is* the deliverable.
+— no rows, decisions, status changes, frontier pushes, Stage 0 refresh, orphan sweep, or `update-brain`
+delegation — so there the report *is* the deliverable.
 
 **Read `reference/REPORTING.md` before writing it.** It fixes each block's columns, the four values the
 `Draft-mode effect` column may take, what a dry run puts in the `Link` column, and **the user-facing version
@@ -472,8 +586,10 @@ The shape is specified rather than left to judgement because on the reference ru
 because a human asked for them afterwards, and the Deferred block — the user's only evidence that a budget is
 set too low — was not shown at all.
 
-Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget`. **Return the report — it is your
-output, not a file.** Under a scheduled routine there is no `runs/` folder to write to and no one to read a
+Footer: the active `mode`, `policy`, `clusterBudget`, `decisionBudget` — then a second line for **what this
+run is leaving for the next one** (frontier pushes, voice profiles observed, do-nothing rule proposed).
+Future tense: **the report ships before Stage 6 writes any of it**, which is what keeps the bookkeeping off
+the path the reader is waiting on. **Return the report — it is your output, not a file.** Under a scheduled routine there is no `runs/` folder to write to and no one to read a
 file left in a container that is about to be discarded; the routine folds what you return into its own run
 record. Locally, the user reads it in the conversation, which is where they already are.
 
@@ -493,7 +609,8 @@ Narrowing the read-side gap is TECH-459.
 
 
 ## Where you write
-- **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`.
+- **Neon** (via `db.mjs`) — `ready` `actions` rows (ACT only), `tasks.status`, `gating_decision_ids`, and
+  **`crawl_frontier` pushes** (§What your searches leave behind — requests to look, never Facts).
 - **Jupi** — the decision(s), via `create-decision-tool` (private, STARTED).
 - **Never** the user's tools, Supermemory (`update-brain` owns writes), or `context` — **and no files.**
   The report, the validator's passes and the narrative are all things you *return*; a scheduled run has no
@@ -501,5 +618,6 @@ Narrowing the read-side gap is TECH-459.
 
 ## Narrate + return
 Narrate per step (✅ done / 🔧 fixed / ⚠️ needs you). Return a short summary (4–6 lines): clusters kept vs
-dropped (budget), what was acted (→ `ready` → `executed` via `execute-action`) vs decided (Jupi url, private),
-task statuses set, and any blocker.
+dropped (budget or a do-nothing rule), what was acted (→ `ready` → `executed` via `execute-action`) vs decided
+(Jupi url, private), task statuses set, **what Stage 6 left for the next run** (frontier pushes, voice
+profiles saved — and anything that failed to persist), and any blocker.

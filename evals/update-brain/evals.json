@@ -60,6 +60,46 @@
         "The shaky-parse hedge appears inside the sentence, surviving the store's rewrite",
         "The Fact is not written as a flat confident assertion"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "FRONTIER DRAIN (full mode). Seed crawl_frontier with three pending eval items pushed by act-or-decide — one `entity` (an unknown counterparty, with a note explaining why it blocked a reply), one `voice` pair, one `topic` — then run update-brain in full mode with is_eval isolation.",
+      "expected_output": "The announced budget is split between frontier and window, and the frontier is drained FIRST, oldest first, each item researched per its kind and then closed with `close-frontier <id> done|dropped`. Facts land under the eval container tag. The summary reports frontier closed vs still pending. FAIL if the window sweep runs first, and FAIL if any drained item is left `pending` (it would be re-drained and re-paid for next run).",
+      "files": [],
+      "expectations": [
+        "The budget announcement splits frontier vs window explicitly",
+        "The frontier is drained before the windowed sweep",
+        "Each item's `note` is read and shapes the lookup, rather than producing a generic profile",
+        "Every drained item is closed `done` or `dropped` — none left pending",
+        "A lookup that found nothing is still closed `done`, not re-queued",
+        "The summary reports items closed and how many remain pending"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "VOICE OBSERVATION (targeted). act-or-decide hands over an observation it already made: 'Anne-Claire -> Nick on email: English, no greeting, 2-4 lines, signs off AC, no emoji — observed from 12 sent messages up to 2026-07-24.' Record it in the eval scratch container.",
+      "expected_output": "The Fact is written straight from the handed-over observation with NO re-read of the sent history — re-verifying would burn the exact cost this path exists to remove. Shape: `[Process] <user> -> <person> on <channel> — <register>. Observed from <n> sent messages up to <date>.` with the observation date INSIDE the sentence, not in a trailing parenthetical. One line back to the caller.",
+      "files": [],
+      "expectations": [
+        "No tool read of the sent history is performed — the observation is taken as given",
+        "The Fact is tagged `[Process]` and names the (person, channel) pair",
+        "The observation date appears inside the sentence, not only in the trailing (src: …)",
+        "A recall of the saved Fact returns the date and register intact",
+        "The return is short — this is a trailing call with nobody waiting on it"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "PUSH ON DISCOVERY. Run update-brain in full mode (eval-isolated) over a window that mentions two organizations the brain has nothing on, neither of which the current budget can cover.",
+      "expected_output": "Both are pushed to the frontier with `pushed_by: update-brain` and notes explaining where they were seen and why they look worth knowing — rather than chased now (which would blow the budget on whatever was noticed first) or dropped. The summary reports what was pushed. FAIL if the run abandons its budget to chase them, and FAIL if they are mentioned in the summary but never queued.",
+      "files": [],
+      "expectations": [
+        "Both unknown orgs are pushed to crawl_frontier rather than chased in-run",
+        "Each push carries a note with the source and why it matters",
+        "`pushed_by` is set to update-brain",
+        "The announced budget is respected — no unbounded chase",
+        "The summary names what was pushed for the next run"
+      ]
     }
   ]
 }
