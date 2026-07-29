@@ -16,10 +16,10 @@ Installing `proactive-jupi` pulls in **`jupi-skills`** automatically — it's de
 claude plugin marketplace add https://github.com/jupi-co/jupi-skills.git
 ```
 
-**2. Add this marketplace.** From a clone of `jupi-co/proactive` (the repo is private, so a local path is the reliable route):
+**2. Add this marketplace:**
 
 ```bash
-claude plugin marketplace add /path/to/proactive
+claude plugin marketplace add https://github.com/jupi-co/proactive.git
 ```
 
 **3. Install the plugin.** `jupi-skills` installs alongside it; the install output lists what came with it.
