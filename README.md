@@ -1,14 +1,12 @@
-# Proactive-Jupi — `proactive/`
+# Proactive-Jupi — 
 
-Workspace + skills for the Proactive-Jupi proactive engine (dogfood build). Full design in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+Workspace + skills for the Proactive-Jupi engine.
 
 ## What it does
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
-The human is bothered **only for genuine trade-offs** (the confidence × risk gate). Everything confident-and-safe just happens.
+The human is bothered **only for genuine decisions** (the confidence × risk gate). Everything confident-and-safe just happens.
 
 ## Get started
-
-Installing `proactive-jupi` pulls in **`jupi-skills`** automatically — it's declared as a dependency, because every skill here reaches Jupi through that plugin's MCP server. Add the `jupi-skills` marketplace *first*, though: a dependency whose marketplace you haven't added is left unresolved.
 
 In the **Claude Desktop app**, every step below is under **Cowork → Customize → Plugins**.
 
@@ -30,15 +28,13 @@ https://github.com/jupi-co/proactive.git
 
 **4. Authorize the Jupi MCP server** — connect `jupi-skills:Jupi` and complete the OAuth flow. Setup blocks on Jupi answering, so this has to happen before step 5.
 
-**5. Run setup** in the workspace you want Proactive-Jupi to work in (your existing repo — it namespaces everything under `.proactive-jupi/`):
+**5. Run setup** in the workspace you want Proactive-Jupi to work in:
 
 ```
 /setup-proactive-jupi
 ```
 
 Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
-
-**On the CLI instead?** Same sequence, as three commands — `claude plugin marketplace add https://github.com/jupi-co/jupi-skills.git`, the same for `…/proactive.git`, then `claude plugin install proactive-jupi@proactive-jupi`.
 
 **Testing an unreleased build?** Upload `dist/proactive-jupi.zip` under **Plugins → Personal → Local uploads** (see [Plugin](#plugin-local-cowork-testing) below). A zip upload carries no dependency resolution, so install `jupi-skills` yourself first.
 
