@@ -1,4 +1,4 @@
-# Proactive-Jupi — 
+# Proactive-Jupi
 
 Workspace + skills for the Proactive-Jupi engine.
 
