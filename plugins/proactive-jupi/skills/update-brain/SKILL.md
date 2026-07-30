@@ -75,54 +75,41 @@ parentheticals.
 ## Types (the ontology)
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
 
-### Voice profiles — the one case that uses the Supermemory HTTP API
+### Voice profiles — just a `[Process]` Fact
 `act-or-decide` has to match the recipient's register before it drafts any message, and its only way to get
 that has been to pull the ten most recent messages the user sent that person in that channel — **every run,
-per recipient**. That is the most repeated expensive read in the whole system, and voice is about the most
-durable thing there is to know about a relationship. So it should be stored.
+per recipient**. That is the most repeated expensive read in the whole system, so it is worth remembering. And
+it is nothing new to remember: *how the user writes to someone* is a **`[Process]` Fact**, exactly like any
+other thing you record about how their world works.
 
-**It stays in Supermemory — but through the HTTP API, not the connector:**
 ```
-node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" put-voice '{"person":"nick","channel":"email",
-  "register":"no greeting, 1–4 lines, question in the first sentence, no emoji, French",
-  "observed_at":"2026-07-24","sample_size":12,"verified":true,
-  "source_note":"gmail in:sent to:n@jupi.co, 12 threads 2026-07-03..21"}'
-
-node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>   → the profile, or null
-node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" list-voice                     → every profile on file
+[Process] the user → <person> on <channel> — <register>.
 ```
-One profile per **(person, channel)** pair, keyed `customId: voice:<person>:<channel>` — the same person is
-often formal on email and terse in Linear, and a merged profile is worse than none.
+- `[Process] the user → Nick on email — no greeting, 1–4 lines, question in the first sentence, no emoji, French.`
+- `[Process] the user → Antoine on email — formal "Bonjour Antoine", full sentences, closes "Bien à vous".`
 
-**Why the API and not `memory`/`recall`.** This is the **upgrade trigger** `references/supermemory.md` has
-described from the start — *"noisy recall (duplicate/contradictory facts) or a need for structured
-filtering/enumeration → add the HTTP API"* — and a voice profile trips it on both counts:
-- **`recall` is ranked and approximate; this lookup is exact.** You want *the* register for this pair, current
-  value. Measured (2026-07-29): a re-saved correction ranked **below** the flattened original (0.81 vs 0.80),
-  so "save a new statement and let recency reconcile" does not reliably return the current one. `customId`
-  gives an exact keyed read with genuine last-write-wins.
-- **The date has to survive, and in `content` it does not.** The extraction layer strips dates and
-  attributions from the top-ranked memory a caller reads, wherever in the sentence they sit — including
-  in-clause, which this skill used to prescribe as the fix. **`metadata` is not rewritten:** it comes back
-  verbatim. A dateless voice profile is not a slightly-degraded one — nothing can tell a fresh register from a
-  two-year-stale one, and it drafts in the user's name from it.
+Write it with the connector `save`, read it back with `recall`, same as every Fact. **One per (person,
+channel)** — the same person is often formal on email and terse in Linear, so a merged register is worse than
+none; make the pair explicit in the sentence so recall can tell them apart.
 
-So the qualifiers (`observed_at`, `sample_size`, `verified`, `source_note`) live in **metadata**, and the
-register prose lives in **content** where semantic recall still finds it ("how do we talk to Nick?"). Same
-store, same container tag, same single-writer rule — you are still the only writer. Keep the content's claims
-**timeless**: state the register, not how fresh it is. Wanting to write "as of <date>" into the content is the
-signal it belongs in metadata.
+**Don't reach for anything more than that.** A voice profile *feels* like it wants a keyed store and a hard
+date — the register gates an outbound message, so a wrong one writes in the user's name. But every worry that
+pulls that way is either general to the brain or already handled elsewhere:
+- **"The date won't survive the extraction layer."** True — and true of every Fact. Of all fact-types this is
+  the one where it matters least: a register barely drifts. Phrase the claim **timeless** (the register, not
+  how fresh it is) and let the ordinary refresh path re-state it when it changes, like any other Fact.
+- **"A stale or wrong register could mis-draft in the user's name."** That risk is bounded where it is
+  created, not in storage: the message is a **draft the user reviews** (an off register is a two-second fix,
+  not a sent mistake), `act-or-decide` **cross-checks distinctive traits against the thread** it is replying
+  into, and a handed-over observation gets **spot-checked** before you record it (below). None of those needs
+  a keyed store.
+- **"Corrections don't reliably win on recall rank."** That is a whole-brain Supermemory property, not a voice
+  one. If it ever bites hard enough to matter, the fix is the brain-wide HTTP-API upgrade the reference
+  already describes (§When to upgrade) — applied to *all* Facts, never smuggled in as a special path for one.
 
-`memory.mjs` handles three API behaviours you would otherwise have to rediscover: a null metadata value
-**400s the whole write** (so absent fields are omitted); `POST` with an existing `customId` **appends** to
-content (five re-observations would leave five contradictory registers in one document — the same failure
-relocated), so it `PATCH`es to update and only `POST`s to create; and `verified` is OR-ed with its prior value
-so a later unverified hand-over cannot erase the fact that someone once checked against the source.
-
-**This is the only thing on the HTTP path.** Ordinary Facts stay on the connector — simpler, and semantic
-recall is what they are for. The cost of the API path is a **second secret** (`supermemoryApiKey`) that a
-scheduled routine has to carry alongside the Neon string, which is why it is scoped to what genuinely needs it
-rather than becoming the default.
+So: connector, `recall`, timeless phrasing. If you catch yourself wanting to write "as of <date>" into the
+sentence, that is the signal the freshness question belongs to `act-or-decide`'s thread cross-check, not to the
+Fact.
 
 ## Incremental crawling — the `crawl_state` cursor
 Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.
@@ -206,30 +193,32 @@ Narrate each step (✅ done / 🔧 fixed / ⚠️ needs you); announce your budg
 - **A lookup** — *"who is X / what is this org / what's the state of this project?"* — the flow above.
 - **An observation to record**, most often a **voice profile** `act-or-decide` observed in its own Stage 6:
   it has already read the sent history and hands you the register it saw, plus the query and date range it
-  read. You **spot-check it, then record it** (§Voice profiles). The single-writer rule is why it routes
-  through you at all: `act-or-decide` may observe, but only you author what lands in the brain.
+  read. You **spot-check it, then record it as a `[Process]` Fact** (§Voice profiles). The single-writer rule
+  is why it routes through you at all: `act-or-decide` may observe, but only you author what lands in the brain.
 
 ### Spot-check a handed-over observation — one call, not ten
 An earlier version of this skill said to take the observation as given, on the reasoning that re-reading the
 same ten messages would burn the exact cost the path exists to remove. **That was wrong, and an eval caught
 it being wrong in the most direct way available:** a run that re-read the source found the handed-over
-observation had the *language* wrong (French, not English) and the *sign-off* wrong (there wasn't one). A
-voice profile is what `act-or-decide` imitates the user with on outbound mail, so a wrong one doesn't sit
-inertly in the brain — it writes in the user's name, in the wrong language, to their counterparty.
+observation had the *language* wrong (French, not English) and the *sign-off* wrong (there wasn't one). The
+register is what `act-or-decide` imitates the user with on outbound mail, so a wrong one doesn't sit inertly in
+the brain — it drafts in the user's name, in the wrong language, to their counterparty.
 
 The saving is real; the way to keep it is to make the check **cheap, not absent**:
-- **One filtered call, metadata or a single thread** — the same `search_threads` query the caller says it
-  used. You are checking the observation's *shape* (language, greeting, sign-off, rough length), which is
-  visible in snippets. You are **not** re-reading ten bodies; that is the cost being avoided.
-- **It agrees** → record it `verified: true`. Cost: one call, and the profile is now trustworthy.
-- **It disagrees** → record what *you* saw, `verified: true`, and **say in your return that the hand-over
-  was wrong and on what**. The caller drafted from the wrong register this run; it needs to know.
-- **You genuinely can't check** (channel unreachable, no sent history) → record it `verified: false` and
-  **say so in the register text itself** — *"as reported by act-or-decide, unchecked against the source"*.
-  An unverified profile is still better than none, but only if whoever reads it knows which it is.
+- **One filtered call** — the same `search_threads` query the caller says it used. You are checking the
+  observation's *shape* (language, greeting, sign-off, rough length), which is visible in snippets. You are
+  **not** re-reading ten bodies; that is the cost being avoided.
+- **It agrees** → save the `[Process]` Fact. Cost: one call, and the register is now checked.
+- **It disagrees** → save what *you* saw, and **say in your return that the hand-over was wrong and on what**.
+  The caller drafted from the wrong register this run; it needs to know.
+- **You genuinely can't check** (channel unreachable, no sent history) → still save it, but **say in the
+  Fact's own sentence that it is unchecked** — *"as reported by act-or-decide, not yet checked against the
+  source."* An unchecked register beats none, but only if whoever recalls it can tell which it is. This is the
+  one qualifier worth carrying in the sentence — not because it will reliably survive, but because it changes
+  how the register gets used, so state it plainly rather than depending on it.
 
 **This is a trailing call — treat it as such.** `act-or-decide` invokes it *after* its report is out,
-deliberately off the critical path, so nothing is waiting on you. One spot-check call, then write. Don't
+deliberately off the critical path, so nothing is waiting on you. One spot-check call, then save. Don't
 expand it into a crawl.
 
 ## Per-tool exploration (read-only, filtered)

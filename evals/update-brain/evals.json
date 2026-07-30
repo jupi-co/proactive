@@ -77,14 +77,13 @@
     },
     {
       "id": 7,
-      "prompt": "VOICE OBSERVATION (targeted). act-or-decide hands over an observation it already made: 'Anne-Claire -> Nick on email: English, no greeting, 2-4 lines, signs off AC, no emoji — observed from 12 sent messages up to 2026-07-24.' Record it in the eval scratch container.",
-      "expected_output": "The Fact is written straight from the handed-over observation with NO re-read of the sent history — re-verifying would burn the exact cost this path exists to remove. Shape: `[Process] <user> -> <person> on <channel> — <register>. Observed from <n> sent messages up to <date>.` with the observation date INSIDE the sentence, not in a trailing parenthetical. One line back to the caller.",
+      "prompt": "VOICE OBSERVATION, HAND-OVER AGREES (targeted). act-or-decide hands over an observation with its evidence: register plus the query and date range it read. A cheap spot-check against that query confirms it. Record it in the eval scratch container.",
+      "expected_output": "ONE filtered spot-check call against the handed-over query (not zero, not a ten-body re-read); it agrees, so the register is saved as a [Process] Fact via the connector save — '[Process] the user -> <person> on <channel> — <register>' — timeless (state the register, not how fresh it is). One line back to the caller. FAIL if it takes the observation on trust with no check, and FAIL if it invents a keyed/HTTP store instead of a plain connector save.",
       "files": [],
       "expectations": [
-        "No tool read of the sent history is performed — the observation is taken as given",
-        "The Fact is tagged `[Process]` and names the (person, channel) pair",
-        "The observation date appears inside the sentence, not only in the trailing (src: …)",
-        "A recall of the saved Fact returns the date and register intact",
+        "Exactly one filtered spot-check call is made — not zero, and not a full ten-body re-read",
+        "The register is saved as a [Process] Fact via the connector save, keyed in the sentence to the (person, channel) pair",
+        "The Fact sentence is timeless — it states the register, not an observation date",
         "The return is short — this is a trailing call with nobody waiting on it"
       ]
     },
@@ -103,26 +102,24 @@
     },
     {
       "id": 9,
-      "prompt": "SPOT-CHECK A HANDED-OVER OBSERVATION. Run update-brain targeted with an observation act-or-decide claims it made, where the claim is WRONG in a way the source contradicts: 'Anne-Claire -> Nick on email: English, no greeting, 2-4 lines, signs off AC. Observed from 12 sent messages up to 2026-07-24, query: gmail in:sent to:nick.'",
-      "expected_output": "The run does NOT take it on trust and does NOT re-read ten bodies either: it makes ONE cheap filtered call against the query it was handed, sees the register disagrees (the real sent mail is French with no sign-off), records what it actually observed with verified=true via `put-voice`, and says in its return that the hand-over was wrong and on which points. FAIL if it saves the handed-over claim unchecked; FAIL if it launches a full crawl.",
+      "prompt": "SPOT-CHECK CATCHES A WRONG HAND-OVER (targeted). act-or-decide hands over an observation that is WRONG where the source contradicts it: claims English and signs off AC, but the sent mail is French with no sign-off. It also hands over the query it used.",
+      "expected_output": "The run does NOT take it on trust and does NOT re-read ten bodies: ONE cheap filtered call against the handed-over query, sees the register disagrees, saves the [Process] Fact for what it ACTUALLY observed (French, no sign-off) via the connector, and says in its return that the hand-over was wrong and on which points. FAIL if it saves the handed-over claim unchecked; FAIL if it launches a full crawl.",
       "files": [],
       "expectations": [
-        "Exactly one filtered source call is made to spot-check — not zero, and not a full ten-body re-read",
-        "The recorded register is what the source showed, not what was handed over",
-        "The `put-voice` row is written with verified=true",
-        "The return states that the handed-over observation was wrong and names which traits",
+        "Exactly one filtered spot-check call is made — not zero, and not a full ten-body re-read",
+        "The saved [Process] Fact is what the source showed, not what was handed over",
+        "The return states the hand-over was wrong and names which traits (language, sign-off)",
         "No full crawl is launched — this is a trailing call and stays cheap"
       ]
     },
     {
       "id": 10,
-      "prompt": "UNCHECKABLE OBSERVATION. Same targeted hand-over as case 9, but for a (person, channel) pair with no reachable sent history at all (the channel is unreachable, or the person has never been written to).",
-      "expected_output": "The observation is still recorded — an unverified profile beats none — but with `verified: false` AND the uncertainty stated inside the register text itself ('as reported by act-or-decide, unchecked against the source'), so whoever reads it can tell which it is. The return says the spot-check could not be performed and why.",
+      "prompt": "UNCHECKABLE HAND-OVER (targeted). Same as case 9, but the (person, channel) pair has no reachable sent history to spot-check against (channel unreachable, or nobody has written to them).",
+      "expected_output": "The register is still saved as a [Process] Fact — an unchecked register beats none — but the Fact SENTENCE ITSELF says it is unchecked (e.g. 'as reported by act-or-decide, not yet checked against the source'), because that qualifier changes how the register gets used and there is no metadata to carry it. The return says the spot-check could not run and why. FAIL if it silently saves the register as if confirmed, and FAIL if it discards it entirely.",
       "files": [],
       "expectations": [
-        "The observation is recorded rather than discarded",
-        "`put-voice` is called with verified=false",
-        "The register text itself says it is unchecked, not just the boolean",
+        "The register is saved rather than discarded",
+        "The Fact sentence itself flags that it is unchecked — not left to a separate field",
         "The return explains why the spot-check could not run"
       ]
     },

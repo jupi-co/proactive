@@ -95,12 +95,6 @@ Verbs you use: `query-window [K]` · `insert-action '<json>'` · `set-action-sta
 the cap) · `list-dropped [days]` (what you've already ruled nothing-to-do — §Negative memory) ·
 `decision-url - "<title>" <id>` (the decision permalink — §Decision links).
 
-One read goes through a **second** helper — the voice record, which lives in Supermemory over its HTTP API
-rather than the connector (§Messaging says why):
-```
-node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>
-```
-
 ---
 
 ## The two state machines (know these cold)
@@ -185,13 +179,13 @@ run it after the dig and you've already paid for everything it was meant to save
    act silently → it's a `[BR]` **amendment** decision (apply-as-is / add-exception / supersede).
    *(A **do-nothing** rule is the one whose match produces no action — you already applied it at the top of
    this stage, before spending the research this step is part of.)*
-4. **Before any message draft**, get the voice — **from the record first, from the tools only if it isn't
-   there.** `memory.mjs get-voice <person> <channel>` (the keyed read, not `recall` — §Messaging says why). It returns the
-   register with `observed_at`, `age_days` and `verified`. Usable record → **use it and skip the history
-   pull.** No record, or one you shouldn't lean on → pull the **≥10 most recent messages you sent that
-   person in that same channel** (Gmail sent/thread for email, Linear comments for Linear…), and **note for
-   Stage 6**: the register you saw, the query you ran, the date range, and how many messages — `update-brain`
-   needs those to spot-check it.
+4. **Before any message draft**, get the voice — **from the brain first, from the tools only if it isn't
+   there.** `recall` the `[Process]` voice Fact for this (person, channel) pair (§Messaging). One that plainly
+   fits → **use it and skip the history pull.** Nothing, or a register that reads stale or contradicts the
+   thread you're replying into → pull the **≥10 most recent messages you sent that person in that same
+   channel** (Gmail sent/thread for email, Linear comments for Linear…), and **note for Stage 6**: the
+   register you saw, the query you ran, the date range, and how many messages — `update-brain` needs those to
+   spot-check it before it saves.
 
    This is the one search in the skill that is **pure repeated cost**: voice barely changes, the pull is ten
    messages every time, and until now every run threw the result away and paid again.
@@ -294,8 +288,8 @@ Everything Stage 3 noted for the next run gets written **here**, once the work i
 - **Voice profiles** — one `update-brain` targeted delegation per (person, channel) observed in Stage 3.4.
   Hand over the register you saw (greeting, sign-off, language, typical length) **and the evidence behind
   it**: the query you ran, the date range, the message count. It spot-checks that against the source with one
-  call before recording, so the evidence isn't a courtesy — without it the check can't happen and the record
-  lands `verified: false`. You never author Facts or voice records; `update-brain` writes both.
+  call before saving the `[Process]` Fact, so the evidence isn't a courtesy — without it the check can't
+  happen and it has to save the register unchecked. You never author Facts; `update-brain` writes them.
 
 **Why it is last.** These writes buy nothing for *this* run — they exist so the next one is cheaper. Run them
 mid-flight and a slow save or a sub-agent delegation delays the drafts and decisions the user is actually
@@ -553,26 +547,19 @@ they're written in (greeting, sign-off, tone, FR/EN, length) — never a generic
 shortest message that does the job.
 
 **Where the register comes from, in order (Stage 3.4):**
-1. **The voice record** — `node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>`.
-   **An exact keyed read, not a `recall`.** It's the same Supermemory store, reached over the HTTP API so the
-   qualifiers come back as written: `recall` is ranked and approximate (a re-saved correction was measured
-   ranking *below* the flattened original), and content-borne dates get stripped by the extraction layer
-   wherever in the sentence they sit. A register you can't date is one you can't tell is two years stale — and
-   you draft in the user's name from it.
-   - **`verified: false` means nobody checked it against the source** — it was reported by a run like yours
-     and taken on trust. Use it, but sanity-check it against the thread you're replying into before you
-     imitate anything distinctive (language, sign-off). An eval found exactly this kind of hand-over wrong on
-     both.
-   - **No `supermemoryApiKey` in config → this path is simply off**, and `get-voice` says so rather than
-     failing the run. Fall straight to (2) every time, and note once in the report that voice profiles aren't
-     enabled so the reader knows why the same history keeps being pulled. Degrading to "correct but more
-     expensive" is right here; a run that dies because an optional store isn't configured is not.
-   - **`age_days` beyond a few months** → a starting point, not gospel. Register shifts as a relationship
-     changes; a profile from before a deal closed can read wrong now.
-2. **The ≥10 recent messages you sent them in that channel** — pull them when (1) gives you nothing usable,
-   then hand the observation to `update-brain` in Stage 6 so the next run starts at (1). Hand over **the
-   evidence, not just the conclusion**: the query, the date range, the message count. It spot-checks with one
-   call before recording, which is what turns your observation into a `verified` record instead of a rumour.
+1. **The voice Fact in the brain** — `recall` the `[Process]` fact for this (person, channel) pair, the same
+   way you recall any Fact. It is a **hint, not a spec.** Use it, but before you imitate anything distinctive
+   (language, sign-off) **cross-check it against the thread you're replying into**, and if the register reads
+   stale or the thread plainly contradicts it, **trust the thread.** An eval found a handed-over observation
+   wrong on both language and sign-off, so this cross-check is the guard that matters — not the storage.
+   *(There is no separate dated "record" and no keyed lookup: voice is a Fact like the rest of the brain. The
+   date won't survive the store, and it doesn't need to — the thread cross-check, not a timestamp, is what
+   tells you the register is off.)*
+2. **The ≥10 recent messages you sent them in that channel** — pull them when (1) gives you nothing usable or
+   the recalled register lost the fight with the thread, then hand the observation to `update-brain` in Stage
+   6 so the next run starts at (1). Hand over **the evidence, not just the conclusion**: the query, the date
+   range, the message count. It spot-checks with one call before saving, which is what keeps a rumour from
+   becoming a Fact.
 
 **First contact — no history to mirror.** A new counterparty has no sent thread, and "never a generic
 template" still holds, so fall back in this order: (1) the register of **the thread you're replying into** —

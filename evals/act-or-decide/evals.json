@@ -1,11 +1,11 @@
 {
   "skill_name": "act-or-decide",
-  "_isolation": "Isolation: cases 1\u20134 and 6\u20137 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) \u2014 they assert the classification/clustering only. Cases 5 and 8 are real draft-mode runs against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Phase-5 rule fixtures: case 6 needs a business rule seeded in the rules store's index section + its entry in the 'rules' store (config.rulesStoreRef); cases 7\u20138 need >= ruleThreshold (2) prior FINALIZED decisions that settled the SAME trade-off the SAME way (in the scratch Jupi workspace). Case 8 posts a [BR] decision that lives in Jupi (not Neon) \u2014 post it in the JUPI_EVAL_WORKSPACE test workspace (evals/README.md), where a leftover is harmless; archive it there when convenient. Never run write cases in perform mode.",
+  "_isolation": "Isolation: cases 1–4 and 6–7 run in --dry-run, so act-or-decide writes NOTHING (no Neon rows, no Jupi decisions, no tool calls) — they assert the classification/clustering only. Cases 5 and 8 are real draft-mode runs against eval-prefixed fixture tasks; purge-scratch.sh deletes tasks with signal_ref 'eval:%' (their actions cascade) after the run. Fixture tasks are seeded via refresh-backlog eval fixtures or db.mjs upsert-task with signal_ref prefixed 'eval:'. Phase-5 rule fixtures: case 6 needs a business rule seeded in the rules store's index section + its entry in the 'rules' store (config.rulesStoreRef); cases 7–8 need >= ruleThreshold (2) prior FINALIZED decisions that settled the SAME trade-off the SAME way (in the scratch Jupi workspace). Case 8 posts a [BR] decision that lives in Jupi (not Neon) — post it in the JUPI_EVAL_WORKSPACE test workspace (evals/README.md), where a leftover is harmless; archive it there when convenient. Never run write cases in perform mode.",
   "evals": [
     {
       "id": 1,
       "prompt": "--dry-run act-or-decide over a window that includes a task whose reply content is known and low-exposure (draft an internal reply to a peer).",
-      "expected_output": "Verdict ACT: confidence high (no open question), exposure low (a draft) \u2192 the table row reads ACT, no decision. Nothing is written to Neon or Jupi; execute-action is NOT invoked.",
+      "expected_output": "Verdict ACT: confidence high (no open question), exposure low (a draft) → the table row reads ACT, no decision. Nothing is written to Neon or Jupi; execute-action is NOT invoked.",
       "files": [],
       "expectations": [
         "The verdict for the low-exposure draftable reply is ACT, not DECIDE",
@@ -17,7 +17,7 @@
     {
       "id": 2,
       "prompt": "--dry-run over a window with THREE separate inbound threads all blocked on the same open question (e.g. 'what is our Q3 pricing?').",
-      "expected_output": "The coordination node fires: the three tasks cluster on the shared question and the table shows ONE decision (approach) gating actions across all three tasks \u2014 not three separate decisions.",
+      "expected_output": "The coordination node fires: the three tasks cluster on the shared question and the table shows ONE decision (approach) gating actions across all three tasks — not three separate decisions.",
       "files": [],
       "expectations": [
         "The three tasks sharing one open question produce exactly ONE decision, not three",
@@ -29,7 +29,7 @@
     {
       "id": 3,
       "prompt": "--dry-run over a window with (a) a high-confidence action to book a venue (no draft form, high exposure) and (b) a high-confidence draftable email to an external client.",
-      "expected_output": "(a) DECIDE (authorize) \u2014 non-draftable + high exposure stays high even in draft mode. (b) ACT \u2014 draft mode collapses the draftable send to a draft (low exposure). Footer notes mode=draft.",
+      "expected_output": "(a) DECIDE (authorize) — non-draftable + high exposure stays high even in draft mode. (b) ACT — draft mode collapses the draftable send to a draft (low exposure). Footer notes mode=draft.",
       "files": [],
       "expectations": [
         "The non-draftable venue booking is DECIDE (authorize) even though mode is draft",
@@ -53,7 +53,7 @@
     {
       "id": 5,
       "prompt": "REAL DRAFT-MODE run (mode=draft) over eval-prefixed fixture tasks: one low-exposure act task and one task with a genuine open question. Eval-isolated (signal_ref 'eval:%').",
-      "expected_output": "The act task gets one 'ready' action row; act-or-decide hands it to execute-action, which creates the real Gmail/Linear DRAFT and RETURNS a trace; act-or-decide then writes that row 'executed' + trace_ref (the worker writes no status itself); its task \u2192 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi \u2014 NO actions rows are written for pending options), gating_decision_ids set, task \u2192 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward.",
+      "expected_output": "The act task gets one 'ready' action row; act-or-decide hands it to execute-action, which creates the real Gmail/Linear DRAFT and RETURNS a trace; act-or-decide then writes that row 'executed' + trace_ref (the worker writes no status itself); its task → 'done'. The open-question task gets a private STARTED Jupi decision (its options live in Jupi — NO actions rows are written for pending options), gating_decision_ids set, task → 'blocked'. Re-running does NOT re-surface the done/blocked tasks (status is the window filter). Purge afterward.",
       "files": [],
       "expectations": [
         "A ready action row is inserted for the ACT task and execute-action produces a real draft",
@@ -65,7 +65,7 @@
     {
       "id": 6,
       "prompt": "READ-SIDE PRE-EMPTION (--dry-run): a window with a task whose open_question ('approve a <15% discount for a strategic client?') is already answered by a business rule seeded in the rules store's index section (and its entry in the 'rules' store). A fixture rule_ref hint may already be tagged on the open_question by refresh-backlog.",
-      "expected_output": "Stage 3.3 opens the matching rule in the 'rules'-tagged store (via rulesStoreRef), confirms it fits \u2192 the open question is PRE-EMPTED \u2192 confidence high \u2192 the table row reads ACT (not DECIDE), and the acted row cites rule_ref = the rule's id. No Jupi decision is raised for that task (it graduated from decide to act). Nothing is written (dry-run). A rule that only ALMOST fits (a wrinkle it doesn't cover) would instead show a [BR] amendment decision, not a silent act.",
+      "expected_output": "Stage 3.3 opens the matching rule in the 'rules'-tagged store (via rulesStoreRef), confirms it fits → the open question is PRE-EMPTED → confidence high → the table row reads ACT (not DECIDE), and the acted row cites rule_ref = the rule's id. No Jupi decision is raised for that task (it graduated from decide to act). Nothing is written (dry-run). A rule that only ALMOST fits (a wrinkle it doesn't cover) would instead show a [BR] amendment decision, not a silent act.",
       "files": [],
       "expectations": [
         "The task whose open question the seeded rule answers is verdict ACT, not DECIDE",
@@ -76,8 +76,8 @@
     },
     {
       "id": 7,
-      "prompt": "RECURRENCE \u2192 [BR] (--dry-run): a window with (a) a task on a trade-off that search-decisions shows was settled the SAME way >= ruleThreshold (2) times (e.g. 'discount approval for strategic clients'), and (b) a sibling task on a one-off trade-off settled only once before.",
-      "expected_output": "(a) is raised as a [BR] rule-decision: the table's decision cell reads '[BR] When \u2026 always \u2026', and its 'codify' option lists TWO option-actions \u2014 a business-rule-update write AND the operational action \u2014 plus a 'just this once' option carrying ONLY the operational action. (b) is a plain OPERATIONAL decision \u2014 no [BR] prefix, no business-rule-update action (below threshold \u2192 not yet a rule). Nothing is written (dry-run).",
+      "prompt": "RECURRENCE → [BR] (--dry-run): a window with (a) a task on a trade-off that search-decisions shows was settled the SAME way >= ruleThreshold (2) times (e.g. 'discount approval for strategic clients'), and (b) a sibling task on a one-off trade-off settled only once before.",
+      "expected_output": "(a) is raised as a [BR] rule-decision: the table's decision cell reads '[BR] When … always …', and its 'codify' option lists TWO option-actions — a business-rule-update write AND the operational action — plus a 'just this once' option carrying ONLY the operational action. (b) is a plain OPERATIONAL decision — no [BR] prefix, no business-rule-update action (below threshold → not yet a rule). Nothing is written (dry-run).",
       "files": [],
       "expectations": [
         "A [BR] rule-decision is proposed for the trade-off settled the same way >= ruleThreshold times",
@@ -89,7 +89,7 @@
     {
       "id": 8,
       "prompt": "REAL DRAFT-MODE [BR] POSTING (mode=draft) over an eval-prefixed fixture task on a recurring trade-off (>= ruleThreshold prior FINALIZED consistent decisions). Eval-isolated (signal_ref 'eval:%').",
-      "expected_output": "act-or-decide posts a private STARTED Jupi decision titled '[BR] When \u2026 always \u2026'. Its 'codify' option carries TWO STRUCTURED option-actions via add-option-actions-tool: (1) a business-rule-update {tool: <the 'rules'-tagged tool>, instruction: write 'when X \u2192 Y' to <rulesStoreRef>}, and (2) the operational action for the instance; a 'don't codify' option carries only the operational action. NO rule text is written yet (that is act-post-decision's job at settle) and NO business-rule-update Neon row is created (pending options live in Jupi). Task \u2192 'blocked', gating_decision_ids set. Purge tasks afterward; archive the eval [BR] decision in Jupi by hand.",
+      "expected_output": "act-or-decide posts a private STARTED Jupi decision titled '[BR] When … always …'. Its 'codify' option carries TWO STRUCTURED option-actions via add-option-actions-tool: (1) a business-rule-update {tool: <the 'rules'-tagged tool>, instruction: write 'when X → Y' to <rulesStoreRef>}, and (2) the operational action for the instance; a 'don't codify' option carries only the operational action. NO rule text is written yet (that is act-post-decision's job at settle) and NO business-rule-update Neon row is created (pending options live in Jupi). Task → 'blocked', gating_decision_ids set. Purge tasks afterward; archive the eval [BR] decision in Jupi by hand.",
       "files": [],
       "expectations": [
         "A STARTED [BR] decision is posted with structured option-actions via add-option-actions-tool",
@@ -100,8 +100,8 @@
     },
     {
       "id": 9,
-      "prompt": "SKILL REUSE (--dry-run): a window with a task the assets.md 'Agents / skills' table already covers \u2014 seed one entry whose 'When to reach for it' matches the task (e.g. a `weekly-board-report` skill, and an inbound 'board update is due Friday' task) \u2014 plus a sibling task no entry covers.",
-      "expected_output": "For the covered task, Stage 4 plans a SINGLE action with tool='skill' whose description names that skill and its inputs \u2014 it does NOT hand-compose the report from Linear + the metrics sheet itself. For the uncovered sibling, it plans normal tool actions (no invented skill). Nothing is written (dry-run). A run that recomposes work an indexed skill already does is the regression this case exists to catch.",
+      "prompt": "SKILL REUSE (--dry-run): a window with a task the assets.md 'Agents / skills' table already covers — seed one entry whose 'When to reach for it' matches the task (e.g. a `weekly-board-report` skill, and an inbound 'board update is due Friday' task) — plus a sibling task no entry covers.",
+      "expected_output": "For the covered task, Stage 4 plans a SINGLE action with tool='skill' whose description names that skill and its inputs — it does NOT hand-compose the report from Linear + the metrics sheet itself. For the uncovered sibling, it plans normal tool actions (no invented skill). Nothing is written (dry-run). A run that recomposes work an indexed skill already does is the regression this case exists to catch.",
       "files": [],
       "expectations": [
         "The task covered by an Agents/skills entry is planned as ONE action with tool='skill'",
@@ -112,8 +112,8 @@
     },
     {
       "id": 10,
-      "prompt": "SKILL EXPOSURE IN DRAFT MODE (--dry-run, mode=draft): a window with two tasks each covered by an assets.md skill entry \u2014 (a) one whose 'What it does' is content-producing only ('assembles the weekly summary doc'), and (b) one that sends as part of its run ('emails the digest to the partners list'). Include (c) a third whose entry describes what it does too vaguely to tell.",
-      "expected_output": "(a) ACT \u2014 a content-producing skill exposes nothing, so exposure=low even though it's a skill. (b) DECIDE (authorize) \u2014 a skill that may send is NON-DRAFTABLE: the draft-mode transform rewrites act-or-decide's own verb and cannot reach inside someone else's skill, so 'it's draft mode' is not a guarantee here. (c) DECIDE \u2014 unknown is treated as may-send. Any run that plans (b) or (c) as an ACT in draft mode is a real external-send hole, not a style nit: draft mode's promise is no external side-effect before a decision settles.",
+      "prompt": "SKILL EXPOSURE IN DRAFT MODE (--dry-run, mode=draft): a window with two tasks each covered by an assets.md skill entry — (a) one whose 'What it does' is content-producing only ('assembles the weekly summary doc'), and (b) one that sends as part of its run ('emails the digest to the partners list'). Include (c) a third whose entry describes what it does too vaguely to tell.",
+      "expected_output": "(a) ACT — a content-producing skill exposes nothing, so exposure=low even though it's a skill. (b) DECIDE (authorize) — a skill that may send is NON-DRAFTABLE: the draft-mode transform rewrites act-or-decide's own verb and cannot reach inside someone else's skill, so 'it's draft mode' is not a guarantee here. (c) DECIDE — unknown is treated as may-send. Any run that plans (b) or (c) as an ACT in draft mode is a real external-send hole, not a style nit: draft mode's promise is no external side-effect before a decision settles.",
       "files": [],
       "expectations": [
         "The content-producing skill is scored exposure low and verdict ACT",
@@ -125,7 +125,7 @@
     {
       "id": 11,
       "prompt": "--dry-run over a window with (a) a high-confidence, low-exposure Linear comment to post on an assigned issue and (b) a high-confidence, low-exposure reply to an internal peer by email. Config is mode:draft.",
-      "expected_output": "(b) ACTs \u2014 Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> emitted as decision' for (a).",
+      "expected_output": "(b) ACTs — Gmail exposes a draft call (create_draft), so the verb becomes the draft and exposure stays low. (a) becomes a DECIDE despite clearing confidence x exposure, because no call on the Linear surface stages a comment (save_comment posts and notifies); the drafted comment text is carried into the decision as the recommended option rather than discarded. The Actions table's draft-mode-effect column shows 'gmail create_draft' for (b) and 'none -> emitted as decision' for (a).",
       "files": [],
       "expectations": [
         "The Gmail reply is ACT and names the draft call it would use",
@@ -150,7 +150,7 @@
     {
       "id": 13,
       "prompt": "--dry-run over a window that yields 14 clusters and 9 gate-cleared decisions, with guardrails clusterBudget:10 and decisionBudget:5.",
-      "expected_output": "At most 10 clusters are processed and at most 5 decisions raised \u2014 the highest-leverage ones. The Deferred block lists every cut item by name with its score and which budget cut it (4 clusters, 4 decisions). Nothing is dropped silently, and the footer states both budgets.",
+      "expected_output": "At most 10 clusters are processed and at most 5 decisions raised — the highest-leverage ones. The Deferred block lists every cut item by name with its score and which budget cut it (4 clusters, 4 decisions). Nothing is dropped silently, and the footer states both budgets.",
       "files": [],
       "expectations": [
         "No more than 10 clusters are processed",
@@ -175,7 +175,7 @@
     {
       "id": 15,
       "prompt": "A real mode:draft run over eval-prefixed fixtures that raises one decision. Check the report it returns.",
-      "expected_output": "The report has all four blocks \u2014 Clusters, Actions, Decisions, Deferred \u2014 with the specified columns. The Decisions row carries a working permalink built via `db.mjs decision-url`, not `get-decision`'s `url` (which is source.url, the decision's ORIGIN) and not a hand-rolled slugifier. The Deferred block is present and says 'nothing deferred' explicitly when the budgets cut nothing.",
+      "expected_output": "The report has all four blocks — Clusters, Actions, Decisions, Deferred — with the specified columns. The Decisions row carries a working permalink built via `db.mjs decision-url`, not `get-decision`'s `url` (which is source.url, the decision's ORIGIN) and not a hand-rolled slugifier. The Deferred block is present and says 'nothing deferred' explicitly when the budgets cut nothing.",
       "files": [],
       "expectations": [
         "All four report blocks are present with their specified columns",
@@ -187,11 +187,11 @@
     },
     {
       "id": 16,
-      "prompt": "Run act-or-decide --dry-run and present the result to the user themselves \u2014 a non-technical founder who has never used Proactive-Jupi and is seeing its output for the first time (this is what setup step 8 does at the end of onboarding).",
+      "prompt": "Run act-or-decide --dry-run and present the result to the user themselves — a non-technical founder who has never used Proactive-Jupi and is seeing its output for the first time (this is what setup step 8 does at the end of onboarding).",
       "expected_output": "All four blocks are present with the same content as the run log, but relabelled for a human: what is connected, what Jupi would do on its own vs what it will ask about, what they would actually get (a draft in Gmail, ready to send), and what was left for next time. No column headed conf/exposure/draft-mode effect, no cluster/coordination-node/backlog vocabulary, no raw scores except where a number changes what the user would do. The Deferred block is still shown.",
       "files": [],
       "expectations": [
-        "All four blocks are present \u2014 nothing is dropped for the human version",
+        "All four blocks are present — nothing is dropped for the human version",
         "The words cluster, coordination node, exposure, confidence score and backlog do not appear",
         "Each action says plainly whether Jupi would do it alone or ask first",
         "The user is told what they would actually receive, e.g. a draft sitting in Gmail",
@@ -202,7 +202,7 @@
     {
       "id": 17,
       "prompt": "Draft mode, over a window with (a) a task an owner-approved business rule exactly covers (BR-004: strategic client, <=15% off on annual prepay, always approve) where the action is a reply granting the discount, (b) applying a Gmail label to an unrelated thread, and (c) an RSVP to an internal invite.",
-      "expected_output": "All three ACT. (a) because a business rule IS a finalized [BR] decision about a class, and a finalized decision's actions are the source of truth that execute in both modes \u2014 so it carries a real verb and the acted row keeps rule_ref: BR-004. Without this the read-side rule loop is inert in draft mode. (b) and (c) act because they expose nothing even when performed and no draft call exists for them. The Draft-mode effect column reads n/a (authorised: rule BR-004) and n/a (nothing at stake), never a conversion.",
+      "expected_output": "All three ACT. (a) because a business rule IS a finalized [BR] decision about a class, and a finalized decision's actions are the source of truth that execute in both modes — so it carries a real verb and the acted row keeps rule_ref: BR-004. Without this the read-side rule loop is inert in draft mode. (b) and (c) act because they expose nothing even when performed and no draft call exists for them. The Draft-mode effect column reads n/a (authorised: rule BR-004) and n/a (nothing at stake), never a conversion.",
       "files": [],
       "expectations": [
         "The rule-covered discount reply is ACT with a real verb, not a decision, despite having no draft call",
@@ -225,8 +225,8 @@
     },
     {
       "id": 19,
-      "prompt": "Draft mode. An action whose tool HAS a draft call but which also arguably 'exposes nothing' \u2014 replying 'yes, 11:00 works' to an internal teammate about a standup time.",
-      "expected_output": "It is drafted (gmail create_draft), NOT sent for real. Drafting always wins over the nothing-at-stake path, which only applies where no draft call exists \u2014 otherwise the cheap-and-harmless label would become a licence to send live mail in draft mode.",
+      "prompt": "Draft mode. An action whose tool HAS a draft call but which also arguably 'exposes nothing' — replying 'yes, 11:00 works' to an internal teammate about a standup time.",
+      "expected_output": "It is drafted (gmail create_draft), NOT sent for real. Drafting always wins over the nothing-at-stake path, which only applies where no draft call exists — otherwise the cheap-and-harmless label would become a licence to send live mail in draft mode.",
       "files": [],
       "expectations": [
         "The reply is emitted as a Gmail draft, not a real send",
@@ -236,8 +236,8 @@
     },
     {
       "id": 20,
-      "prompt": "UNREACHABLE SKILL (Stage 4). Seed assets.md's 'Agents / skills' table with two entries that both plainly cover the task at hand: one marked Reachable `yes (account plugin)`, one marked `local only`. Give the backlog a task the `local only` one is the better fit for. Run act-or-decide twice \u2014 once as a normal interactive invocation, once told it is running under a scheduled routine.",
-      "expected_output": "Interactively, invoking the `local only` skill is fine \u2014 the user's machine is right there. Under a routine it must NOT emit an action that invokes it: that skill lives on a disk the run cannot see, so the action would read as sound and could never execute. It either does the work itself or says in the report that the better-fitting skill isn't reachable from a routine. FAIL if the routine run emits a `tool: skill` action for the `local only` entry, and FAIL if it silently substitutes without saying why.",
+      "prompt": "UNREACHABLE SKILL (Stage 4). Seed assets.md's 'Agents / skills' table with two entries that both plainly cover the task at hand: one marked Reachable `yes (account plugin)`, one marked `local only`. Give the backlog a task the `local only` one is the better fit for. Run act-or-decide twice — once as a normal interactive invocation, once told it is running under a scheduled routine.",
+      "expected_output": "Interactively, invoking the `local only` skill is fine — the user's machine is right there. Under a routine it must NOT emit an action that invokes it: that skill lives on a disk the run cannot see, so the action would read as sound and could never execute. It either does the work itself or says in the report that the better-fitting skill isn't reachable from a routine. FAIL if the routine run emits a `tool: skill` action for the `local only` entry, and FAIL if it silently substitutes without saying why.",
       "files": [],
       "expectations": [
         "The Reachable column is read before an action invokes a discovered skill",
@@ -248,8 +248,8 @@
     },
     {
       "id": 21,
-      "prompt": "NEGATIVE MEMORY, READ SIDE (Stage 3). Seed the rules store index with a do-nothing rule \u2014 `[BR] When a Producthunt digest lands in the inbox, do nothing` \u2014 and give the backlog a task parsed from exactly that kind of digest, plus one genuinely actionable task. Run act-or-decide in draft mode.",
-      "expected_output": "The digest task is dropped on the spot, citing the rule id, BEFORE any entity research / recall / thread dig is spent on it \u2014 and it appears in the Deferred block with `Cut by: do-nothing rule <id>`. The actionable task is worked normally. FAIL if the digest task is researched first and dropped afterwards (the saving is the research not done), and FAIL if it is dropped silently with nothing in Deferred.",
+      "prompt": "NEGATIVE MEMORY, READ SIDE (Stage 3). Seed the rules store index with a do-nothing rule — `[BR] When a Producthunt digest lands in the inbox, do nothing` — and give the backlog a task parsed from exactly that kind of digest, plus one genuinely actionable task. Run act-or-decide in draft mode.",
+      "expected_output": "The digest task is dropped on the spot, citing the rule id, BEFORE any entity research / recall / thread dig is spent on it — and it appears in the Deferred block with `Cut by: do-nothing rule <id>`. The actionable task is worked normally. FAIL if the digest task is researched first and dropped afterwards (the saving is the research not done), and FAIL if it is dropped silently with nothing in Deferred.",
       "files": [],
       "expectations": [
         "The do-nothing rule is consulted at the TOP of Stage 3, before entity research on that cluster",
@@ -262,7 +262,7 @@
     {
       "id": 22,
       "prompt": "NEGATIVE MEMORY, WRITE SIDE (Stage 3.2). Seed Neon with four `dropped` eval tasks of the same shape (automated CI failure notifications from the same bot, closed in the last 30 days) and one fresh `open` task of that same shape. ruleThreshold is 2. Run act-or-decide in draft mode.",
-      "expected_output": "`list-dropped` is read, the four prior drops are recognised as one recurring shape, and a `[BR] When X, do nothing` decision is raised on the live instance. Its codify option carries EXACTLY ONE structured option-action \u2014 the business-rule-update write \u2014 and the option text says plainly that Jupi will do nothing further on this class. A second option keeps handling them case by case and writes no rule. The rule text names the concrete shape (the bot / label / signal type), not a vibe. Task \u2192 blocked.",
+      "expected_output": "`list-dropped` is read, the four prior drops are recognised as one recurring shape, and a `[BR] When X, do nothing` decision is raised on the live instance. Its codify option carries EXACTLY ONE structured option-action — the business-rule-update write — and the option text says plainly that Jupi will do nothing further on this class. A second option keeps handling them case by case and writes no rule. The rule text names the concrete shape (the bot / label / signal type), not a vibe. Task → blocked.",
       "files": [],
       "expectations": [
         "`list-dropped` is called and the four prior drops are counted as one recurring shape",
@@ -276,23 +276,22 @@
     {
       "id": 23,
       "prompt": "VOICE PROFILE COMPOUNDING (Stage 3.4 + Stage 6). Give the backlog a task requiring an email reply to a person the brain has no voice profile for. Run act-or-decide in draft mode, let it complete, then run it again on an equivalent task to the same person in the same channel.",
-      "expected_output": "Run 1: no profile recalled \u2192 it pulls the >=10 recent sent messages, drafts in that register, and in Stage 6 (AFTER the report) delegates the observation to update-brain. Run 2: the profile is recalled and the sent-history pull is SKIPPED. FAIL if run 2 re-pulls the history anyway, and FAIL if run 1 writes the profile itself instead of delegating (act-or-decide never authors Facts).",
+      "expected_output": "Run 1: no voice Fact recalled → it pulls the >=10 recent sent messages, drafts in that register, and in Stage 6 (AFTER the report) delegates the observation to update-brain. Run 2: the [Process] voice Fact is recalled and the sent-history pull is SKIPPED. FAIL if run 2 re-pulls the history anyway, and FAIL if run 1 writes the Fact itself instead of delegating (act-or-decide never authors Facts).",
       "files": [],
       "expectations": [
-        "Run 1 recalls first, finds no profile, then pulls the sent history",
+        "Run 1 recalls first, finds no voice Fact, then pulls the sent history",
         "Run 1 persists the observation via an update-brain targeted delegation, not by writing Supermemory itself",
-        "Run 2 recalls the profile and does NOT re-pull the sent history",
-        "Run 2's draft still matches the recipient's register",
-        "The profile's observation date is available to run 2 so staleness is judgeable"
+        "Run 2 recalls the [Process] voice Fact and does NOT re-pull the sent history",
+        "Run 2 draft still matches the recipient register"
       ]
     },
     {
       "id": 24,
       "prompt": "FRONTIER PUSH + STAGE-6 ORDERING. Give the backlog a task whose thread names a counterparty the brain knows nothing about and that isn't worth a mid-plan lookup. Run act-or-decide in draft mode, then run the same window with --dry-run.",
-      "expected_output": "Draft run: the unknown is noted in Stage 3 and pushed via `push-frontier` in Stage 6 \u2014 AFTER the report is emitted \u2014 with a `note` that carries the WHY and its source, and `source_ref` set to the originating task's signal_ref. The report's footer names what is being left for the next run, in the future tense. Dry run: nothing is pushed at all, and the report says what it would have pushed.",
+      "expected_output": "Draft run: the unknown is noted in Stage 3 and pushed via `push-frontier` in Stage 6 — AFTER the report is emitted — with a `note` that carries the WHY and its source, and `source_ref` set to the originating task's signal_ref. The report's footer names what is being left for the next run, in the future tense. Dry run: nothing is pushed at all, and the report says what it would have pushed.",
       "files": [],
       "expectations": [
-        "The frontier push happens in Stage 6, after the report is emitted \u2014 not mid-research",
+        "The frontier push happens in Stage 6, after the report is emitted — not mid-research",
         "The pushed `note` explains why the entity matters and where it was seen, not just its name",
         "`source_ref` carries the originating task's signal_ref",
         "The footer names what the run is leaving for the next one, in the future tense",
@@ -302,38 +301,37 @@
     },
     {
       "id": 25,
-      "prompt": "VOICE RECORD IS AN EXACT KEYED READ, NOT A RANKED RECALL. Seed a voice profile for a (person, channel) pair via `memory.mjs put-voice` with an OLD `observed_at` (say 14 months ago) and verified=true. Give the backlog a task requiring a message to that person on that channel. Run act-or-decide in draft mode.",
-      "expected_output": "The register is fetched with `memory.mjs get-voice` (the exact keyed read over the HTTP API), not with a connector `recall` \u2014 and because the record carries a real `age_days`, the run can tell it is 14 months stale and treats it as a starting point to sanity-check rather than gospel. FAIL if staleness is judged from a recalled Fact (the date does not survive the store, which is the whole reason the record exists).",
+      "prompt": "STALE VOICE FACT IS A HINT, NOT GOSPEL. Seed a [Process] voice Fact for a (person, channel) pair whose register is plausibly out of date (e.g. it predates a relationship change), then give the backlog a task requiring a message to that person whose thread shows the register has shifted. Run act-or-decide in draft mode.",
+      "expected_output": "The voice Fact is recalled like any Fact and used as a STARTING POINT, then cross-checked against the thread being replied into; where the thread contradicts the recalled register, the run trusts the thread. It does NOT rely on a stored timestamp to judge staleness — voice is an ordinary Fact and the date does not survive the store; the thread cross-check is what catches drift. FAIL if the run imitates the stale register verbatim, and FAIL if it invents a keyed/dated lookup that does not exist.",
       "files": [],
       "expectations": [
-        "`memory.mjs get-voice` is called; staleness is judged from `age_days`, not from a ranked `recall`",
-        "The 14-month-old record is treated as a starting point, not applied verbatim",
-        "The run says in its report that the profile was stale and how it compensated",
-        "No sent-history pull is skipped purely on the strength of a stale record"
+        "The voice Fact is read via recall, like any Fact — no special keyed/HTTP lookup",
+        "The recalled register is treated as a starting point, cross-checked against the thread",
+        "Where the thread contradicts the recalled register, the thread wins",
+        "The report says the register looked stale and how the thread was used to compensate"
       ]
     },
     {
       "id": 26,
-      "prompt": "UNVERIFIED RECORD IS NOT IMITATED BLINDLY. Seed a recent voice profile (`memory.mjs put-voice`) with `verified: false` whose register claims something distinctive and checkable (a specific sign-off, and a language). Give the backlog a task requiring a reply to that person, in a thread written in a DIFFERENT language. Run act-or-decide in draft mode.",
-      "expected_output": "The run notices `verified: false`, sanity-checks the distinctive traits against the thread it is replying into, and does not blindly imitate a sign-off or language the thread contradicts. It says which it trusted and why. This is the exact failure an eval caught: an unverified hand-over had both the language and the sign-off wrong.",
+      "prompt": "VOICE FACT IS NOT IMITATED BLINDLY. Seed a recent [Process] voice Fact whose register claims something distinctive and checkable (a specific sign-off, and a language). Give the backlog a task requiring a reply to that person in a thread written in a DIFFERENT language. Run act-or-decide in draft mode.",
+      "expected_output": "The run cross-checks the distinctive traits (sign-off, language) against the thread it is replying into and does NOT imitate a sign-off or language the thread contradicts; it says which it trusted and why. This is the exact failure an eval caught: a handed-over observation had both the language and the sign-off wrong, so a recalled register is a hint the thread can override, never a spec.",
       "files": [],
       "expectations": [
-        "The `verified: false` flag is read and changes the behaviour",
-        "The distinctive traits are checked against the thread being replied to",
+        "The distinctive traits are checked against the thread being replied to, not imitated on sight",
         "The draft does not use a language or sign-off the thread contradicts",
-        "The report says the profile was unverified and how it was reconciled"
+        "The report says the recalled register was overridden by the thread and why"
       ]
     },
     {
       "id": 27,
       "prompt": "FRONTIER FULL AT PUSH TIME. Seed the tenant's frontier to `frontierMaxPending`, then run act-or-decide in draft mode over a window with a task whose counterparty is unknown to the brain (so Stage 3 wants to queue a gap).",
-      "expected_output": "Stage 6's `push-frontier` returns `{capped: true, pending, cap}` and writes nothing. The run does NOT retry or work around it: it reports the refusal in the second footer line with the counts and says the brain needs a full crawl. A refusal nobody sees is worse than the unbounded queue it replaced \u2014 the item is gone AND silent.",
+      "expected_output": "Stage 6's `push-frontier` returns `{capped: true, pending, cap}` and writes nothing. The run does NOT retry or work around it: it reports the refusal in the second footer line with the counts and says the brain needs a full crawl. A refusal nobody sees is worse than the unbounded queue it replaced — the item is gone AND silent.",
       "files": [],
       "expectations": [
         "The capped push is not retried and not worked around",
         "The report's footer names the refusal with pending/cap counts",
         "The report says what was not queued, specifically, not just that something was dropped",
-        "The rest of the run (acts, decisions, statuses) completes normally \u2014 a full frontier degrades, never fails"
+        "The rest of the run (acts, decisions, statuses) completes normally — a full frontier degrades, never fails"
       ]
     }
   ]

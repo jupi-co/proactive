@@ -45,12 +45,16 @@ Two eval layers, both isolated so they never pollute real Facts.
     `"is_eval": true`) and `list-frontier N eval`; delete them afterwards with
     `evals/act-or-decide/purge-scratch.sh`, which clears `is_eval` frontier rows. Neon frontier rows are
     **not** covered by this directory's Supermemory purge.
-- **Cases 9–12 (the 2026-07-29 fixes) — each one exists because a run found the original wrong:**
-  - **9 · Spot-check a hand-over** — the first version said to record a handed-over voice observation
-    unchecked, to save the ten-message re-read. A run that re-read found the observation wrong on *language*
-    and *sign-off*. Grade the **tool calls**: exactly one cheap filtered check, not zero and not a re-read.
-  - **10 · Uncheckable hand-over** — records it anyway, `verified: false`, with the uncertainty **in the
-    register text**, since the boolean lives in Neon and the prose is what a semantic reader gets.
+- **Cases 7, 9–12 (the 2026-07-29 fixes) — each one exists because a run found the original wrong.** A voice
+  profile is an ordinary `[Process]` Fact saved via the connector — no keyed store, no HTTP path, no second
+  secret (that over-reach was reverted); the guard is a cheap spot-check, not special storage.
+  - **7 · Hand-over agrees** — one filtered spot-check confirms it → save the `[Process]` Fact, timeless.
+  - **9 · Spot-check catches a wrong hand-over** — the first version said to record a handed-over observation
+    unchecked, to save the ten-message re-read. A run that re-read found it wrong on *language* and
+    *sign-off*. Grade the **tool calls**: exactly one cheap filtered check, not zero and not a re-read; the
+    saved Fact is what the source showed.
+  - **10 · Uncheckable hand-over** — saves it anyway, but the **Fact sentence itself** says it is unchecked,
+    since there is no metadata field to carry that and the prose is what a semantic reader gets.
   - **11 · Backpressure at the cap** — the frontier is bounded; a refused push must be *reported*, because a
     silent refusal is strictly worse than the unbounded queue it replaced.
   - **12 · Budget scales with the queue** — a fixed one-third against a queue growing 6× is a rule that

@@ -35,38 +35,22 @@
 ## Upgrade trigger
 Noisy recall (duplicate/contradictory facts) or a need for structured filtering/enumeration → add the **HTTP API**: `POST /v3/documents` (raw content, `customId`, `metadata`) and `POST /v4/memories` (entity-centric, `isStatic`), authenticated with the Supermemory API key. Re-introduce the key in `config.local.json` only when this trigger fires.
 
-## The trigger fired — 2026-07-29, for voice profiles only
+**Nothing has tripped it yet, and voice profiles do NOT.** A voice profile felt at first like it needed the
+keyed read and the surviving date this trigger buys, so an earlier pass built an HTTP-path helper for it. That
+was over-reach: a voice profile is an ordinary `[Process]` Fact, its freshness is handled by `act-or-decide`
+cross-checking the register against the thread it is replying into (not by a stored timestamp), and the
+correction-doesn't-win concern below is general to the brain rather than specific to voice. So it stays on the
+connector like everything else. When the trigger *does* fire, it fires for the **whole brain**, never as a
+side path for one fact-type — that is the mistake to avoid, and it was nearly made here.
 
-`shared/memory.mjs` is the HTTP path. **One thing uses it: the voice profile** (`put-voice` / `get-voice` /
-`list-voice`), because it needs both halves of the trigger at once — an *exact keyed read* rather than a ranked
-one, and *fields that survive*. Everything else stays on the connector, which is simpler and is what semantic
-recall is for. The cost of this path is a second secret (`supermemoryApiKey`) for a scheduled routine to carry
-alongside the Neon string, so it should stay scoped to what genuinely needs it.
-
-Measured behaviours, so nobody has to rediscover them:
-
-| Behaviour | What we measured |
-|---|---|
-| `customId` | A true key. Three writes to `voice:nick:email` returned **one** document id. |
-| `metadata` | **Returned verbatim, not rewritten** — the only reason a dated profile can be trusted. Merges on update: a field you omit keeps its prior value. |
-| **null metadata value** | **400s the entire write.** Omit absent fields; never send `null`. |
-| `POST` with an existing `customId` | **APPENDS** to content (`"<old>\n\n---\n\n<new>"`). Five re-observations would leave five contradictory registers in one document — the same "correction doesn't win" failure, relocated. |
-| `PATCH /v3/documents/<customId>` | **Replaces content, merges metadata.** This is what re-observation means, so `put-voice` PATCHes to update and only POSTs to create. |
-| `PUT /v3/documents/<customId>` | 404 — doesn't exist. |
-| `DELETE /v3/documents/<customId>` | Works, but **409 while the document is still processing** — don't build a delete-then-write update on it. |
-| `GET /v3/documents/<customId>` | 200, with metadata. The keyed read. |
-| `filters` on `/v3/documents/list` | Works: `{"AND":[{"key":"kind","value":"voice","negate":false}]}` enumerates just the profiles. |
-
-**Extraction lag is real** (~20s+). A read straight after a write can return the *previous* content and
-metadata, which reads exactly like the write having failed. Poll until the new value appears rather than
-concluding it didn't land — this is the same trap as the missing save-confirmation, one layer down.
-
-### What this does NOT fix
-The connector's content-rewriting still applies to every ordinary Fact: hedges and attributions are stripped
-or occasionally **inverted** ("update-brain's inferred read is that…" → a flat assertion; an explicit inference
-rendered as "…**confirm** that…"). In-clause hedging is a mitigation, not a fix. If a Fact is only safe
-*because* it is hedged, either state the narrower claim unqualified or put the qualifier in `metadata` on this
-path — the voice profile is the worked example.
+### In-clause hedging is a mitigation, not a fix
+The connector's content-rewriting strips hedges and attributions from the top-ranked memory a caller reads,
+and occasionally **inverts** them ("update-brain's inferred read is that…" → a flat assertion; an explicit
+inference rendered as "…**confirm** that…", measured 2026-07-29). Writing the hedge in-clause helps but does
+not guarantee survival. So never let safety rest on a qualifier surviving: state the narrower claim you can
+defend unqualified. The one place a qualifier is still worth writing is where it changes how the Fact is
+*used* even if degraded — e.g. a voice register marked "not yet checked against the source" — but write it
+knowing it may not come back, not depending on it.
 
 ### Correction to the concurrency note above
 This file claims single-session parallel saves route correctly and misroutes need concurrent multi-session
