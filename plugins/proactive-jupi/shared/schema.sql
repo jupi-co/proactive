@@ -1,9 +1,10 @@
 -- Proactive-Jupi backlog store — Neon Postgres.
 -- The plugin's DB contract; applied by the setup skill (step 5). Idempotent.
 --
--- Four tables: TASKS (the backlog) · ACTIONS (units of execution) · CRAWL_STATE
--- (incremental cursors, shared with update-brain) · ROUTINE_RUNS (did the
--- scheduled routine run? — the one thing a routine writes about itself).
+-- Five tables: TASKS (the backlog) · ACTIONS (units of execution) · CRAWL_STATE
+-- (incremental cursors, shared with update-brain) · CRAWL_FRONTIER (the queue of
+-- things worth looking up, pushed by whoever trips over them) · ROUTINE_RUNS (did
+-- the scheduled routine run? — the one thing a routine writes about itself).
 -- There is no decision_registry: the canonical decision + its lifecycle
 -- (STARTED → FINALIZED → EXECUTED) live in Jupi. The "pile" is just the
 -- gated action rows — each carries the Jupi decision/option it depends on
@@ -118,6 +119,16 @@ create index if not exists actions_user_decision_idx on actions (user_id, decisi
 -- then `(user_id, source)`), neither with the consumer/is_eval split. Drop iff
 -- it's an OLD, EMPTY table (never drop data); the create below builds the new
 -- shape. A populated legacy table would need additive alters — not a live case.
+--
+-- The emptiness check is NESTED rather than a third `and` on the outer condition,
+-- and that is load-bearing on a FRESH database. PL/pgSQL prepares each statement
+-- as a whole when it first executes it, so `select 1 from crawl_state` sitting in
+-- the same IF expression gets parsed even when the earlier "does the table exist"
+-- conjunct is false — SQL's `and` gives no parse-time short-circuit. On a brand-new
+-- DB that raised `relation "crawl_state" does not exist` and the statement failed.
+-- It was survivable only because apply-schema.mjs continues past a failed statement,
+-- so every fresh install quietly reported `failed: 1`. Nesting defers the inner
+-- query to a branch that is only reached once the table is known to exist.
 do $$ begin
   if exists (select 1 from information_schema.tables
              where table_schema='public' and table_name='crawl_state')
@@ -125,8 +136,10 @@ do $$ begin
                       where table_name='crawl_state' and column_name='consumer')
           or not exists (select 1 from information_schema.columns
                          where table_name='crawl_state' and column_name='user_id'))
-     and not exists (select 1 from crawl_state) then
-    drop table crawl_state;
+  then
+    if not exists (select 1 from crawl_state) then
+      drop table crawl_state;
+    end if;
   end if;
 end $$;
 create table if not exists crawl_state (
@@ -139,6 +152,50 @@ create table if not exists crawl_state (
   updated_at   timestamptz not null default now(),
   primary key (user_id, consumer, source, is_eval)
 );
+
+-- ── CRAWL_FRONTIER ────────────────────────────────────────────────────
+-- The frontier: what is worth looking up next, pushed by whichever skill tripped
+-- over it. crawl_state is the *visited set* ("don't re-read this window"); on its
+-- own that makes update-brain a crawler that only ever walks forward in time. The
+-- frontier is the other half — the reason knowledge converges instead of merely
+-- accumulating: act-or-decide meets an entity it can't resolve mid-plan, pushes it
+-- here, and the next full brain crawl drains it as priority work.
+--
+-- It holds REQUESTS TO LOOK, never Facts. That keeps update-brain the single writer
+-- of the brain: a pusher says "someone should find out who Batch's procurement
+-- contact is", and update-brain is still the one that reads the tools and authors
+-- the Fact. A row is spent once drained — this is a queue, not a knowledge store.
+--   kind     : routing hint for the drainer — 'entity' (who/what is this?),
+--              'voice' (how does the user write to X in channel Y?), 'topic'
+--              (a subject area worth a sweep)
+--   entity   : the thing to look up, when there is a nameable one. Used for
+--              best-effort dedup so the same unknown pushed on five runs is one row.
+--   note     : "explore X because found Y (src)" — the *why*, which is what makes a
+--              drained item researchable months later by someone who wasn't there.
+--   pushed_by: which skill pushed it, so a noisy pusher is visible in the data.
+create table if not exists crawl_frontier (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     text not null,                       -- tenant key = Jupi user id
+  kind        text not null default 'entity'
+                check (kind in ('entity','voice','topic')),
+  entity      text,                                -- nameable target, if any (dedup key)
+  note        text not null,                       -- why it's worth looking at, with its source
+  source_ref  text,                                -- where it was seen (task id, gmail thread, issue)
+  pushed_by   text not null,                       -- 'act-or-decide' | 'update-brain' | 'refresh-backlog'
+  status      text not null default 'pending'
+                check (status in ('pending','done','dropped')),
+  is_eval     boolean not null default false,      -- eval pushes never enter the real frontier
+  created_at  timestamptz not null default now(),
+  drained_at  timestamptz
+);
+-- The only read shape: this tenant's pending items, oldest first (FIFO — an item
+-- pushed three runs ago has been waiting three runs).
+create index if not exists crawl_frontier_user_status_idx
+  on crawl_frontier (user_id, is_eval, status, created_at);
+-- Dedup is done in the INSERT (db.mjs `push-frontier` guards on a pending same-entity
+-- row) rather than by a unique index on purpose: a duplicate push is harmless noise,
+-- but a unique violation raised inside an unattended routine is a failed run. Cheap
+-- de-noising, no new failure mode.
 
 -- ── ROUTINE_RUNS ──────────────────────────────────────────────────────
 -- The ground truth for "did the routine run?". A scheduled routine leaves no

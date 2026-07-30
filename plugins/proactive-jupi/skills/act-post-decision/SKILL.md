@@ -169,6 +169,16 @@ FINALIZED — the task goes **`blocked → done` directly** (Stage 3). Approving
 unblocks the instance in one settle. A business-rule-update never originates here and never runs as an
 immediate act — it is always a settled `[BR]` option-action (it carries a Jupi `decisionId`/`actionId`).
 
+**The do-nothing rule is the one that settles with a *single* option-action.** A `[BR] When X, do nothing`
+decision codifies "stop surfacing this class"; the operational answer to the instance is, by construction,
+nothing — so its codify option carries only the business-rule-update write. **One action is the correct
+shape here, not a truncated decision:** run the rule write, index it as above, and complete the task
+`blocked → done`. Don't go looking for a missing operational action, and don't confuse this with the
+`savedOptions`-empty case in Stage 1 (that's a decision with *no* actions at all, which you skip) — here
+there is exactly one and it ran. From the next run, `act-or-decide` reads that rule at the top of its
+research stage and drops the class before spending anything on it, which is the entire point of having
+approved it.
+
 ## Robustness
 - If a source/tool is unreachable, `execute-action` returns `ok:false`; you leave that option-action `to-do`
   and the task `blocked` — never mark done what didn't run, never lose it. Next poll retries.

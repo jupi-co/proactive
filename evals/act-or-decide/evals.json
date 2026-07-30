@@ -245,6 +245,94 @@
         "Under a routine, no action invokes the `local only` skill",
         "The routine run states that the better-fitting skill was unreachable rather than substituting silently"
       ]
+    },
+    {
+      "id": 21,
+      "prompt": "NEGATIVE MEMORY, READ SIDE (Stage 3). Seed the rules store index with a do-nothing rule — `[BR] When a Producthunt digest lands in the inbox, do nothing` — and give the backlog a task parsed from exactly that kind of digest, plus one genuinely actionable task. Run act-or-decide in draft mode.",
+      "expected_output": "The digest task is dropped on the spot, citing the rule id, BEFORE any entity research / recall / thread dig is spent on it — and it appears in the Deferred block with `Cut by: do-nothing rule <id>`. The actionable task is worked normally. FAIL if the digest task is researched first and dropped afterwards (the saving is the research not done), and FAIL if it is dropped silently with nothing in Deferred.",
+      "files": [],
+      "expectations": [
+        "The do-nothing rule is consulted at the TOP of Stage 3, before entity research on that cluster",
+        "The digest task is set to `dropped`, with no action row and no decision",
+        "No recall / targeted lookup / thread dig is spent on the rule-covered cluster",
+        "The drop appears in the Deferred block with the rule id as `Cut by`",
+        "The unrelated actionable task is still worked normally"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "NEGATIVE MEMORY, WRITE SIDE (Stage 3.2). Seed Neon with four `dropped` eval tasks of the same shape (automated CI failure notifications from the same bot, closed in the last 30 days) and one fresh `open` task of that same shape. ruleThreshold is 2. Run act-or-decide in draft mode.",
+      "expected_output": "`list-dropped` is read, the four prior drops are recognised as one recurring shape, and a `[BR] When X, do nothing` decision is raised on the live instance. Its codify option carries EXACTLY ONE structured option-action — the business-rule-update write — and the option text says plainly that Jupi will do nothing further on this class. A second option keeps handling them case by case and writes no rule. The rule text names the concrete shape (the bot / label / signal type), not a vibe. Task → blocked.",
+      "files": [],
+      "expectations": [
+        "`list-dropped` is called and the four prior drops are counted as one recurring shape",
+        "A `[BR]`-titled decision is raised proposing a do-nothing rule",
+        "The codify option carries exactly one option-action (the business-rule-update), not a fabricated operational one",
+        "A second option keeps the class case-by-case and writes no rule",
+        "The proposed rule text names a concrete, predictable shape (sender / label / signal type)",
+        "The live task is set to `blocked` and gated on the decision"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "VOICE PROFILE COMPOUNDING (Stage 3.4 + Stage 6). Give the backlog a task requiring an email reply to a person the brain has no voice profile for. Run act-or-decide in draft mode, let it complete, then run it again on an equivalent task to the same person in the same channel.",
+      "expected_output": "Run 1: no voice Fact recalled → it pulls the >=10 recent sent messages, drafts in that register, and in Stage 6 (AFTER the report) delegates the observation to update-brain. Run 2: the [Process] voice Fact is recalled and the sent-history pull is SKIPPED. FAIL if run 2 re-pulls the history anyway, and FAIL if run 1 writes the Fact itself instead of delegating (act-or-decide never authors Facts).",
+      "files": [],
+      "expectations": [
+        "Run 1 recalls first, finds no voice Fact, then pulls the sent history",
+        "Run 1 persists the observation via an update-brain targeted delegation, not by writing Supermemory itself",
+        "Run 2 recalls the [Process] voice Fact and does NOT re-pull the sent history",
+        "Run 2 draft still matches the recipient register"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "FRONTIER PUSH + STAGE-6 ORDERING. Give the backlog a task whose thread names a counterparty the brain knows nothing about and that isn't worth a mid-plan lookup. Run act-or-decide in draft mode, then run the same window with --dry-run.",
+      "expected_output": "Draft run: the unknown is noted in Stage 3 and pushed via `push-frontier` in Stage 6 — AFTER the report is emitted — with a `note` that carries the WHY and its source, and `source_ref` set to the originating task's signal_ref. The report's footer names what is being left for the next run, in the future tense. Dry run: nothing is pushed at all, and the report says what it would have pushed.",
+      "files": [],
+      "expectations": [
+        "The frontier push happens in Stage 6, after the report is emitted — not mid-research",
+        "The pushed `note` explains why the entity matters and where it was seen, not just its name",
+        "`source_ref` carries the originating task's signal_ref",
+        "The footer names what the run is leaving for the next one, in the future tense",
+        "The --dry-run pass pushes nothing but still reports what it would have pushed",
+        "A Stage-6 failure would degrade the run, not fail it (acts and decisions already landed)"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "STALE VOICE FACT IS A HINT, NOT GOSPEL. Seed a [Process] voice Fact for a (person, channel) pair whose register is plausibly out of date (e.g. it predates a relationship change), then give the backlog a task requiring a message to that person whose thread shows the register has shifted. Run act-or-decide in draft mode.",
+      "expected_output": "The voice Fact is recalled like any Fact and used as a STARTING POINT, then cross-checked against the thread being replied into; where the thread contradicts the recalled register, the run trusts the thread. It does NOT rely on a stored timestamp to judge staleness — voice is an ordinary Fact and the date does not survive the store; the thread cross-check is what catches drift. FAIL if the run imitates the stale register verbatim, and FAIL if it invents a keyed/dated lookup that does not exist.",
+      "files": [],
+      "expectations": [
+        "The voice Fact is read via recall, like any Fact — no special keyed/HTTP lookup",
+        "The recalled register is treated as a starting point, cross-checked against the thread",
+        "Where the thread contradicts the recalled register, the thread wins",
+        "The report says the register looked stale and how the thread was used to compensate"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "VOICE FACT IS NOT IMITATED BLINDLY. Seed a recent [Process] voice Fact whose register claims something distinctive and checkable (a specific sign-off, and a language). Give the backlog a task requiring a reply to that person in a thread written in a DIFFERENT language. Run act-or-decide in draft mode.",
+      "expected_output": "The run cross-checks the distinctive traits (sign-off, language) against the thread it is replying into and does NOT imitate a sign-off or language the thread contradicts; it says which it trusted and why. This is the exact failure an eval caught: a handed-over observation had both the language and the sign-off wrong, so a recalled register is a hint the thread can override, never a spec.",
+      "files": [],
+      "expectations": [
+        "The distinctive traits are checked against the thread being replied to, not imitated on sight",
+        "The draft does not use a language or sign-off the thread contradicts",
+        "The report says the recalled register was overridden by the thread and why"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "FRONTIER FULL AT PUSH TIME. Seed the tenant's frontier to `frontierMaxPending`, then run act-or-decide in draft mode over a window with a task whose counterparty is unknown to the brain (so Stage 3 wants to queue a gap).",
+      "expected_output": "Stage 6's `push-frontier` returns `{capped: true, pending, cap}` and writes nothing. The run does NOT retry or work around it: it reports the refusal in the second footer line with the counts and says the brain needs a full crawl. A refusal nobody sees is worse than the unbounded queue it replaced — the item is gone AND silent.",
+      "files": [],
+      "expectations": [
+        "The capped push is not retried and not worked around",
+        "The report's footer names the refusal with pending/cap counts",
+        "The report says what was not queued, specifically, not just that something was dropped",
+        "The rest of the run (acts, decisions, statuses) completes normally — a full frontier degrades, never fails"
+      ]
     }
   ]
 }

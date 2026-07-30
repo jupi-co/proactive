@@ -51,6 +51,7 @@ close the run record saying so and stop.
   "neonConnString": "<conn>",
   "rulesStoreRef": "<id/path that opens the rules store>",
   "crawlWindowDays": <n>, "backlogWindowSize": <n>, "ruleThreshold": <n>,
+  "frontierMaxPending": <n>,
   "scoring": <the scoring block, verbatim from config.local.json>,
   "guardrails": <the guardrails block, verbatim from config.local.json>
 }

@@ -31,6 +31,34 @@ Two eval layers, both isolated so they never pollute real Facts.
   - **5 · Provenance to the source task** — a Fact derived from a `parse_confidence: low` task names the
     originating task id and carries the hedge **inside the sentence**, so a corrected parse has a path to
     the derived Fact and the brain can't silently corroborate a misreading.
+- **Cases 6–8 (the crawler's second half):**
+  - **6 · Frontier drain** — seeded `crawl_frontier` items are drained **before** the window sweep, on an
+    announced frontier/window budget split, and every drained item is **closed** (`done` even when the lookup
+    found nothing). An item left `pending` is one the next run pays for again; the window running first means
+    a planner's evidenced gap lost to a guess about what matters.
+  - **7 · Voice observation** — an observation handed over by `act-or-decide` is written **without re-reading
+    the sent history**, with the date inside the sentence. Re-verifying it burns the exact cost the path
+    exists to remove; grade the tool calls, not just the Fact.
+  - **8 · Push on discovery** — unknowns met mid-sweep are **queued, not chased**, with notes that say where
+    and why. Chasing them blows the budget on whatever was noticed first.
+  - **Fixtures + teardown for 6 and 8:** seed/inspect with `db.mjs push-frontier '<json>'` (pass
+    `"is_eval": true`) and `list-frontier N eval`; delete them afterwards with
+    `evals/act-or-decide/purge-scratch.sh`, which clears `is_eval` frontier rows. Neon frontier rows are
+    **not** covered by this directory's Supermemory purge.
+- **Cases 7, 9–12 (the 2026-07-29 fixes) — each one exists because a run found the original wrong.** A voice
+  profile is an ordinary `[Process]` Fact saved via the connector — no keyed store, no HTTP path, no second
+  secret (that over-reach was reverted); the guard is a cheap spot-check, not special storage.
+  - **7 · Hand-over agrees** — one filtered spot-check confirms it → save the `[Process]` Fact, timeless.
+  - **9 · Spot-check catches a wrong hand-over** — the first version said to record a handed-over observation
+    unchecked, to save the ten-message re-read. A run that re-read found it wrong on *language* and
+    *sign-off*. Grade the **tool calls**: exactly one cheap filtered check, not zero and not a re-read; the
+    saved Fact is what the source showed.
+  - **10 · Uncheckable hand-over** — saves it anyway, but the **Fact sentence itself** says it is unchecked,
+    since there is no metadata field to carry that and the prose is what a semantic reader gets.
+  - **11 · Backpressure at the cap** — the frontier is bounded; a refused push must be *reported*, because a
+    silent refusal is strictly worse than the unbounded queue it replaced.
+  - **12 · Budget scales with the queue** — a fixed one-third against a queue growing 6× is a rule that
+    guarantees non-convergence. Measured: one 5-item sweep pushed 12.
 - **Blind version** (skill-creator): spawn with-skill vs baseline subagents per task, grade, then `generate_review.py` for the viewer. Point every write at `user_eval_scratch`.
 - **Always run `purge-scratch.sh` when done.**
 

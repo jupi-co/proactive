@@ -60,6 +60,93 @@
         "The shaky-parse hedge appears inside the sentence, surviving the store's rewrite",
         "The Fact is not written as a flat confident assertion"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "FRONTIER DRAIN (full mode). Seed crawl_frontier with three pending eval items pushed by act-or-decide — one `entity` (an unknown counterparty, with a note explaining why it blocked a reply), one `voice` pair, one `topic` — then run update-brain in full mode with is_eval isolation.",
+      "expected_output": "The announced budget is split between frontier and window, and the frontier is drained FIRST, oldest first, each item researched per its kind and then closed with `close-frontier <id> done|dropped`. Facts land under the eval container tag. The summary reports frontier closed vs still pending. FAIL if the window sweep runs first, and FAIL if any drained item is left `pending` (it would be re-drained and re-paid for next run).",
+      "files": [],
+      "expectations": [
+        "The budget announcement splits frontier vs window explicitly",
+        "The frontier is drained before the windowed sweep",
+        "Each item's `note` is read and shapes the lookup, rather than producing a generic profile",
+        "Every drained item is closed `done` or `dropped` — none left pending",
+        "A lookup that found nothing is still closed `done`, not re-queued",
+        "The summary reports items closed and how many remain pending"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "VOICE OBSERVATION, HAND-OVER AGREES (targeted). act-or-decide hands over an observation with its evidence: register plus the query and date range it read. A cheap spot-check against that query confirms it. Record it in the eval scratch container.",
+      "expected_output": "ONE filtered spot-check call against the handed-over query (not zero, not a ten-body re-read); it agrees, so the register is saved as a [Process] Fact via the connector save — '[Process] the user -> <person> on <channel> — <register>' — timeless (state the register, not how fresh it is). One line back to the caller. FAIL if it takes the observation on trust with no check, and FAIL if it invents a keyed/HTTP store instead of a plain connector save.",
+      "files": [],
+      "expectations": [
+        "Exactly one filtered spot-check call is made — not zero, and not a full ten-body re-read",
+        "The register is saved as a [Process] Fact via the connector save, keyed in the sentence to the (person, channel) pair",
+        "The Fact sentence is timeless — it states the register, not an observation date",
+        "The return is short — this is a trailing call with nobody waiting on it"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "PUSH ON DISCOVERY. Run update-brain in full mode (eval-isolated) over a window that mentions two organizations the brain has nothing on, neither of which the current budget can cover.",
+      "expected_output": "Both are pushed to the frontier with `pushed_by: update-brain` and notes explaining where they were seen and why they look worth knowing — rather than chased now (which would blow the budget on whatever was noticed first) or dropped. The summary reports what was pushed. FAIL if the run abandons its budget to chase them, and FAIL if they are mentioned in the summary but never queued.",
+      "files": [],
+      "expectations": [
+        "Both unknown orgs are pushed to crawl_frontier rather than chased in-run",
+        "Each push carries a note with the source and why it matters",
+        "`pushed_by` is set to update-brain",
+        "The announced budget is respected — no unbounded chase",
+        "The summary names what was pushed for the next run"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "SPOT-CHECK CATCHES A WRONG HAND-OVER (targeted). act-or-decide hands over an observation that is WRONG where the source contradicts it: claims English and signs off AC, but the sent mail is French with no sign-off. It also hands over the query it used.",
+      "expected_output": "The run does NOT take it on trust and does NOT re-read ten bodies: ONE cheap filtered call against the handed-over query, sees the register disagrees, saves the [Process] Fact for what it ACTUALLY observed (French, no sign-off) via the connector, and says in its return that the hand-over was wrong and on which points. FAIL if it saves the handed-over claim unchecked; FAIL if it launches a full crawl.",
+      "files": [],
+      "expectations": [
+        "Exactly one filtered spot-check call is made — not zero, and not a full ten-body re-read",
+        "The saved [Process] Fact is what the source showed, not what was handed over",
+        "The return states the hand-over was wrong and names which traits (language, sign-off)",
+        "No full crawl is launched — this is a trailing call and stays cheap"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "UNCHECKABLE HAND-OVER (targeted). Same as case 9, but the (person, channel) pair has no reachable sent history to spot-check against (channel unreachable, or nobody has written to them).",
+      "expected_output": "The register is still saved as a [Process] Fact — an unchecked register beats none — but the Fact SENTENCE ITSELF says it is unchecked (e.g. 'as reported by act-or-decide, not yet checked against the source'), because that qualifier changes how the register gets used and there is no metadata to carry it. The return says the spot-check could not run and why. FAIL if it silently saves the register as if confirmed, and FAIL if it discards it entirely.",
+      "files": [],
+      "expectations": [
+        "The register is saved rather than discarded",
+        "The Fact sentence itself flags that it is unchecked — not left to a separate field",
+        "The return explains why the spot-check could not run"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "FRONTIER BACKPRESSURE. Seed the tenant's frontier to its cap (`frontierMaxPending`), then run update-brain in full mode over a window that surfaces several unknowns.",
+      "expected_output": "`frontier-stats` is read at budget time and returns verdict `full — pushes are being refused`; the run gives the WHOLE budget to draining, pushes nothing new, and opens its summary with the fact that the frontier is full. Any push it does attempt comes back `{capped: true}` and is reported with the count, never dropped silently.",
+      "files": [],
+      "expectations": [
+        "`frontier-stats` is consulted before the budget is announced",
+        "The announced budget names the verdict it was sized from",
+        "At `full`, the whole budget goes to draining and no new pushes are attempted",
+        "Any capped push is reported with pending/cap counts rather than dropped silently",
+        "The summary opens with the frontier being full — it is the run's headline, not a footnote"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "BUDGET SCALES WITH THE QUEUE. Seed a frontier that is growing but not full (e.g. 20 pending, 12 pushed in the last week against 2 drained), then run update-brain in full mode.",
+      "expected_output": "`frontier-stats` returns verdict `growing` (growth_ratio ~6). The run gives the frontier HALF the budget or more — not the ~1/3 default — and says why. A fixed third against a growing queue is what guarantees it never converges; the report must make the sizing decision visible.",
+      "files": [],
+      "expectations": [
+        "`frontier-stats` verdict is `growing` and is named in the report",
+        "The frontier gets half the budget or more, not the default third",
+        "The reason for the larger frontier share is stated, not silently applied",
+        "The summary reports pushed vs closed vs pending so the trajectory is visible"
+      ]
     }
   ]
 }

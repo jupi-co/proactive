@@ -32,5 +32,10 @@ if (!uid) throw new Error('no tenant id: set \$JUPI_USER_ID or jupiUserId in con
 const sql = neon(conn);
 const t = await sql.query(\"delete from tasks where user_id = \$1 and signal_ref like 'eval:%' returning id\", [uid]);
 console.log('deleted eval tasks:', t.length, '(their actions cascaded)');
+// Frontier pushes have no FK to the task, so they don't cascade — delete them explicitly or an
+// eval leaves items that the next real update-brain run would drain and crawl for real.
+// Matched two ways: is_eval, and the eval-prefixed signal_ref act-or-decide carries into source_ref.
+const f = await sql.query(\"delete from crawl_frontier where user_id = \$1 and (is_eval = true or source_ref like 'eval:%') returning id\", [uid]);
+console.log('deleted eval frontier items:', f.length);
 "
 echo "done."

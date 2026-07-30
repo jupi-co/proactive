@@ -59,10 +59,44 @@ Two layers, matching `evals/refresh-backlog/`.
      failure mode is an action that reads as perfectly sound and can never execute, so a routine run must
      either do the work itself or say the better-fitting skill wasn't reachable.
 
+  21. **Negative memory, read side** — a seeded **do-nothing rule** drops its class at the *top* of Stage 3,
+      before any research is spent on it, and the drop shows in Deferred as `Cut by: do-nothing rule <id>`.
+      Dropping it *after* the dig is the failure: the saving is the research not done.
+  22. **Negative memory, write side** — ≥ `ruleThreshold` `dropped` tasks of one shape (read via
+      `list-dropped`, since drops never reach Jupi) → a `[BR] When X, do nothing` decision whose codify
+      option carries **exactly one** option-action, the rule write. The documented exception to *every option
+      carries an action*: the operational answer really is nothing.
+  23. **Voice profiles compound** — run 1 has no profile → pulls the ≥10 sent messages and delegates the
+      observation in Stage 6; run 2 recalls it and **skips the pull**. This is the single most repeated
+      expensive read in the skill, so a run 2 that re-pulls means nothing compounded.
+  24. **Frontier push + Stage-6 ordering** — an unresolvable unknown is noted in Stage 3 and pushed **after
+      the report**, with a note carrying the *why* and `source_ref` = the task's `signal_ref`; `--dry-run`
+      pushes nothing and says what it would have. The ordering is the point: bookkeeping that delays the
+      user's drafts is bookkeeping that gets cut.
+
+  25. **A stale voice Fact is a hint, not gospel** — the register is recalled like any Fact and cross-checked
+      against the thread being replied into; where the thread contradicts it, the thread wins. Staleness is
+      caught by that cross-check, not a stored timestamp — voice is an ordinary `[Process]` Fact, no keyed or
+      dated store. Fails if the run imitates the stale register verbatim or invents a lookup that doesn't exist.
+  26. **A voice Fact is not imitated blindly** — distinctive traits (language, sign-off) are checked against
+      the thread being replied to, and a recalled register the thread contradicts loses to the thread. A real
+      eval hand-over had both language and sign-off wrong, so the recalled register is a hint, never a spec.
+  27. **Frontier full at push time** — a capped push is reported in the footer with its counts, never retried
+      and never silently dropped; the rest of the run completes. A refusal nobody sees is worse than the
+      unbounded queue it replaced.
+
 **Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
 decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`
 is prefixed `eval:`; run `purge-scratch.sh` afterward to delete them (their `actions` cascade). **Never run a
-write case in `perform` mode.** Jupi decisions from a write run live in Jupi (not Neon) — keep write runs
+write case in `perform` mode.**
+
+**Cases 21–24 fixtures + teardown.** 21 needs a do-nothing rule seeded in the `rules` store (index entry +
+rule text). 22 needs ≥ `ruleThreshold` (2) `dropped` eval tasks of one shape with a recent `closed_at`, plus
+one live `open` task of that shape. 23 and 24 are **real draft-mode runs** — 23 writes a Supermemory Fact via
+`update-brain` (point it at the `user_eval_scratch` container, per `evals/update-brain/`), and 24 writes a
+`crawl_frontier` row. `purge-scratch.sh` now deletes eval frontier items too (matched on `is_eval` or an
+`eval:`-prefixed `source_ref`) — **they don't cascade from the task**, so skipping teardown leaves items a
+real `update-brain` run would later drain and crawl for real. Jupi decisions from a write run live in Jupi (not Neon) — keep write runs
 rare and archive stray eval decisions in Jupi by hand.
 
 Seed fixtures via `refresh-backlog` (eval mode) or `db.mjs upsert-task` with `signal_ref` prefixed `eval:`.

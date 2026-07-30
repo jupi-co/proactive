@@ -13,8 +13,11 @@
   "_neonProjectId": "Informational only — nothing in the pipeline reads it. Reflects which Neon project the connection string below belongs to, so a human reading this file can tell prod from scratch at a glance. Leave blank if unknown rather than guessing.",
   "neonProjectId": "<optional, informational — the Neon project id for reference; nothing in the pipeline reads it. Leave blank if unknown.>",
 
-  "_neonConnString": "The project-scoped Postgres connection string for the backlog database (tasks · actions · crawl_state). Reflects the PHYSICAL boundary: it reaches exactly one Neon project, which is why the pipeline uses it instead of the account-wide Neon MCP (whose OAuth spans every project on the account, production included). Secret — this is the one field that makes the file gitignored.",
+  "_neonConnString": "The project-scoped Postgres connection string for the backlog database (tasks · actions · crawl_state · crawl_frontier). Reflects the PHYSICAL boundary: it reaches exactly one Neon project, which is why the pipeline uses it instead of the account-wide Neon MCP (whose OAuth spans every project on the account, production included). Secret — this is the one field that makes the file gitignored.",
   "neonConnString": "postgres://<user>:<pass>@<host>/<db>?sslmode=require",
+
+  "_frontierMaxPending": "How many pending crawl_frontier items before push-frontier starts refusing. The frontier is the queue of things worth looking up that a run tripped over; a measured brain sweep pushed 12 items on a 5-item budget, so unbounded it grows about six times faster than it drains and buries the gaps that actually blocked work. At the cap a push returns {capped:true} and the pushing skill reports it — which is the signal that the brain is not being crawled often enough.",
+  "frontierMaxPending": 50,
 
   "_rulesStoreRef": "The id/path needed to OPEN the tool tagged `rules` in assets.md — a Notion page id, a Drive file id, a Confluence space key. Reflects the ADDRESS of the business-rule store, not its identity: which tool it is comes from the assets.md role. Normally the shared space where the team's SOPs already live; '.proactive-jupi/business-rules.md' is a last-resort fallback for someone with no external home, never the recommended answer. Without it, act-or-decide cannot read rules to pre-empt a question and will raise decisions the team's handbook already answers.",
   "rulesStoreRef": "<the id/path that opens the `rules`-tagged tool: a Notion page id, a Drive file id, a Confluence space key>",
