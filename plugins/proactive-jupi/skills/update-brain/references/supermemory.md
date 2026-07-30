@@ -28,34 +28,12 @@
 - Types: `Person · Org · Project · Process · Tool · Goal`.
 - Provenance always; `confirmed` vs `inferred`; never a deduction as certainty.
 
-## Verified connector findings (2026-07-21)
-- **`save` can misroute a container tag under concurrency — verify each confirmed tag.** Single-session parallel saves route correctly (6/6 in test); the misroute was observed only under **concurrent writes from two sessions sharing one Supermemory account** (tags cross-applied both ways) — root cause looks server-side. **Guard:** don't run concurrent Facts-writers, and verify each save's confirmed tag, re-saving on mismatch. *Multi-user future: prefer per-user API tokens over container-tag isolation alone.*
-- **`save` is async-rewritten/retitled** and extracted into *multiple* memories (tests: 4 saved docs → 11 memories; 5 → 19). The stored form differs from what you sent — which is also why `forget`-by-content fails (see the tool note).
+## Connector behaviour you must design around
+- **`save` is async-rewritten, retitled, and split into several memories** (4 docs → 11, 5 → 19). The stored form differs from what you sent, which is why `forget`-by-content fails and why the top-ranked memory a caller reads often isn't your sentence.
+- **The rewrite strips — and sometimes inverts — hedges and attributions.** *"update-brain's inferred read is that…"* comes back as a flat assertion; an explicit inference has been seen rendered as *"…confirm that…"*. In-clause hedging reduces this but does not prevent it, so **never let safety rest on a qualifier surviving**: state the narrower claim you can defend unqualified. Write a qualifier only where it changes how the Fact is *used* even when degraded — e.g. a voice register marked "not yet checked against the source" — and write it knowing it may not come back.
+- **`save` can land under the wrong container tag, and responses can cross-talk** — a save confirming into another tenant's tag; a `save` returning a `recall` payload, or vice versa. This is not confined to multi-session concurrency. **So verify by reading, not by trusting the confirmation:** after a batch, `recall` on your tag and check the Fact is present under it; re-save only if it is genuinely absent. Re-saving on a mismatched *confirmation* manufactures duplicates you cannot delete, because the confirmation is the unreliable part. Don't run a second Facts-writer concurrently, and prefer per-user API tokens over container-tag isolation alone once there is more than one user.
 
 ## Upgrade trigger
 Noisy recall (duplicate/contradictory facts) or a need for structured filtering/enumeration → add the **HTTP API**: `POST /v3/documents` (raw content, `customId`, `metadata`) and `POST /v4/memories` (entity-centric, `isStatic`), authenticated with the Supermemory API key. Re-introduce the key in `config.local.json` only when this trigger fires.
 
-**Nothing has tripped it yet, and voice profiles do NOT.** A voice profile felt at first like it needed the
-keyed read and the surviving date this trigger buys, so an earlier pass built an HTTP-path helper for it. That
-was over-reach: a voice profile is an ordinary `[Process]` Fact, its freshness is handled by `act-or-decide`
-cross-checking the register against the thread it is replying into (not by a stored timestamp), and the
-correction-doesn't-win concern below is general to the brain rather than specific to voice. So it stays on the
-connector like everything else. When the trigger *does* fire, it fires for the **whole brain**, never as a
-side path for one fact-type — that is the mistake to avoid, and it was nearly made here.
-
-### In-clause hedging is a mitigation, not a fix
-The connector's content-rewriting strips hedges and attributions from the top-ranked memory a caller reads,
-and occasionally **inverts** them ("update-brain's inferred read is that…" → a flat assertion; an explicit
-inference rendered as "…**confirm** that…", measured 2026-07-29). Writing the hedge in-clause helps but does
-not guarantee survival. So never let safety rest on a qualifier surviving: state the narrower claim you can
-defend unqualified. The one place a qualifier is still worth writing is where it changes how the Fact is
-*used* even if degraded — e.g. a voice register marked "not yet checked against the source" — but write it
-knowing it may not come back, not depending on it.
-
-### Correction to the concurrency note above
-This file claims single-session parallel saves route correctly and misroutes need concurrent multi-session
-writes. **Two eval runs contradicted that on 2026-07-29**: a save inside one session confirmed into a
-*different* tenant's tag, and there was response cross-talk (a `save` returning a `recall` payload, a `recall`
-returning a save confirmation). Consequence for the guard: *"check the confirmation names your tag, re-save on
-mismatch"* fires on a false signal and manufactures duplicates you cannot delete. **Make `recall`-to-verify the
-primary path and re-save only if the Fact is genuinely absent** — not the fallback for a missing confirmation.
+**When it fires, it fires for the whole brain — never as a side path for one fact-type.** In particular a voice profile does not trip it: it is an ordinary `[Process]` Fact, and its freshness is handled by `act-or-decide` cross-checking the register against the thread it is replying into, not by a stored date. Anything that tempts a keyed store or a surviving timestamp for a single kind of Fact is the same underlying gap (rewrite-loses-qualifiers, recall-is-ranked) that the HTTP-API upgrade addresses uniformly; solve it there, for all Facts, or not at all.
