@@ -75,50 +75,54 @@ parentheticals.
 ## Types (the ontology)
 **Person · Org · Project · Process · Tool · Goal** — tag inline as `[Person]`, etc. A **Process** *describes* how they work; if you spot an automatable recurrence, just note it as a fact — `act-or-decide` turns recurrences into Patterns, not you.
 
-### Voice profiles — the record goes in Neon, the prose goes in the brain
+### Voice profiles — the one case that uses the Supermemory HTTP API
 `act-or-decide` has to match the recipient's register before it drafts any message, and its only way to get
 that has been to pull the ten most recent messages the user sent that person in that channel — **every run,
 per recipient**. That is the most repeated expensive read in the whole system, and voice is about the most
-durable thing there is to know about a relationship. So it should be stored. The question is *where*.
+durable thing there is to know about a relationship. So it should be stored.
 
-**Write the observation record to Neon, always:**
+**It stays in Supermemory — but through the HTTP API, not the connector:**
 ```
-node "${CLAUDE_PLUGIN_ROOT}/shared/db.mjs" put-voice '{"person":"nick","channel":"email",
+node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" put-voice '{"person":"nick","channel":"email",
   "register":"no greeting, 1–4 lines, question in the first sentence, no emoji, French",
   "observed_at":"2026-07-24","sample_size":12,"verified":true,
   "source_note":"gmail in:sent to:n@jupi.co, 12 threads 2026-07-03..21"}'
+
+node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>   → the profile, or null
+node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" list-voice                     → every profile on file
 ```
-One row per **(person, channel)** pair — the same person is often formal on email and terse in Linear, and a
-merged profile is worse than none.
+One profile per **(person, channel)** pair, keyed `customId: voice:<person>:<channel>` — the same person is
+often formal on email and terse in Linear, and a merged profile is worse than none.
 
-**Why not the brain, when this is so obviously knowledge?** Because the part that makes it *safe* is the part
-Supermemory drops. Measured across four independent runs (2026-07-29): the extraction layer strips the
-observation date and the attribution from the top-ranked memories a caller actually reads — **whether they
-sit in a trailing `(src: …)` parenthetical or inside the clause itself**, which is what this skill used to
-prescribe as the fix. One run also saw a re-saved correction rank *below* the flattened original (0.81 vs
-0.80), so "save a corrected statement and let recency win" doesn't hold here either. A dateless voice profile
-is not a slightly-degraded voice profile: `act-or-decide` can't tell a fresh one from a two-year-stale one,
-and it writes in the user's name from it.
+**Why the API and not `memory`/`recall`.** This is the **upgrade trigger** `references/supermemory.md` has
+described from the start — *"noisy recall (duplicate/contradictory facts) or a need for structured
+filtering/enumeration → add the HTTP API"* — and a voice profile trips it on both counts:
+- **`recall` is ranked and approximate; this lookup is exact.** You want *the* register for this pair, current
+  value. Measured (2026-07-29): a re-saved correction ranked **below** the flattened original (0.81 vs 0.80),
+  so "save a new statement and let recency reconcile" does not reliably return the current one. `customId`
+  gives an exact keyed read with genuine last-write-wins.
+- **The date has to survive, and in `content` it does not.** The extraction layer strips dates and
+  attributions from the top-ranked memory a caller reads, wherever in the sentence they sit — including
+  in-clause, which this skill used to prescribe as the fix. **`metadata` is not rewritten:** it comes back
+  verbatim. A dateless voice profile is not a slightly-degraded one — nothing can tell a fresh register from a
+  two-year-stale one, and it drafts in the user's name from it.
 
-So the split is by **what breaks if it degrades**. Semantic recall over rephrased Facts is exactly what
-Supermemory is good at, and a fuzzy `[Person]` fact costs little when it comes back paraphrased. A dated
-observation record costs a lot, so it lives in a store that returns what was written. `put-voice` is the same
-category as `crawl_state` and `crawl_frontier` — metadata about *observing*, not knowledge about the world —
-which is why holding it in Neon doesn't split the brain or dent the single-writer rule. **You are still the
-only writer of both.**
+So the qualifiers (`observed_at`, `sample_size`, `verified`, `source_note`) live in **metadata**, and the
+register prose lives in **content** where semantic recall still finds it ("how do we talk to Nick?"). Same
+store, same container tag, same single-writer rule — you are still the only writer. Keep the content's claims
+**timeless**: state the register, not how fresh it is. Wanting to write "as of <date>" into the content is the
+signal it belongs in metadata.
 
-**Also save the register as a `[Process]` Fact**, for the semantic path (someone asking "how do we talk to
-Nick?" should find it):
-```
-[Process] <user> → <person> on <channel> — <register>.
-```
-Keep the Fact's claims **timeless**, since the date won't survive: state the register, not how fresh it is.
-The date lives in Neon, where `act-or-decide` reads it. If you find yourself wanting to write "as of
-<date>" into the Fact, that's the signal the claim belongs in the record, not the prose.
+`memory.mjs` handles three API behaviours you would otherwise have to rediscover: a null metadata value
+**400s the whole write** (so absent fields are omitted); `POST` with an existing `customId` **appends** to
+content (five re-observations would leave five contradictory registers in one document — the same failure
+relocated), so it `PATCH`es to update and only `POST`s to create; and `verified` is OR-ed with its prior value
+so a later unverified hand-over cannot erase the fact that someone once checked against the source.
 
-**Test it, don't assume.** After saving, `recall` one profile and read what comes back. The behaviour above
-is what we measured on this connector; if a future version preserves qualifiers, that changes the design and
-is worth reporting rather than quietly benefiting from.
+**This is the only thing on the HTTP path.** Ordinary Facts stay on the connector — simpler, and semantic
+recall is what they are for. The cost of the API path is a **second secret** (`supermemoryApiKey`) that a
+scheduled routine has to carry alongside the Neon string, which is why it is scoped to what genuinely needs it
+rather than becoming the default.
 
 ## Incremental crawling — the `crawl_state` cursor
 Neon `crawl_state` holds a row per `(user_id, consumer, source, is_eval)`; yours is **`consumer='brain'`**, scoped to your tenant. Dedup **and** credit control: only ever read content **newer** than the cursor, then advance it — never re-read a window twice. The `consumer` column keeps your cursors independent of `refresh-backlog`'s (`consumer='backlog'`) on the same source; `is_eval=true` isolates eval runs.

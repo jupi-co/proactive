@@ -50,7 +50,9 @@ close the run record saying so and stop.
   "jupiUserId": "<id>",
   "neonConnString": "<conn>",
   "rulesStoreRef": "<id/path that opens the rules store>",
+  "supermemoryApiKey": "<key, or omit entirely if voice profiles are off>",
   "crawlWindowDays": <n>, "backlogWindowSize": <n>, "ruleThreshold": <n>,
+  "frontierMaxPending": <n>,
   "scoring": <the scoring block, verbatim from config.local.json>,
   "guardrails": <the guardrails block, verbatim from config.local.json>
 }
@@ -94,6 +96,13 @@ updating the first — the reconcile matched nothing, so it created.
 
 ## Rotation
 
-`neonConnString` is the one secret in a prompt and the one rotation point. Rotating it
-means **re-running setup**, which updates both routines in place. It is never a hand-edit
-of two task definitions, and the string must not be pasted anywhere else.
+`neonConnString` is the main secret in a prompt, and `supermemoryApiKey` is a second one
+**when voice profiles are enabled** (blank otherwise — see config.template.json). Rotating
+either means **re-running setup**, which updates both routines in place. Never a hand-edit
+of two task definitions, and neither value gets pasted anywhere else.
+
+Two secrets in a prompt is worse than one, and that cost is the reason the HTTP-API path is
+scoped to the single case the Supermemory connector cannot serve rather than becoming the
+default write path. If an install doesn't want voice profiles, leaving the key blank keeps
+the prompt back to one secret; `act-or-decide` then re-reads the sent history each run,
+which works and simply costs more.

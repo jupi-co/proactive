@@ -74,9 +74,9 @@ Two layers, matching `evals/refresh-backlog/`.
       pushes nothing and says what it would have. The ordering is the point: bookkeeping that delays the
       user's drafts is bookkeeping that gets cut.
 
-  25. **Voice record read from Neon, not `recall`** — staleness is judged from `age_days` on the
-      `voice_observations` row. Judging it from a recalled Fact is the failure: the store strips the date,
-      which is why the record exists at all.
+  25. **Voice record is an exact keyed read, not a ranked one** — staleness is judged from `age_days` off
+      `memory.mjs get-voice` (Supermemory's HTTP API, `customId`-keyed). Judging it from a connector `recall`
+      is the failure: content-borne dates are stripped and a correction can rank below the original.
   26. **An unverified record is not imitated blindly** — `verified: false` means a run reported it and nobody
       checked it. Distinctive traits (language, sign-off) get sanity-checked against the thread being replied
       to. A real eval hand-over had both wrong.

@@ -92,9 +92,14 @@ Verbs you use: `query-window [K]` · `insert-action '<json>'` · `set-action-sta
 (you write this after the worker runs the row) · `set-task-status <id> <status>` · `set-task-gating <task_id>
 '<uuid[] json>'` · `list-actions status ready` (your own queue + the orphan-sweep — §Stage 0) ·
 `push-frontier '<json>'` (queue what you couldn't resolve — §What your searches leave behind; refuses at
-the cap) · `get-voice <person> <channel>` (the dated register record — §Messaging) ·
-`list-dropped [days]` (what you've already ruled nothing-to-do — §Negative memory) ·
+the cap) · `list-dropped [days]` (what you've already ruled nothing-to-do — §Negative memory) ·
 `decision-url - "<title>" <id>` (the decision permalink — §Decision links).
+
+One read goes through a **second** helper — the voice record, which lives in Supermemory over its HTTP API
+rather than the connector (§Messaging says why):
+```
+node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>
+```
 
 ---
 
@@ -181,7 +186,7 @@ run it after the dig and you've already paid for everything it was meant to save
    *(A **do-nothing** rule is the one whose match produces no action — you already applied it at the top of
    this stage, before spending the research this step is part of.)*
 4. **Before any message draft**, get the voice — **from the record first, from the tools only if it isn't
-   there.** `get-voice <person> <channel>` (Neon, not `recall` — §Messaging says why). It returns the
+   there.** `memory.mjs get-voice <person> <channel>` (the keyed read, not `recall` — §Messaging says why). It returns the
    register with `observed_at`, `age_days` and `verified`. Usable record → **use it and skip the history
    pull.** No record, or one you shouldn't lean on → pull the **≥10 most recent messages you sent that
    person in that same channel** (Gmail sent/thread for email, Linear comments for Linear…), and **note for
@@ -548,15 +553,20 @@ they're written in (greeting, sign-off, tone, FR/EN, length) — never a generic
 shortest message that does the job.
 
 **Where the register comes from, in order (Stage 3.4):**
-1. **The voice record** — `get-voice <person> <channel>`. **Read it from Neon, not from `recall`.** The brain
-   holds the register as prose for semantic lookup, but it cannot hold the *date*: Supermemory's extraction
-   strips temporal qualifiers from the top-ranked memory a caller reads, wherever in the sentence they sit
-   (measured, four runs). A register you can't date is one you can't tell is two years stale — and you draft
-   in the user's name from it. So the dated record lives where it comes back as written.
+1. **The voice record** — `node "${CLAUDE_PLUGIN_ROOT}/shared/memory.mjs" get-voice <person> <channel>`.
+   **An exact keyed read, not a `recall`.** It's the same Supermemory store, reached over the HTTP API so the
+   qualifiers come back as written: `recall` is ranked and approximate (a re-saved correction was measured
+   ranking *below* the flattened original), and content-borne dates get stripped by the extraction layer
+   wherever in the sentence they sit. A register you can't date is one you can't tell is two years stale — and
+   you draft in the user's name from it.
    - **`verified: false` means nobody checked it against the source** — it was reported by a run like yours
      and taken on trust. Use it, but sanity-check it against the thread you're replying into before you
      imitate anything distinctive (language, sign-off). An eval found exactly this kind of hand-over wrong on
      both.
+   - **No `supermemoryApiKey` in config → this path is simply off**, and `get-voice` says so rather than
+     failing the run. Fall straight to (2) every time, and note once in the report that voice profiles aren't
+     enabled so the reader knows why the same history keeps being pulled. Degrading to "correct but more
+     expensive" is right here; a run that dies because an optional store isn't configured is not.
    - **`age_days` beyond a few months** → a starting point, not gospel. Register shifts as a relationship
      changes; a profile from before a deal closed can read wrong now.
 2. **The ≥10 recent messages you sent them in that channel** — pull them when (1) gives you nothing usable,
