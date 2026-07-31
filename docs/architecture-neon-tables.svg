@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="526" viewBox="0 0 680 526" role="img">
+<title>The five Neon tables and how the routines use them</title>
+<desc>Neon holds five tables: tasks and actions (act-and-decide only); crawl_state, crawl_frontier and routine_runs (used by both routines). On the act-and-decide side, refresh-backlog writes tasks, act-or-decide reads N tasks and writes actions. On the refresh-brain side, update-brain reads crawl_state as its cursor and drains crawl_frontier, then writes Facts to Supermemory.</desc>
+<style>
+  .th{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-weight:500;font-size:14px;fill:#2C2C2A}
+  .ts{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-weight:400;font-size:12px;fill:#5F5E5A}
+  .teal{fill:#E1F5EE;stroke:#0F6E56}
+  .purple{fill:#EEEDFE;stroke:#534AB7}
+  .box{fill:#FFFFFF;stroke:#B4B2A9}
+  .pill{fill:#FFFFFF;stroke:#888780}
+  .tab{fill:#FFFFFF;stroke:#888780}
+  .arr{stroke:#5F5E5A;stroke-width:1.5;fill:none}
+  .darr{stroke:#888780;stroke-width:1.5;fill:none;stroke-dasharray:4 3}
+  .dash{fill:none;stroke:#888780;stroke-width:1;stroke-dasharray:6 4}
+  .bg{fill:#FCFCFA;stroke:#E7E5DE}
+</style>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect class="bg" x="1" y="1" width="678" height="524" rx="16"/>
+
+<rect class="box" x="200" y="58" width="282" height="412" rx="16"/>
+<text class="th" x="216" y="80" dominant-baseline="central">Neon backlog store · Postgres</text>
+
+<rect class="teal" x="216" y="102" width="250" height="54" rx="8" stroke-width="0.5"/>
+<text class="th" x="232" y="121" dominant-baseline="central">tasks</text>
+<text class="ts" x="232" y="138" dominant-baseline="central">the backlog</text>
+
+<rect class="teal" x="216" y="166" width="250" height="54" rx="8" stroke-width="0.5"/>
+<text class="th" x="232" y="185" dominant-baseline="central">actions</text>
+<text class="ts" x="232" y="202" dominant-baseline="central">execution units</text>
+
+<rect class="teal" x="216" y="230" width="250" height="54" rx="8" stroke-width="0.5"/>
+<text class="th" x="232" y="249" dominant-baseline="central">crawl_state</text>
+<text class="ts" x="232" y="266" dominant-baseline="central">crawl cursors</text>
+
+<rect class="teal" x="216" y="294" width="250" height="54" rx="8" stroke-width="0.5"/>
+<text class="th" x="232" y="313" dominant-baseline="central">crawl_frontier</text>
+<text class="ts" x="232" y="330" dominant-baseline="central">look-up queue</text>
+
+<rect class="teal" x="216" y="358" width="250" height="54" rx="8" stroke-width="0.5"/>
+<text class="th" x="232" y="377" dominant-baseline="central">routine_runs</text>
+<text class="ts" x="232" y="394" dominant-baseline="central">run records</text>
+
+<rect class="pill" x="362" y="120" width="46" height="18" rx="9"/>
+<text class="ts" x="385" y="129" text-anchor="middle" dominant-baseline="central">A&amp;D</text>
+<rect class="pill" x="362" y="184" width="46" height="18" rx="9"/>
+<text class="ts" x="385" y="193" text-anchor="middle" dominant-baseline="central">A&amp;D</text>
+<rect class="pill" x="362" y="248" width="46" height="18" rx="9"/>
+<text class="ts" x="385" y="257" text-anchor="middle" dominant-baseline="central">A&amp;D</text>
+<rect class="pill" x="414" y="248" width="52" height="18" rx="9"/>
+<text class="ts" x="440" y="257" text-anchor="middle" dominant-baseline="central">brain</text>
+<rect class="pill" x="362" y="312" width="46" height="18" rx="9"/>
+<text class="ts" x="385" y="321" text-anchor="middle" dominant-baseline="central">A&amp;D</text>
+<rect class="pill" x="414" y="312" width="52" height="18" rx="9"/>
+<text class="ts" x="440" y="321" text-anchor="middle" dominant-baseline="central">brain</text>
+<rect class="pill" x="362" y="376" width="46" height="18" rx="9"/>
+<text class="ts" x="385" y="385" text-anchor="middle" dominant-baseline="central">A&amp;D</text>
+<rect class="pill" x="414" y="376" width="52" height="18" rx="9"/>
+<text class="ts" x="440" y="385" text-anchor="middle" dominant-baseline="central">brain</text>
+
+<rect class="purple" x="36" y="92" width="150" height="50" rx="8" stroke-width="0.5"/>
+<text class="th" x="111" y="109" text-anchor="middle" dominant-baseline="central">refresh-backlog</text>
+<text class="ts" x="111" y="126" text-anchor="middle" dominant-baseline="central">parse + score</text>
+
+<rect class="purple" x="36" y="214" width="150" height="50" rx="8" stroke-width="0.5"/>
+<text class="th" x="111" y="231" text-anchor="middle" dominant-baseline="central">act-or-decide</text>
+<text class="ts" x="111" y="248" text-anchor="middle" dominant-baseline="central">cluster · gate</text>
+
+<path d="M186 118 L213 127" class="arr" marker-end="url(#arrow)"/>
+<path d="M216 142 L189 236" class="darr" marker-end="url(#arrow)"/>
+<path d="M186 220 L213 201" class="arr" marker-end="url(#arrow)"/>
+
+<rect class="dash" x="508" y="206" width="168" height="110" rx="14"/>
+<rect class="tab" x="508" y="200" width="132" height="22" rx="6"/>
+<text class="th" x="574" y="211" text-anchor="middle" dominant-baseline="central">refresh-brain</text>
+
+<path d="M466 257 L520 257" class="darr" marker-end="url(#arrow)"/>
+<path d="M466 321 L498 321 L498 283 L520 283" class="darr" marker-end="url(#arrow)"/>
+<line x1="592" y1="288" x2="592" y2="370" class="arr" marker-end="url(#arrow)"/>
+<text class="ts" x="476" y="249" dominant-baseline="central">cursor</text>
+<text class="ts" x="474" y="312" dominant-baseline="central">drain</text>
+<text class="ts" x="606" y="330" dominant-baseline="central">Facts</text>
+
+<rect class="purple" x="522" y="236" width="140" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="592" y="254" text-anchor="middle" dominant-baseline="central">update-brain</text>
+<text class="ts" x="592" y="271" text-anchor="middle" dominant-baseline="central">read-only crawl</text>
+
+<rect class="teal" x="522" y="372" width="140" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="592" y="390" text-anchor="middle" dominant-baseline="central">Supermemory</text>
+<text class="ts" x="592" y="407" text-anchor="middle" dominant-baseline="central">Facts (brain)</text>
+
+<rect class="teal" x="40" y="484" width="12" height="12" rx="3"/>
+<text class="ts" x="58" y="494">Neon table</text>
+<rect class="purple" x="146" y="484" width="12" height="12" rx="3"/>
+<text class="ts" x="164" y="494">skill</text>
+<text class="ts" x="210" y="494">solid → into a table = write · dashed = read</text>
+<text class="ts" x="40" y="516">A&amp;D = act-&amp;-decide routine · brain = refresh-brain routine</text>
+</svg>
