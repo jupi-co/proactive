@@ -6,6 +6,16 @@ Workspace + skills for the Proactive-Jupi engine.
 `Signals → scored Tasks (backlog) → act-or-decide → Actions / Decisions → execute (closing loop)`.
 The human is bothered **only for genuine decisions** (the confidence × risk gate). Everything confident-and-safe just happens.
 
+## Architecture
+
+Two scheduled routines (daily, cloud). **refresh-brain** crawls your tools into the Supermemory brain; **act-&-decide** works the backlog: parse + score signals into Neon, then either act (draft/send) or raise a decision in Jupi for you to finalize. Boxes say what each skill does; arrows carry the entity that flows.
+
+<p align="center"><img src="docs/architecture-flow.svg" alt="Proactive-Jupi run flow: signals through refresh-backlog, Neon, act-or-decide, and execute-action, with the decision fork through Jupi and the brain lane through Supermemory" width="460"></p>
+
+State lives in three stores — **Neon** (tasks + actions), **Jupi** (decisions + lifecycle), **Supermemory** (Facts). Neon holds five tables; here is who reads and writes each, and how the refresh-brain routine uses `crawl_state` (its cursor) and `crawl_frontier` (drained into Facts).
+
+<p align="center"><img src="docs/architecture-neon-tables.svg" alt="The five Neon tables — tasks, actions, crawl_state, crawl_frontier, routine_runs — tagged by routine, with the act-&-decide and refresh-brain read/write wiring" width="640"></p>
+
 ## Get started
 
 In the **Claude Desktop app**, every step below is under **Cowork → Customize → Plugins**.
