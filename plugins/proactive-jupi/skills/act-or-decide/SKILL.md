@@ -190,6 +190,17 @@ run it after the dig and you've already paid for everything it was meant to save
    This is the one search in the skill that is **pure repeated cost**: voice barely changes, the pull is ten
    messages every time, and until now every run threw the result away and paid again.
 
+4b. **Read what the other people have already said.** Step 3.4 pulls the messages
+*you sent* someone, to match their register — this step is its mirror, and it is
+not optional. For every person the cluster names, pull their recent **inbound**
+messages on the subject: Gmail `from:<them>` across the window, their Linear
+comments, their comments on the doc. You are looking for one thing — **a position
+they have already stated.** If someone proposed a solution, offered to take
+something on, or said plainly what they want, that offer **is an option**: author
+it as one, quote them in it, and say it came from them. A decision about how to
+resolve something *with* a person, built without reading what that person already
+said about it, is not a decision — it is a guess with options attached.
+
 5. **Note what you couldn't resolve, and what you tripped over** — the gaps and stray discoveries that make
    the four steps above worth keeping (§What your searches leave behind). **Collect them here; Stage 6
    writes them.**
@@ -244,6 +255,18 @@ the gate (§The gate) per action to get its ACT/DECIDE verdict. **Nothing is wri
     guarantee about a skill you don't control; if the table's *what it does* doesn't tell you, treat it as
     high. This is what keeps §Draft mode's promise (no external side-effect before a decision is settled)
     true for borrowed capability.
+- **Resolve the call before you write the verb.** An action's `tool` names a
+  surface; the verb inside its `instruction` names a *call* on that surface.
+  Before writing either, name the exact call you would make and confirm it
+  exists — check `assets.md`'s **Draft call** column, then the connector's live
+  tool list. If the surface has no call for the verb you want, you do not get to
+  write that verb: author the action with the call that *does* exist, and state
+  the remaining human step in the option text ("Jupi will prepare the email —
+  you send it"). Never author `send` on a draft-only surface, `comment` on a
+  read-only one, or any verb you have not resolved to a real call. An
+  instruction naming an impossible operation is worse than no action at all: it
+  reads as prepared work, and it fails at execution — after the user has settled
+  the decision on the strength of it.
 - For an **ACT** action, prepare its `insert-action` payload (`decision_id` null, `exposure` tagged; **`rule_ref`
   set** if a business rule pre-empted the question, Stage 3.3). Apply the **draft-mode transform** (§Draft mode)
   — in `draft` the verb is the draft form (`create draft email…`).
