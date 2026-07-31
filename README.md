@@ -36,6 +36,8 @@ https://github.com/jupi-co/proactive.git
 
 Setup front-loads everything human-gated into an attended prelude — config keys, OAuth consents, questions about your stack and tools, and the Neon credential + egress probe — behind a `✋ needs-you done` boundary. Steps after that boundary run unattended. Budget ~15 minutes and stay at the keyboard until you see it.
 
+> **Allowlist Neon's hosts first.** Proactive-Jupi reaches Neon over HTTPS, and databases live on per-project `*.aws.neon.tech` hosts. If your environment restricts network egress, allow **`*.aws.neon.tech`** (and **`*.neon.tech`**) under **Admin settings → Capabilities → network access** before running setup, so the egress probe clears on the first try.
+
 **Testing an unreleased build? (Developer mode)** 
 - Clone the repo
 - Ask an AI agent to package the plugin, or run `bash scripts/package-plugin.sh`
