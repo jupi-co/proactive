@@ -84,11 +84,22 @@ Two layers, matching `evals/refresh-backlog/`.
   27. **Frontier full at push time** — a capped push is reported in the footer with its counts, never retried
       and never silently dropped; the rest of the run completes. A refusal nobody sees is worse than the
       unbounded queue it replaced.
+  28. **Inbound positions become options (Stage 3.4b)** — Stage 3 reads the *counterparty's* inbound messages,
+      not only the user's sent history, and a resolution the other person already stated (Nick's offer to
+      reschedule the clashing meeting) becomes one of the decision's options, quoted and attributed to him.
+      Fails if every option only moves the user's own calendar and the already-offered fix never appears — a
+      decision built without reading what the one person who could authorise the cheapest fix already said.
+  29. **Resolve the call before the verb (Stage 4)** — the verb inside an instruction resolves to a real call
+      on the surface *before* it's written, on both the ready-row and option-action paths: a Gmail action
+      names `create_draft` (a call that exists) and leaves the send to the user, never `Create AND SEND a
+      Gmail message` against a draft-only surface. Distinct from case 11 (ACT-vs-DECIDE routing); here the
+      failure is an instruction naming an impossible call — it reads as prepared work and fails at execution
+      after the user has settled the decision on it.
 
-**Isolation.** Cases 1–4 and 6–7 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no Jupi
-decisions, no tool calls). Cases 5 and 8 are real **`mode:draft`** runs over fixture tasks whose `signal_ref`
-is prefixed `eval:`; run `purge-scratch.sh` afterward to delete them (their `actions` cascade). **Never run a
-write case in `perform` mode.**
+**Isolation.** Cases 1–4, 6–7, and 28–29 run **`--dry-run`** → act-or-decide writes nothing (no Neon rows, no
+Jupi decisions, no tool calls), so they need no fixtures teardown. Cases 5 and 8 are real **`mode:draft`** runs
+over fixture tasks whose `signal_ref` is prefixed `eval:`; run `purge-scratch.sh` afterward to delete them
+(their `actions` cascade). **Never run a write case in `perform` mode.**
 
 **Cases 21–24 fixtures + teardown.** 21 needs a do-nothing rule seeded in the `rules` store (index entry +
 rule text). 22 needs ≥ `ruleThreshold` (2) `dropped` eval tasks of one shape with a recent `closed_at`, plus

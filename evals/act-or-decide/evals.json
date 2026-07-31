@@ -333,6 +333,32 @@
         "The report says what was not queued, specifically, not just that something was dropped",
         "The rest of the run (acts, decisions, statuses) completes normally — a full frontier degrades, never fails"
       ]
+    },
+    {
+      "id": 28,
+      "prompt": "INBOUND POSITIONS BECOME OPTIONS (Stage 3.4b). Draft mode, --dry-run. A calendar-clash task: two meetings collide at 15:00 and the open question is how to resolve it. In the thread, the counterparty (Nick) has already written an INBOUND message — `on peut se split ? ou sinon je le reschedule np` — offering to reschedule his own meeting. The user's own sent history to Nick is available too. Run act-or-decide.",
+      "expected_output": "Stage 3 reads Nick's INBOUND messages on the subject (the mirror of 3.4's sent-history pull), not only the user's sent mail, and finds the position he already stated. His offer to reschedule becomes one of the options in the decision it would raise (shown in the dry-run Decisions block) — quoted and attributed to him ('Nick offered to reschedule his meeting: …') — sitting alongside any option that moves the user's own calendar. FAIL if every option only asks the user to move their own side and Nick's already-offered resolution never appears: that is the exact failure the sub-step was added for — a decision built without reading what the one person who could authorise the cheapest fix already said, i.e. a guess with options attached.",
+      "files": [],
+      "expectations": [
+        "Stage 3 pulls the counterparty's inbound messages on the subject, not only the user's sent history",
+        "Nick's already-stated resolution (rescheduling his own meeting) appears as one of the decision's options",
+        "That option quotes him and attributes it to him, rather than presenting it as the user's own idea",
+        "The decision is not composed solely of ways for the user to move their own calendar",
+        "Nothing is written (dry-run)"
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "RESOLVE THE CALL BEFORE THE VERB (Stage 4). Draft mode, --dry-run. A window with (a) an internal-peer email reply that clears the gate as an ACT and (b) an external email that gates to a DECIDE. Gmail is the surface, and its only write calls are `create_draft`/`update_draft` — there is no single 'create-and-send' call. Run act-or-decide.",
+      "expected_output": "Both the ACT row's verb (a) and the DECIDE option-action's instruction (b) name a call the Gmail surface actually exposes — `create_draft` — and leave the send to the user in the human-readable text ('Jupi will prepare the email — you send it'). Neither instruction names an operation the surface has no call for. FAIL if any action or option-action reads 'Create AND SEND a Gmail message' (or a bare 'send') against this draft-only surface: an instruction naming an impossible call reads as prepared work and fails at execution — for (b), after the user has already settled the decision on the strength of it. This is distinct from case 11 (which tests ACT-vs-DECIDE routing on draftable vs non-draftable surfaces); here the guard is that the verb inside the instruction resolves to a real call before it is written, on both the ready-row and option-action paths.",
+      "files": [],
+      "expectations": [
+        "The ACT row (a) names create_draft as its verb — a call the Gmail surface actually exposes",
+        "The DECIDE option-action (b) also resolves to a real call (create_draft), not an unavailable 'create-and-send'",
+        "Neither instruction reads 'Create AND SEND a Gmail message' or a bare 'send' against the draft-only surface",
+        "The remaining human step (sending) is stated in the action/option text, not silently assumed",
+        "Nothing is written (dry-run)"
+      ]
     }
   ]
 }
