@@ -93,6 +93,9 @@ read as "a careful run *can* do this", not "any run *will*".
 | 20 | Run observability — ok / stalled / degraded / no-row-at-all are four distinguishable states, and the next run says so |
 | 21 | The setup report — approval mode last and plain, the draft-mode ratio warned about, local skills named as unreachable |
 | 22 | Cadence — anchored to the real ritual, converted to UTC, day-of-week shifted when it crosses midnight |
+| 23 | No Neon account — ask before demanding a string, walk the signup, dedicated project; never a prerequisites checklist |
+| 24 | No Supermemory account — three-state first, then connector via OAuth (no key), no container-tag question, re-probe |
+| 25 | Both accounts missing and declined — one batched ask; the decline is answered, not accepted, and the run pauses incomplete |
 
 Cases 14–18 come from the 2026-07-28 edit spec (the first full run on a real workspace); 19–22 from
 the 29 July install (rationale in IMPLEMENTATION-PLAN §12; the prompt rule in the
@@ -106,6 +109,13 @@ verbatim from the create/update calls rather than from the report, which paraphr
 Neon project and nothing else**: it drives `db.mjs run-open` / `run-close` / `run-last` directly, so it is
 cheap and worth running on every change to the routine boot sequence.
 
+Cases 23–25 cover the no-account handling (a user with no Neon or Supermemory account yet): setup establishes
+the account exists before asking for anything it issues, walks the signup (`reference/account-setup.md`), and
+batches both asks into one trip. **All three stores are required, not optional** — so a declined or unfinished
+signup pauses the run as **incomplete** (the outstanding signup named, a re-run resuming from there) rather
+than being carried past with a ⚠️; only Jupi *hard-stops* the prelude, but Neon and Supermemory are just as
+required to finish. All three run **prelude-only** against a fresh scratch workspace; none reaches steps 5–8.
+
 ## Prerequisites
 
 The prelude probes real services, so a run needs the same access a real setup does:
@@ -118,6 +128,23 @@ The prelude probes real services, so a run needs the same access a real setup do
   hands the string to a real `SELECT 1` and case 10 applies the schema over it.
 - Plus the shared fresh-worktree prerequisites in [`evals/README.md`](../README.md) — a new worktree has
   neither `config.local.json` nor `shared/node_modules`, and neither absence is an auth failure.
+
+**Cases 14–16 test the *absence* of an account, so don't provision one for them.** Nobody actually signs up
+mid-eval — the persona simulates it, and the point is what the agent does on the way there:
+
+- **Case 14** starts from an empty config. When the agent asks for the connection string, hand it the same
+  scratch Neon string case 9 uses; that paste *stands in for* a completed signup, so the `SELECT 1` still
+  proves the validation half of the behavior. Everything before that paste is the actual subject.
+- **Case 15** needs a session where the Supermemory MCP genuinely doesn't resolve — and **you must inject that
+  fault explicitly, as ground truth that overrides observation**. Do not just assert it in passing: a run that
+  probes and finds Supermemory live will believe the probe over your note (correctly — "probe, don't assume" is
+  the rule), report "already connected", and never reach the account path, voiding the case while looking like
+  a clean pass. Observed: two arms void this way before the fault was stated as overriding. The persona says
+  they've added the connector, but nothing was added, so **the re-probe will fail
+  and that is the expected shape**: what's graded is that the agent re-probed rather than believing the claim,
+  and then reported the gap instead of writing a `brain` row for a connector that isn't there.
+- **Case 16** grades a refusal, so the run should end with two ⚠️ gaps and a completed interview. A run that
+  keeps circling back to the signups, or halts on them, has failed even if everything it says is polite.
 
 ## Teardown
 
